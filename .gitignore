@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- SeqSFG ---
+# Participant data: never committed (consent, codes, per-trial responses, provenance).
+data/
+# Generated stimuli and analysis output: rebuild with `seqsfg demo` / `seqsfg analyze`.
+demo/*.wav
+*.wav

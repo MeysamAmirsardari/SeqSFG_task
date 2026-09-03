@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seqsfg"
+version = "0.1.0"
+description = "Temporally sheared stochastic figure-ground: stimulus, verification battery, runner, analysis"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "sounddevice>=0.4",
+    "soundfile>=0.12",
+]
+
+[project.scripts]
+seqsfg = "seqsfg.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["seqsfg*"]
