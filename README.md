@@ -1,5 +1,14 @@
 # SeqSFG: does an auditory figure survive being sheared in time?
 
+[![Open the playground in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_playground.ipynb)
+
+**Start here if you are skeptical.** `notebooks/SeqSFG_playground.ipynb` is a runnable
+playground written to be attacked: it lets you hear the figure, take the 2IFC task yourself,
+listen to each interval reduced to *only* its long-term spectrum and *only* its amplitude
+envelope (the two cues that would break the design, if either were the cue), re-run the
+62-feature permutation test on a fresh random draw, and **plant a confound on purpose and
+watch the verification battery catch it**. No installation: it clones this repository and runs.
+
 A two-interval forced-choice experiment on the stochastic figure-ground stimulus in which
 the figure's components are pulled apart in onset time. The independent variable is
 `step`, the onset delay between successive components of one figure element. At
@@ -556,6 +565,7 @@ seqsfg/runner.py     the experiment
 seqsfg/analysis.py   statistics; seqsfg/figures.py  result plots
 seqsfg/plots.py      diagnostic figures: rasters, matching, observers, design checks
 seqsfg/cli.py        seqsfg config | verify | plots | demo | calibrate | run | analyze | participants
+notebooks/           SeqSFG_playground.ipynb: the Colab playground (audio, self-test, live tests)
 tests/               50 tests: validator refusals, stimulus invariants, two-ladder balance and ordering,
                      practice stages, resume, analysis gates, and positive controls that the permutation
                      test catches a planted difference and the curve comparison catches a planted
