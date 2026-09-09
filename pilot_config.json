@@ -7,33 +7,34 @@
  "min_beat_rate_hz": 40.0,
  "tone_dur_ms": 60.0,
  "ramp_ms": 10.0,
- "tone_amplitude": 0.03,
- "tones_per_channel": 21,
- "interval_dur_ms": 3000.0,
+ "tone_amplitude": 0.028,
+ "tones_per_channel": 22,
+ "interval_dur_ms": 3400.0,
  "n_components": 7,
  "figure_repeats": 1,
  "figure_min_spacing_channels": 2,
  "figure_anchor_seed": 20260909,
  "steps_ms": [
   0.0,
-  8.0,
-  16.0,
-  24.0,
-  32.0,
-  40.0
+  5.0,
+  9.0,
+  14.0,
+  18.0,
+  23.0
  ],
  "main_variants": [
   "rising",
   "ungrouped"
  ],
  "n_elements": 6,
- "iei_min_ms": 300.0,
- "iei_max_ms": 450.0,
- "lead_min_ms": 150.0,
- "lead_max_ms": 250.0,
- "tail_min_ms": 100.0,
- "max_shared_consecutive": 1,
- "max_shared_any": 2,
+ "iei_min_ms": 200.0,
+ "iei_max_ms": 333.0,
+ "lead_min_ms": 500.0,
+ "lead_max_ms": 900.0,
+ "tail_min_ms": 500.0,
+ "foil_subpool_size": 12,
+ "max_shared_consecutive": 5,
+ "max_shared_any": 5,
  "isi_ms": 400.0,
  "lead_silence_ms": 50.0,
  "trials_per_condition": 10,
@@ -58,11 +59,11 @@
  "control_cells": [
   [
    "scrambled",
-   24.0
+   14.0
   ],
   [
    "redrawn",
-   24.0
+   14.0
   ],
   [
    "onechannel",

@@ -78,3 +78,58 @@ def test_pilot_config_validates_and_is_audible():
     assert cfg.tone_dur_ms >= 50.0, "the pilot config exists because 30 ms tones were inaudible"
     assert d.est_session_minutes <= cfg.max_session_minutes
     assert d.peak_bound < 0.99
+
+
+# ---- the foil subpool, which is what restored the speech rate ----
+def test_foil_subpool_concentrates_the_foil_channels():
+    """A restricted subpool makes the foil's channels recur nearly as often as the target's,
+    which is what removes the single-channel periodicity residual."""
+    import numpy as np
+    from seqsfg.stimulus import make_trial
+    wide = DEFAULT.replace(foil_subpool_size=None)
+    tight = DEFAULT.replace(foil_subpool_size=12, max_shared_any=5, max_shared_consecutive=5)
+    reuse = {}
+    for label, cfg in (("wide", wide), ("tight", tight)):
+        d = validate(cfg)
+        tr = make_trial(cfg, 11, 10.0, "rising", d=d)
+        uses = np.bincount(np.concatenate(list(tr.other.element_sets)), minlength=d.n_channels)
+        reuse[label] = uses[uses > 0].mean()
+    assert reuse["tight"] > reuse["wide"] * 1.5
+    assert len(np.unique(np.concatenate(list(
+        make_trial(tight, 11, 10.0, "rising", d=validate(tight)).other.element_sets)))) <= 12
+
+
+def test_foil_still_redraws_within_the_subpool():
+    """Concentrating the foil must not make it recur, or the manipulation disappears."""
+    from seqsfg.stimulus import make_trial
+    cfg = DEFAULT.replace(foil_subpool_size=12, max_shared_any=5, max_shared_consecutive=5)
+    d = validate(cfg)
+    tr = make_trial(cfg, 5, 10.0, "rising", d=d)
+    sets = [tuple(s.tolist()) for s in tr.other.element_sets]
+    assert len(set(sets)) >= cfg.n_elements - 1, "the foil must land on a different set each element"
+
+
+@pytest.mark.parametrize("Q,shared,needle", [
+    (7, 5, "must exceed n_components"),
+    (20, 5, "exceeds the"),
+    (10, 2, "share at least"),
+])
+def test_validator_refuses_impossible_subpools(Q, shared, needle):
+    from seqsfg.config import ConfigError
+    with pytest.raises(ConfigError) as e:
+        validate(DEFAULT.replace(foil_subpool_size=Q, max_shared_any=shared,
+                                 max_shared_consecutive=shared))
+    assert needle in str(e.value)
+
+
+def test_pilot_config_is_at_speech_rate():
+    """The rate must stay >= 3 Hz: the paradigm's whole rationale is comparability with speech."""
+    import json, pathlib
+    p = pathlib.Path(__file__).resolve().parent.parent / "pilot_config.json"
+    if not p.exists():
+        pytest.skip("pilot_config.json not present")
+    cfg = config.Config.from_dict(json.loads(p.read_text()))
+    validate(cfg)
+    assert 1000.0 / cfg.iei_max_ms >= 3.0, "element rate fell below 3 Hz"
+    assert 1000.0 / cfg.iei_min_ms <= 5.0
+    assert cfg.foil_subpool_size is not None, "the subpool is what makes 3-5 Hz affordable"

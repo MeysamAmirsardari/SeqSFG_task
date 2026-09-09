@@ -84,16 +84,31 @@ def sample_figure_set(rng: np.random.Generator, n_channels: int, n: int, spacing
     return y + np.arange(n) * (spacing - 1)
 
 
+def sample_spaced_subpool(rng: np.random.Generator, n_channels: int, size: int, spacing: int) -> np.ndarray:
+    """A subpool of `size` channels, itself spaced, so any subset of it satisfies the spacing rule."""
+    return sample_figure_set(rng, n_channels, size, spacing)
+
+
 def sample_redrawn_sets(rng: np.random.Generator, cfg: Config, n_channels: int, k: int,
                         max_tries: int = 20000) -> List[np.ndarray]:
-    """k channel sets with |S_k & S_{k-1}| <= max_shared_consecutive and |S_k & S_j| <= max_shared_any."""
+    """k channel sets with |S_k & S_{k-1}| <= max_shared_consecutive and |S_k & S_j| <= max_shared_any.
+
+    With cfg.foil_subpool_size set, all k sets are drawn from one restricted, already-spaced
+    subpool, so the foil's channels recur nearly as often as the target's and the single-channel
+    periodicity of the two intervals is matched.
+    """
+    subpool = (sample_spaced_subpool(rng, n_channels, cfg.foil_subpool_size, cfg.figure_min_spacing_channels)
+               if cfg.foil_subpool_size is not None else None)
     sets: List[np.ndarray] = []
     tries = 0
     while len(sets) < k:
         tries += 1
         if tries > max_tries:
             raise PlacementError("could not draw redrawn channel sets under the sharing constraints")
-        cand = sample_figure_set(rng, n_channels, cfg.n_components, cfg.figure_min_spacing_channels)
+        if subpool is None:
+            cand = sample_figure_set(rng, n_channels, cfg.n_components, cfg.figure_min_spacing_channels)
+        else:
+            cand = np.sort(rng.choice(subpool, size=cfg.n_components, replace=False))
         ok = True
         for j, s in enumerate(sets):
             shared = np.intersect1d(cand, s).size

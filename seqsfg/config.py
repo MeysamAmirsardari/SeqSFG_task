@@ -79,6 +79,14 @@ class Config:
     lead_min_ms: float = 150.0           # first element onset, drawn uniformly
     lead_max_ms: float = 250.0
     tail_min_ms: float = 100.0           # guaranteed background after the last element ends
+    foil_subpool_size: Optional[int] = None
+    # None -> the foil draws its element channels from the WHOLE pool, so its channels are each
+    #         used ~K*N/P times while the target's are used K times. That asymmetry is the
+    #         single-channel periodicity residual.
+    # int  -> the foil draws from a restricted subpool of this many channels, so its channels
+    #         recur ~K*N/Q times and the periodicity of the two intervals is far closer. The
+    #         foil's figure still lands on a DIFFERENT set every element, so the manipulation
+    #         (does the set recur?) is preserved.
     max_shared_consecutive: int = 1      # redrawn sets: channels in common with the previous set
     max_shared_any: int = 2              # redrawn sets: channels in common with any earlier set
 
@@ -324,6 +332,25 @@ def validate(cfg: Config) -> Derived:
         errs.append(f"schedule does not fit: lead_max + (K-1)*iei_max + widest span + tail = "
                     f"{d.schedule_max_ms:.0f} ms > interval_dur_ms={T:.0f}. Raise interval_dur_ms to >= "
                     f"{d.schedule_max_ms:.0f} (the jitter is never clipped by a rejection rule)")
+    if cfg.foil_subpool_size is not None:
+        Q = cfg.foil_subpool_size
+        n_spaced = (d.n_channels + cfg.figure_min_spacing_channels - 1) // cfg.figure_min_spacing_channels
+        if Q < N + 1:
+            errs.append(f"foil_subpool_size={Q} must exceed n_components={N}, or the foil cannot draw "
+                        f"a different set each element")
+        elif Q > n_spaced:
+            errs.append(f"foil_subpool_size={Q} exceeds the {n_spaced} channels available at "
+                        f"figure_min_spacing_channels={cfg.figure_min_spacing_channels}; lower it")
+        else:
+            # two N-subsets of a Q-subpool must share at least 2N-Q channels
+            forced = max(0, 2 * N - Q)
+            if cfg.max_shared_any < forced:
+                errs.append(f"with foil_subpool_size={Q} and n_components={N}, any two foil sets must "
+                            f"share at least {forced} channels; raise max_shared_any to >= {forced}")
+            if cfg.max_shared_consecutive < forced:
+                errs.append(f"with foil_subpool_size={Q} and n_components={N}, CONSECUTIVE foil sets must "
+                            f"also share at least {forced} channels; raise max_shared_consecutive to "
+                            f">= {forced} (it is currently {cfg.max_shared_consecutive})")
     if cfg.max_shared_consecutive > cfg.max_shared_any:
         errs.append("max_shared_consecutive must be <= max_shared_any")
     if cfg.max_shared_any < 0:
