@@ -353,7 +353,7 @@ class ConditionResult:
 def run_condition(cfg: Config, d: Derived, variant: str, step_ms: float, n_trials: int, seed: int,
                   ref: float, progress=None) -> ConditionResult:
     n_comp = 1 if variant == "onechannel" else cfg.n_components
-    span_ms = (n_comp - 1) * step_ms + cfg.tone_dur_ms
+    span_ms = (n_comp - 1) * step_ms + cfg.figure_repeats * cfg.tone_dur_ms
     res = ConditionResult(variant, step_ms, span_ms, [], [], [], [], [], [], [])
     for j in range(n_trials):
         tseed = int(np.random.default_rng([seed, zlib.crc32(variant.encode()) & 0xFFFF, int(step_ms * 1000), j]).integers(2 ** 31 - 1))

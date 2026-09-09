@@ -170,18 +170,25 @@ def build_recurring(rng: np.random.Generator, cfg: Config, d: Derived, step_ms: 
     P, N, K = d.n_channels, cfg.n_components, cfg.n_elements
     D = d.tone_dur_grid
     step = cfg.ms_to_grid(step_ms)
+    # An anchored figure sits on the SAME channels in every trial, so it can be learned.
+    set_rng = (np.random.default_rng([int(cfg.figure_anchor_seed), 0xF16])
+               if cfg.figure_anchor_seed is not None else rng)
     if variant == "onechannel":
         N = 1
-        S = np.array([int(rng.integers(P))])
+        S = np.array([int(set_rng.integers(P))])
         patterns = [np.zeros(1, dtype=int) for _ in range(K)]
     else:
-        S = sample_figure_set(rng, P, N, cfg.figure_min_spacing_channels)
+        S = sample_figure_set(set_rng, P, N, cfg.figure_min_spacing_channels)
         patterns = sample_patterns(rng, cfg, variant)
     t_el = sample_schedule(rng, cfg)
-    f_onset = np.array([t_el[k] + patterns[k][i] * step for k in range(K) for i in range(N)], dtype=int)
-    f_chan = np.array([S[i] for k in range(K) for i in range(N)], dtype=int)
-    f_elem = np.array([k for k in range(K) for i in range(N)], dtype=int)
-    f_comp = np.array([i for k in range(K) for i in range(N)], dtype=int)
+    R = cfg.figure_repeats
+    # Each component occupies R consecutive tone-slots, so the figure SUSTAINS for R*tone_dur
+    # rather than being a single pip. Repeats are back-to-back, never overlapping.
+    f_onset = np.array([t_el[k] + patterns[k][i] * step + r * D
+                        for k in range(K) for i in range(N) for r in range(R)], dtype=int)
+    f_chan = np.array([S[i] for k in range(K) for i in range(N) for r in range(R)], dtype=int)
+    f_elem = np.array([k for k in range(K) for i in range(N) for r in range(R)], dtype=int)
+    f_comp = np.array([i for k in range(K) for i in range(N) for r in range(R)], dtype=int)
     if f_onset.max() + D > cfg.n_grid:
         raise PlacementError("element runs past the end of the interval (validator should prevent this)")
     b_onset, b_chan = _fill_background(rng, cfg, d, f_onset, f_chan)

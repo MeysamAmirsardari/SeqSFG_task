@@ -11,7 +11,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass, field, fields
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 import numpy as np
 
@@ -60,7 +60,17 @@ class Config:
 
     # ---- figure --------------------------------------------------------------
     n_components: int = 7
+    figure_repeats: int = 1              # tone-slots each component occupies: the element's DURATION.
+                                         # 1 = a single pip (isolated blip); >1 = a sustained figure, as in
+                                         # the published stimulus where the figure spans consecutive chords.
     figure_min_spacing_channels: int = 2 # components of one element at least this many channels apart
+    figure_anchor_seed: Optional[int] = None
+    # None  -> the figure occupies FRESH channels on every trial (nothing can be learned across
+    #          trials; only the K repetitions inside one trial are available).
+    # int   -> the figure occupies the SAME channels on every trial, so a listener accumulates
+    #          K x n_trials exposures to one pattern. Required for any claim about implicit
+    #          learning. The foil interval still redraws its channels every element, so the
+    #          within-trial comparison is unchanged and the per-channel budget still matches.
     steps_ms: Tuple[float, ...] = (0.0, 5.0, 10.0, 15.0, 20.0, 28.0)
     main_variants: Tuple[str, ...] = ("rising", "ungrouped")   # one psychometric function each
     n_elements: int = 6
@@ -195,8 +205,9 @@ def derive(cfg: Config) -> Derived:
     freqs = _pool.make_pool(cfg.pool_low_hz, cfg.pool_high_hz, cfg.pool_spacing_erb)
     P = len(freqs)
     N, D, T, M, K = cfg.n_components, cfg.tone_dur_ms, cfg.interval_dur_ms, cfg.tones_per_channel, cfg.n_elements
-    spans = tuple((N - 1) * s + D for s in cfg.steps_ms)
-    control_spans = tuple((N - 1) * s + D for _, s in tuple(cfg.control_cells) + tuple(cfg.practice_cells))
+    R = cfg.figure_repeats
+    spans = tuple((N - 1) * s + R * D for s in cfg.steps_ms)
+    control_spans = tuple((N - 1) * s + R * D for _, s in tuple(cfg.control_cells) + tuple(cfg.practice_cells))
     max_span = max(spans + control_spans) if (spans or control_spans) else D
     sched_max = cfg.lead_max_ms + (K - 1) * cfg.iei_max_ms + max_span + cfg.tail_min_ms
     occ = M * D / T
@@ -207,10 +218,10 @@ def derive(cfg: Config) -> Derived:
     erb_low = _pool.erb_width_hz(freqs[0]) if P else float("nan")
     ladder = []
     for s in cfg.steps_ms:
-        overlap = max(0.0, 1.0 - s / D) if s > 0 else 1.0
-        max_simul = N if s == 0 else min(N, int(math.ceil(D / s)) if D % s else int(D // s))
+        overlap = max(0.0, 1.0 - s / (R * D)) if s > 0 else 1.0
+        max_simul = N if s == 0 else min(N, int(math.ceil(R * D / s)) if (R * D) % s else int(R * D // s))
         ladder.append(dict(step_ms=s, adjacent_overlap=overlap, max_simultaneous=max_simul,
-                           span_ms=(N - 1) * s + D, gap_ms=max(0.0, s - D)))
+                           span_ms=(N - 1) * s + R * D, gap_ms=max(0.0, s - R * D)))
     main_cells = tuple((v, float(s)) for v in cfg.main_variants for s in cfg.steps_ms)
     n_main = cfg.trials_per_condition * len(main_cells)
     n_prac = cfg.practice_n * len(cfg.practice_cells)
@@ -281,9 +292,14 @@ def validate(cfg: Config) -> Derived:
                     f"or reduce tones_per_channel")
 
     # background / budget
-    if M < 2 * K:
-        errs.append(f"tones_per_channel={M} < 2*n_elements={2 * K}: the recurring channels need {K} figure "
-                    f"tones and at least as many background tones to swap against; raise tones_per_channel")
+    if cfg.figure_anchor_seed is not None and not isinstance(cfg.figure_anchor_seed, int):
+        errs.append("figure_anchor_seed must be an int or None")
+    if cfg.figure_repeats < 1:
+        errs.append("figure_repeats must be >= 1")
+    if M < 2 * K * cfg.figure_repeats:
+        errs.append(f"tones_per_channel={M} < 2*n_elements*figure_repeats={2 * K * cfg.figure_repeats}: a recurring "
+                    f"channel spends {K * cfg.figure_repeats} tones on the figure and needs at least as many "
+                    f"background tones to swap against; raise tones_per_channel or lower figure_repeats")
     if d.occupancy_per_channel > 0.6:
         errs.append(f"per-channel occupancy {d.occupancy_per_channel:.2f} > 0.6: tones cannot be packed "
                     f"without overlap; reduce tones_per_channel or tone_dur_ms, or raise interval_dur_ms")
@@ -396,6 +412,9 @@ def describe(cfg: Config) -> str:
     for r in d.ladder:
         lines.append(f"   {r['step_ms']:6.1f}   {r['adjacent_overlap']:.2f}   {r['max_simultaneous']}   "
                      f"{r['span_ms']:.0f}   {r['gap_ms']:.0f}")
+    lines.append(f"figure anchoring     " + ("FIXED across trials (seed "
+                 f"{cfg.figure_anchor_seed}): learning is possible" if cfg.figure_anchor_seed is not None
+                 else "fresh every trial: cross-trial learning is IMPOSSIBLE"))
     lines.append(f"ladders              {len(cfg.main_variants)}: " +
                  ", ".join(f"{v} x {len(cfg.steps_ms)} steps x {cfg.trials_per_condition} trials"
                            for v in cfg.main_variants))
