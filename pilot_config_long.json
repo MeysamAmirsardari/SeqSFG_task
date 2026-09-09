@@ -1,0 +1,85 @@
+{
+ "sample_rate": 48000,
+ "grid_ms": 1.0,
+ "pool_low_hz": 250.0,
+ "pool_high_hz": 6000.0,
+ "pool_spacing_erb": 1.0,
+ "min_beat_rate_hz": 40.0,
+ "tone_dur_ms": 60.0,
+ "ramp_ms": 10.0,
+ "tone_amplitude": 0.027,
+ "tones_per_channel": 28,
+ "interval_dur_ms": 4000.0,
+ "n_components": 7,
+ "figure_repeats": 1,
+ "figure_min_spacing_channels": 2,
+ "figure_anchor_seed": 20260909,
+ "steps_ms": [
+  0.0,
+  11.0,
+  22.0,
+  34.0,
+  45.0,
+  56.0
+ ],
+ "main_variants": [
+  "rising",
+  "ungrouped"
+ ],
+ "n_elements": 6,
+ "iei_min_ms": 400.0,
+ "iei_max_ms": 600.0,
+ "lead_min_ms": 150.0,
+ "lead_max_ms": 250.0,
+ "tail_min_ms": 100.0,
+ "max_shared_consecutive": 1,
+ "max_shared_any": 2,
+ "isi_ms": 400.0,
+ "lead_silence_ms": 50.0,
+ "trials_per_condition": 8,
+ "max_condition_run": 2,
+ "max_variant_run": 4,
+ "practice_cells": [
+  [
+   "ungrouped",
+   0.0
+  ],
+  [
+   "rising",
+   0.0
+  ]
+ ],
+ "practice_n": 12,
+ "practice_criterion": 10,
+ "practice_max_rounds": 2,
+ "break_every": 40,
+ "feedback_main": true,
+ "feedback_control": true,
+ "control_cells": [
+  [
+   "scrambled",
+   34.0
+  ],
+  [
+   "redrawn",
+   34.0
+  ],
+  [
+   "onechannel",
+   0.0
+  ]
+ ],
+ "control_trials_per_cell": 8,
+ "max_session_minutes": 40.0,
+ "response_allowance_s": 1.2,
+ "feedback_s": 0.4,
+ "iti_s": 0.5,
+ "break_s": 45.0,
+ "setup_minutes": 5.0,
+ "tone_level_db_spl": 60.0,
+ "calibration_freq_hz": 1000.0,
+ "calibration_dur_s": 5.0,
+ "bootstrap_n": 1000,
+ "threshold_pc": 0.75,
+ "alpha": 0.05
+}

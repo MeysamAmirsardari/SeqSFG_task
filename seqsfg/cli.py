@@ -87,6 +87,24 @@ def cmd_plots(args):
     print("\n".join(str(p) for p in written))
 
 
+def cmd_train(args):
+    from .runner import Audio, QuitRequested, getkey
+    from .train import run_training
+    cfg = load_config(args)
+    validate(cfg)
+    audio = Audio(cfg.sample_rate, args.device, enabled=not args.no_audio)
+
+    def pause(msg):
+        print(msg)
+        getkey({" "})
+
+    try:
+        run_training(cfg, audio, per_level=args.per_level, criterion=args.criterion,
+                     getkey=getkey, pause=pause)
+    except (QuitRequested, KeyboardInterrupt):
+        print("\ntraining stopped. Nothing here is recorded, so just run it again when you want.")
+
+
 def cmd_calibrate(args):
     import math
     import numpy as np
@@ -158,6 +176,12 @@ def main(argv=None):
     q = sub.add_parser("plots", help="write the diagnostic figures (rasters, matching, observers)"); add_common(q)
     q.add_argument("--out", default="verification/figures"); q.add_argument("--trials", type=int, default=24)
     q.add_argument("--seed", type=int, default=2026); q.set_defaults(fn=cmd_plots)
+
+    q = sub.add_parser("train", help="progressive training: learn what the figure sounds like"); add_common(q)
+    q.add_argument("--device"); q.add_argument("--no-audio", action="store_true")
+    q.add_argument("--per-level", type=int, default=5, help="trials at each background level")
+    q.add_argument("--criterion", type=int, default=4, help="correct needed to move a level harder")
+    q.set_defaults(fn=cmd_train)
 
     q = sub.add_parser("calibrate", help="loop the reference tone for level calibration"); add_common(q)
     q.add_argument("--device"); q.set_defaults(fn=cmd_calibrate)
