@@ -2,6 +2,13 @@
 
 [![Open the playground in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_playground.ipynb)
 
+**Two runnable notebooks.** [`SeqSFG_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_playground.ipynb)
+is the skeptic's notebook (below). [`SeqSFG_strategy.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_strategy.ipynb)
+is the strategy notebook: the crossover hypothesis made quantitative, the ordered-versus-reshuffled
+contrast played aloud, a demonstration that the current design forbids the cross-trial learning the
+hypothesis needs, a **working rate-STDP model prototype**, a power analysis for the order x asynchrony
+interaction, and falsification conditions.
+
 **Start here if you are skeptical.** `notebooks/SeqSFG_playground.ipynb` is a runnable
 playground written to be attacked: it lets you hear the figure, take the 2IFC task yourself,
 listen to each interval reduced to *only* its long-term spectrum and *only* its amplitude
@@ -565,7 +572,8 @@ seqsfg/runner.py     the experiment
 seqsfg/analysis.py   statistics; seqsfg/figures.py  result plots
 seqsfg/plots.py      diagnostic figures: rasters, matching, observers, design checks
 seqsfg/cli.py        seqsfg config | verify | plots | demo | calibrate | run | analyze | participants
-notebooks/           SeqSFG_playground.ipynb: the Colab playground (audio, self-test, live tests)
+notebooks/           SeqSFG_playground.ipynb  the skeptic's playground (audio, self-test, live tests)
+                     SeqSFG_strategy.ipynb    where the project can go (model prototype, power, plan)
 tests/               50 tests: validator refusals, stimulus invariants, two-ladder balance and ordering,
                      practice stages, resume, analysis gates, and positive controls that the permutation
                      test catches a planted difference and the curve comparison catches a planted
