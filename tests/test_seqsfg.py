@@ -33,7 +33,7 @@ def test_default_config_validates():
     (dict(practice_cells=(("rising", 15.0),)), "not the easiest step"),
     (dict(max_variant_run=9), "max_variant_run > 6"),
     (dict(steps_ms=(10.0, 20.0)), "start at 0"),
-    (dict(tones_per_channel=8), "2*n_elements"),
+    (dict(tones_per_channel=8), "too small"),
     (dict(trials_per_condition=40), "estimated session"),
 ])
 def test_validator_refuses(kw, needle):
@@ -57,8 +57,12 @@ def test_trial_invariants(variant, step):
     inv = stimulus.check_invariants(cfg, tr, d)
     assert inv["same_n_tones"] and inv["same_channel_counts"] and inv["budget_exact"] and inv["no_same_channel_overlap"]
     n_comp = 1 if variant == "onechannel" else cfg.n_components
-    assert inv["figure_tones"] == cfg.n_elements * n_comp
+    assert inv["figure_tones"] == cfg.n_elements * n_comp * cfg.figure_repeats
     A = tr.recurring
+    if variant == "scattered":
+        # by construction its components are placed at random times, not at pattern*step
+        assert np.all(np.diff(A.figure_set) >= cfg.figure_min_spacing_channels)
+        return
     # element structure: component i of element k on S[i] at t_k + pattern[i]*step
     for k in range(cfg.n_elements):
         for i in range(n_comp):

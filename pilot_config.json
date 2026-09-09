@@ -9,7 +9,7 @@
  "ramp_ms": 10.0,
  "tone_amplitude": 0.028,
  "tones_per_channel": 22,
- "interval_dur_ms": 3400.0,
+ "interval_dur_ms": 3200.0,
  "n_components": 7,
  "figure_repeats": 1,
  "figure_min_spacing_channels": 2,
@@ -26,12 +26,12 @@
   "rising",
   "ungrouped"
  ],
- "n_elements": 6,
+ "n_elements": 7,
  "iei_min_ms": 200.0,
  "iei_max_ms": 333.0,
- "lead_min_ms": 500.0,
- "lead_max_ms": 900.0,
- "tail_min_ms": 500.0,
+ "lead_min_ms": 350.0,
+ "lead_max_ms": 600.0,
+ "tail_min_ms": 350.0,
  "foil_subpool_size": 12,
  "max_shared_consecutive": 5,
  "max_shared_any": 5,
@@ -58,7 +58,7 @@
  "feedback_control": true,
  "control_cells": [
   [
-   "scrambled",
+   "scattered",
    14.0
   ],
   [

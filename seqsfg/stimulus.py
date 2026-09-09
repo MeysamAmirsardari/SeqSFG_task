@@ -137,7 +137,7 @@ def sample_schedule(rng: np.random.Generator, cfg: Config) -> np.ndarray:
 def sample_patterns(rng: np.random.Generator, cfg: Config, variant: str) -> List[np.ndarray]:
     n, k = cfg.n_components, cfg.n_elements
     ident = np.arange(n)
-    if variant in ("rising", "ungrouped", "onechannel"):
+    if variant in ("rising", "ungrouped", "onechannel", "scattered"):
         return [ident.copy() for _ in range(k)]
     if variant == "scrambled":
         p = rng.permutation(n)
@@ -197,10 +197,24 @@ def build_recurring(rng: np.random.Generator, cfg: Config, d: Derived, step_ms: 
         patterns = sample_patterns(rng, cfg, variant)
     t_el = sample_schedule(rng, cfg)
     R = cfg.figure_repeats
-    # Each component occupies R consecutive tone-slots, so the figure SUSTAINS for R*tone_dur
-    # rather than being a single pip. Repeats are back-to-back, never overlapping.
-    f_onset = np.array([t_el[k] + patterns[k][i] * step + r * D
-                        for k in range(K) for i in range(N) for r in range(R)], dtype=int)
+    if variant == "scattered":
+        # Same channels, same recurrence, same element windows -- but the components are placed
+        # at random times inside the window so they never form a coherent onset. Recurrence
+        # without binding.
+        # Spread over one element-duration, so the components never coincide even at step 0
+        # where the 'rising' element is a chord. The span is then 2*R*D, which the validator
+        # budgets for (see scattered_span_ms in config.derive).
+        window = max(1, R * D)
+        # One offset per (element, component) -- the R repeats stay back to back, as in every
+        # other variant. Drawing per repeat would let a component collide with itself.
+        offs = {(k, i): int(rng.integers(0, window)) for k in range(K) for i in range(N)}
+        f_onset = np.array([t_el[k] + offs[(k, i)] + r * D
+                            for k in range(K) for i in range(N) for r in range(R)], dtype=int)
+    else:
+        # Each component occupies R consecutive tone-slots, so the figure SUSTAINS for R*tone_dur
+        # rather than being a single pip. Repeats are back-to-back, never overlapping.
+        f_onset = np.array([t_el[k] + patterns[k][i] * step + r * D
+                            for k in range(K) for i in range(N) for r in range(R)], dtype=int)
     f_chan = np.array([S[i] for k in range(K) for i in range(N) for r in range(R)], dtype=int)
     f_elem = np.array([k for k in range(K) for i in range(N) for r in range(R)], dtype=int)
     f_comp = np.array([i for k in range(K) for i in range(N) for r in range(R)], dtype=int)
@@ -278,7 +292,7 @@ def make_trial(cfg: Config, seed: int, step_ms: float, variant: str, max_rebuild
         try:
             A = build_recurring(rng, cfg, d, step_ms, variant)
             other = (build_ungrouped(rng, cfg, d, A) if variant in ("ungrouped", "onechannel")
-                     else build_redrawn(rng, cfg, d, A))
+                     else build_redrawn(rng, cfg, d, A))   # 'scattered' uses redrawn: same scatter, new channels
             return Trial(seed=seed, variant=variant, step_ms=step_ms, recurring=A, other=other, n_rebuilds=attempt)
         except PlacementError:
             continue

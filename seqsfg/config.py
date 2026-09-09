@@ -22,7 +22,7 @@ class ConfigError(ValueError):
     """Raised by :func:`validate` with a message that says what to change."""
 
 
-VARIANTS = ("rising", "scrambled", "redrawn", "ungrouped", "onechannel")
+VARIANTS = ("rising", "scrambled", "redrawn", "ungrouped", "onechannel", "scattered")
 # rising     : main task. Element = rising staircase of N components, step apart.
 #              Interval A recurs on one channel set; interval B redraws it each element.
 # scrambled  : same asynchronies, fixed random order of the delays (same order in both
@@ -35,6 +35,12 @@ VARIANTS = ("rising", "scrambled", "redrawn", "ungrouped", "onechannel")
 #              differs between intervals by construction; see README.
 # onechannel : ONE channel recurs at the element times (no grouping possible) against a
 #              plain background. Measures the single-channel periodicity cue on its own.
+# scattered  : the LOAD-BEARING control for a dense stream. The target's channels recur exactly
+#              as in 'rising', but each component is placed at a random time inside the element
+#              window, so the components never group. The foil redraws channels and is scattered
+#              the same way. The ONLY thing separating the intervals is channel recurrence, with
+#              binding removed. A listener above chance here is using single-channel periodicity
+#              rather than grouping, which bounds how much of the main result binding explains.
 
 
 @dataclass(frozen=True)
@@ -215,7 +221,10 @@ def derive(cfg: Config) -> Derived:
     N, D, T, M, K = cfg.n_components, cfg.tone_dur_ms, cfg.interval_dur_ms, cfg.tones_per_channel, cfg.n_elements
     R = cfg.figure_repeats
     spans = tuple((N - 1) * s + R * D for s in cfg.steps_ms)
-    control_spans = tuple((N - 1) * s + R * D for _, s in tuple(cfg.control_cells) + tuple(cfg.practice_cells))
+    # 'scattered' spreads its components over one element-duration instead of using the step,
+    # so its element is 2*R*D wide regardless of the step. Budget for that.
+    control_spans = tuple((2 * R * D if v == "scattered" else (N - 1) * s + R * D)
+                          for v, s in tuple(cfg.control_cells) + tuple(cfg.practice_cells))
     max_span = max(spans + control_spans) if (spans or control_spans) else D
     sched_max = cfg.lead_max_ms + (K - 1) * cfg.iei_max_ms + max_span + cfg.tail_min_ms
     occ = M * D / T
@@ -304,10 +313,12 @@ def validate(cfg: Config) -> Derived:
         errs.append("figure_anchor_seed must be an int or None")
     if cfg.figure_repeats < 1:
         errs.append("figure_repeats must be >= 1")
-    if M < 2 * K * cfg.figure_repeats:
-        errs.append(f"tones_per_channel={M} < 2*n_elements*figure_repeats={2 * K * cfg.figure_repeats}: a recurring "
-                    f"channel spends {K * cfg.figure_repeats} tones on the figure and needs at least as many "
-                    f"background tones to swap against; raise tones_per_channel or lower figure_repeats")
+    need = int(math.ceil(K * cfg.figure_repeats * 1.25)) + 2
+    if M < need:
+        errs.append(f"tones_per_channel={M} is too small: a recurring channel spends "
+                    f"{K * cfg.figure_repeats} tones on the figure and needs background left over to "
+                    f"place around them; raise tones_per_channel to >= {need} or lower "
+                    f"n_elements/figure_repeats")
     if d.occupancy_per_channel > 0.6:
         errs.append(f"per-channel occupancy {d.occupancy_per_channel:.2f} > 0.6: tones cannot be packed "
                     f"without overlap; reduce tones_per_channel or tone_dur_ms, or raise interval_dur_ms")
