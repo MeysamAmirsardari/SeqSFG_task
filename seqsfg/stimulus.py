@@ -183,6 +183,127 @@ def sample_foil_sets_dissimilar(rng: np.random.Generator, cfg: Config, universe:
     return sets
 
 
+def _pick_spaced(rng: np.random.Generator, cand: np.ndarray, n: int, spacing: int,
+                 avoid: Optional[np.ndarray] = None, tries: int = 200) -> Optional[np.ndarray]:
+    """n channels from `cand`, pairwise >= spacing apart, preferring ones outside `avoid`.
+
+    Sliding a band by one channel can leave its candidate list unchanged when the channels that
+    enter and leave both belong to the figure set, so two different windows can otherwise hand
+    back the same element. Preferring channels the previous element did not use makes the sets
+    differ whenever the window has any room to differ.
+    """
+    if cand.size < n:
+        return None
+    bad = np.isin(cand, avoid) if avoid is not None and len(avoid) else np.zeros(cand.size, bool)
+    key = bad.astype(float) + rng.uniform(0.0, 0.5, size=cand.size)
+    order = cand[np.argsort(key, kind="stable")]
+    if spacing <= 1:
+        return np.sort(order[:n])
+    for _ in range(tries):
+        out: List[int] = []
+        for c in order:
+            if all(abs(int(c) - x) >= spacing for x in out):
+                out.append(int(c))
+                if len(out) == n:
+                    return np.sort(np.array(out, dtype=int))
+        key = bad.astype(float) + rng.uniform(0.0, 0.5, size=cand.size)
+        order = cand[np.argsort(key, kind="stable")]
+    return None
+
+
+def _band_windows(cfg: Config, n_channels: int, band: int, forbidden: Optional[np.ndarray] = None,
+                  slack: int = 0):
+    """Every contiguous window of `band` channels that can still supply a whole element.
+
+    `slack` is how many spare channels a window must have beyond one element. A window with no
+    slack hands back the SAME element every time it is used, so reusing it produces an exact
+    repeat -- which is the one thing the foil must never do.
+
+    Returns (start, centre, candidate channels) per usable window.
+    """
+    bad = set(int(x) for x in forbidden) if forbidden is not None else set()
+    out = []
+    for w in range(0, n_channels - band + 1):
+        cand = np.array([c for c in range(w, w + band) if c not in bad], dtype=int)
+        if cand.size < cfg.n_components + slack:
+            continue
+        if _pick_spaced(np.random.default_rng(0), cand, cfg.n_components,
+                        cfg.figure_min_spacing_channels) is not None:
+            out.append((w, w + (band - 1) / 2.0, cand))
+    return out
+
+
+def sample_banded_figure_set(rng: np.random.Generator, cfg: Config, n_channels: int,
+                             band: int) -> np.ndarray:
+    """The target's channels, confined to one contiguous band of the pool.
+
+    Components scattered over the whole pool span nearly the whole spectrum -- at 7 of 30
+    channels, 4.7 octaves of a 5.6 octave pool -- so two figures on completely disjoint
+    channels still cover the same range and sound alike. What the ear compares across a
+    300 ms gap is register, and a set spread over five octaves has none. Confining an element
+    to a band gives it one, so elements can differ in PITCH and not merely in membership.
+    """
+    wins = _band_windows(cfg, n_channels, band)
+    if not wins:
+        raise PlacementError(f"no {band}-channel band can hold {cfg.n_components} components")
+    _, _, cand = wins[int(rng.integers(len(wins)))]
+    S = _pick_spaced(rng, cand, cfg.n_components, cfg.figure_min_spacing_channels)
+    if S is None:
+        raise PlacementError("could not lay out a banded figure set")
+    return S
+
+
+def sample_foil_sets_banded(rng: np.random.Generator, cfg: Config, n_channels: int,
+                            S: np.ndarray, k: int, band: int) -> List[np.ndarray]:
+    """k banded channel sets, none containing a channel of S, each in a different register.
+
+    Each element is placed in the band that is furthest in register from the target's band and
+    from the previous element's, subject to a minimum separation of half a band; among the
+    windows that clear that minimum the choice is uniform, so the foil moves around the
+    spectrum instead of cycling through two or three fixed registers.
+    """
+    # Two elements drawn from one window share at least 2*n - |window|, so a window needs
+    # n + (n - max_shared_any) spare channels before it can be reused without repeating.
+    slack = max(0, cfg.n_components - cfg.max_shared_any)
+    wins = _band_windows(cfg, n_channels, band, forbidden=S, slack=slack)
+    if not wins:
+        raise PlacementError(f"no {band}-channel band clear of the figure set can hold an element")
+    cS = float(np.mean(S))
+    need = band / 2.0
+    limit = min(cfg.max_shared_consecutive, max(1, cfg.n_components // 3))
+    sets: List[np.ndarray] = []
+    prev = None
+    for _ in range(k):
+        score = np.array([min(abs(c - cS), abs(c - prev) if prev is not None else np.inf)
+                          for _, c, _ in wins])
+        # Qualifying windows first, shuffled so the foil roams instead of cycling through two or
+        # three fixed registers; then the rest by register distance, as a fallback.
+        ok = np.flatnonzero(score >= need)
+        rest = np.flatnonzero(score < need)
+        order = list(rng.permutation(ok)) + list(rest[np.argsort(-score[rest], kind="stable")])
+        chosen = None
+        for tier in (limit, cfg.max_shared_consecutive):
+            for j in order:
+                g = _pick_spaced(rng, wins[j][2], cfg.n_components,
+                                 cfg.figure_min_spacing_channels,
+                                 avoid=sets[-1] if sets else None)
+                if g is None:
+                    continue
+                if sets and np.intersect1d(g, sets[-1]).size > tier:
+                    continue
+                if any(np.intersect1d(g, h).size > cfg.max_shared_any for h in sets[:-1]):
+                    continue
+                chosen = (g, wins[j][1])
+                break
+            if chosen is not None:
+                break
+        if chosen is None:
+            raise PlacementError("no banded foil element differs enough from its predecessor")
+        sets.append(chosen[0])
+        prev = chosen[1]
+    return sets
+
+
 def sample_schedule(rng: np.random.Generator, cfg: Config) -> np.ndarray:
     """Element onsets on the grid: lead ~ U[lead_min, lead_max], IEIs ~ U[iei_min, iei_max].
 
@@ -439,18 +560,23 @@ def make_matched_trial(cfg: Config, d: Derived, rng: np.random.Generator, seed: 
     P, N, K = d.n_channels, cfg.n_components, cfg.n_elements
     anchored = _anchored_for(cfg, seed)
     set_rng = np.random.default_rng([int(cfg.figure_anchor_seed), 0xF16]) if anchored else rng
+    band = cfg.figure_band_channels
     if variant == "onechannel":
         S = np.array([int(set_rng.integers(P))])
         patterns = [np.zeros(1, dtype=int) for _ in range(K)]
+    elif band:
+        S = sample_banded_figure_set(set_rng, cfg, P, band)
+        patterns = sample_patterns(rng, cfg, variant)
     else:
         S = sample_figure_set(set_rng, P, N, cfg.figure_min_spacing_channels)
         patterns = sample_patterns(rng, cfg, variant)
     U = cfg.foil_universe_size or (K * N)
     universe = sample_foil_universe(rng, cfg, P, S, U)
-    foil_sets = sample_foil_sets_dissimilar(rng, cfg, universe, K)
+    foil_sets = (sample_foil_sets_banded(rng, cfg, P, S, K, band) if band and variant != "onechannel"
+                 else sample_foil_sets_dissimilar(rng, cfg, universe, K))
     if variant == "onechannel":
         foil_sets = [g[:1].copy() for g in foil_sets]
-    active = np.sort(np.concatenate([S, universe]))
+    active = np.unique(np.concatenate([S, universe] + [np.asarray(g) for g in foil_sets]))
     t_el = sample_schedule(rng, cfg)
     A = build_matched("recurring", rng, cfg, d, step_ms, variant, t_el, S, foil_sets, patterns,
                       active, aligned="S")

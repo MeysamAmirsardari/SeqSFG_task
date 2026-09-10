@@ -177,7 +177,7 @@ def test_resume_refuses_when_design_changes(tmp_path):
     dz = design.make_design(cfg, "P01", 1)
     meta = {"config_hash": cfg.hash(), "design_hash": dz["design_hash"], "source_hash": session.source_hash()}
     session.check_resumable(meta, cfg, dz)
-    cfg2 = cfg.replace(tones_per_channel=26)
+    cfg2 = cfg.replace(tones_per_channel=cfg.tones_per_channel + 1)
     with pytest.raises(session.DesignChanged):
         session.check_resumable(meta, cfg2, design.make_design(cfg2, "P01", 1))
 

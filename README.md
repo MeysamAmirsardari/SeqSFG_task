@@ -57,19 +57,25 @@ figures it refers to are in `verification/figures/`.
 
 ## 1. The design in one paragraph
 
-Both intervals of a trial contain the same 600 tones, 20 in every channel of a 30-channel
+Both intervals of a trial contain the same 780 tones, 26 in every channel of a 30-channel
 pool spaced 1 ERB apart from 200 to 9486 Hz, arriving over 4.0 s. Tones are 45 ms with 5 ms
 ramps. Nine figure *elements* of seven components each arrive at 3.0 to 3.3 Hz, so the target
 is a 2.5 s continuous stream at a speech-like rate rather than a few isolated events.
 
+**Each element is confined to a band of 13 pool channels**, about two octaves wide, so it has
+a register. That is not decoration. Components drawn from the whole pool span 4.7 of the
+pool's 5.6 octaves, so two elements on completely disjoint channels still cover the same range
+and sound alike: interleaved combs, not different pitches. Banding cuts an element's own
+spread to 2.2 octaves and lets consecutive foil elements land 1.5 octaves apart, with the foil
+sitting 2.1 octaves from the target's register -- against 0.69 and 0.57 octaves unbanded.
+
 The two intervals are built by a **matched-incidence** construction. Every element puts one
 tone on each of the target's seven channels AND one on each of that element's seven foil
 channels, in *both* intervals. What differs is which of the two is time-aligned: the aligned
-set starts together at the element onset and binds into a group, the other is scattered
-across the same span and never binds. In the target interval the aligned set is the same
-seven channels every time ("sam, sam, sam"); in the other it is seven fresh channels each
-time, drawn so that consecutive elements are *disjoint* and no element shares a single pitch
-with the target set ("bob, kim, she", with no sam anywhere).
+set starts together at the element onset and binds into a group, the other is scattered across
+the same span and never binds. In the target interval the aligned set is the same seven
+channels every time ("sam, sam, sam"); in the other it is a fresh band each time, none of them
+containing a single channel of the target set ("bob, kim, she", with no sam anywhere).
 
 Three properties follow by construction rather than by tuning. Per-channel tone counts are
 identical, so the long-term spectrum is identical. Every channel that recurs in one interval
@@ -92,10 +98,10 @@ measure of whether a learned regularity helps.
 compare two intervals that both contain bound elements. The obvious construction (add the
 figure's tones on top of a random background) fails immediately: the recurring interval
 piles extra tones into each of seven channels and the long-term spectrum reads it off
-without any binding. The fix is a fixed per-channel budget (20 tones per channel per
+without any binding. The fix is a fixed per-channel budget (26 tones per channel per
 4.0 s interval), out of which figure tones are scheduled rather than added. A recurring
-channel then has 9 element tones and 11 background tones; every channel the trial uses carries
-20 either way; the long-term spectrum is identical in the two intervals by construction, and
+channel then has 9 element tones and 17 background tones; every channel the trial uses carries
+26 either way; the long-term spectrum is identical in the two intervals by construction, and
 the battery measures per-channel counts as exactly equal. The grouped-versus-grouped
 comparison is therefore used as the main experiment. The ungrouped comparison is kept as a
 second ladder, with its known envelope cue reported below.
@@ -173,6 +179,30 @@ excluded, which is 7 + 23; one channel per ERB over the usable range is 30. Pair
 foil elements would need 49 channels and hearing has about 30 ERBs to spend, which is why
 some pitch reuse at longer lags is arithmetic rather than a choice (see section 4).
 
+**Elements are banded, because disjoint channels are not different pitches.** The first
+version drew each element's seven components from the whole pool. Their channel sets were
+exactly disjoint -- zero shared channels between consecutive foil elements, zero with the
+target set -- and they still sounded the same, which is what the first listener reported. The
+measurement says why: an element drawn from the whole pool spans 4.73 of the pool's 5.57
+octaves, while consecutive elements' centroids differ by 0.69 octaves, 15% of an element's own
+spread. Two interleaved combs covering the same five octaves have the same register and the
+same timbre; membership is not something the ear compares across a 300 ms gap.
+
+Confining an element to 13 contiguous channels fixes it: spread falls to 2.22 octaves,
+consecutive foil elements land 1.49 octaves apart, and the foil sits 2.05 octaves from the
+target's register. The jump is now 0.67 of an element's own width rather than 0.15.
+
+What it costs, precisely. Narrower is better for register -- a 9-channel band gives a 1.54
+octave element and 2.30 octaves of separation -- but narrower bands crowd the components into
+fewer critical bands and the residual of section 4 becomes visible: at band 9 the global
+permutation test rejected in one seed of four and sat below 0.10 in two more. Thirteen is the
+widest band that still buys most of the register separation and the narrowest that stays clean
+across seven seeds. The pool affords only about three non-overlapping registers for a
+seven-component element, so the foil reuses registers at longer lags; the sampler spends that
+reuse as far back as it can and never repeats a channel set (`max_shared_any`). Setting
+`figure_band_channels` to null restores the unbanded version, which is cleaner still and which
+no listener could do.
+
 **Equal amplitude, no loudness weighting.** Table [7] of the battery computes, per channel,
 the excitation produced by the rest of the pool (roex filters, Glasberg & Moore ERBs) against
 the absolute threshold (Terhardt). Masking exceeds absolute threshold by 29 to 51 dB in every
@@ -229,7 +259,7 @@ Between the two intervals of a trial, at every step:
 
 | property | how measured | result |
 |---|---|---|
-| total number of tones | schedule | 600 / 600, exact, every condition |
+| total number of tones | schedule | 780 / 780, exact, every condition |
 | tones sounding at any instant (mean, min, max) | schedule, 1 ms grid; and demodulated audio | mean and min exact; max within 0.35 +/- 0.24 |
 | long-term RMS | audio | differences under 0.005 dB |
 | long-term spectrum, band by band | complex demodulation at each channel frequency, 40 ms Hann | mean per-channel abs(A-B) 0.034 to 0.036 dB, worst channel 0.21 dB; peakedness matched |
@@ -248,8 +278,8 @@ Every row above is for the `rising` ladder, which carries the inference. The `un
 ladder does not match on envelope and cannot; that is section 4.
 
 Across conditions: nine elements per interval; inter-element interval mean 316 to 317 ms,
-sd 10 ms, min 300, max 333; element span 45 to 147 ms across the ladder; 20 tones in every
-channel the trial uses; 6.8 tones sounding on average; RMS identical to 0.005 dB.
+sd 10 ms, min 300, max 333; element span 45 to 147 ms across the ladder; 26 tones in every
+channel the trial uses; 8.8 tones sounding on average; RMS identical to 0.005 dB.
 
 ### The ideal observers
 
@@ -317,20 +347,40 @@ manipulation.
 What can be done is to put it under the noise. Each channel's timing statistics are estimated
 from that channel's own tones, so the background tones sharing the channel act as independent
 noise on the estimate, and the leak's visibility tracks how many of them there are. It has
-surfaced twice and been buried twice by the same knob:
+surfaced three times and been buried three times by the same knob:
 
-| tone duration | tones per channel | result on the `rising` ladder |
-|---|---|---|
-| 30 ms | 11 | learnt single-channel observer d' = +0.50 (Holm p = 0.000), 1 cell surviving, permutation p = 0.002 |
-| 30 ms | 16 | every observer at chance, no cell surviving, permutation p = 0.197 |
-| 45 ms | 16 | permutation p = 0.001, largest feature `ch_audio:pairs_iei_norm:sd` at 0.497 |
-| **45 ms** | **20 (shipped)** | **every observer at chance, no cell surviving, permutation p = 0.298** |
+| tone duration | elements banded | tones per channel | result on the `rising` ladder |
+|---|---|---|---|
+| 30 ms | no | 11 | learnt single-channel observer d' = +0.50 (Holm p = 0.000), 1 cell surviving, permutation p = 0.002 |
+| 30 ms | no | 16 | clean; permutation p = 0.197 |
+| 45 ms | no | 16 | permutation p = 0.001, largest feature `ch_audio:pairs_iei_norm:sd` at 0.497 |
+| 45 ms | no | 20 | clean; permutation p = 0.298 |
+| 45 ms | band 13 | 20 | one draw in seven at permutation p = 0.001 -- a rejection, not noise |
+| **45 ms** | **band 13** | **26 (shipped)** | **clean; see the seed sweep below** |
 
-Longer tones raise per-channel occupancy, which leaves `place_free` less room and makes
-background placement less independent of the element tones, so 45 ms needed more background
-tones than 30 ms did to hide the same thing. Extending the interval to 4.0 s and the stream to
-nine elements pays for those extra tones: density is 150 tones/s, against 176 if the same
-budget were packed into 3.4 s.
+Longer tones and banded elements both raise the number of background tones needed. Longer
+tones raise per-channel occupancy, which leaves background placement less independent of the
+element tones. Banding does something different and more interesting: making the foil's
+elements audibly unlike *each other* necessarily makes them physically unlike each other, and
+how much a trial's elements differ among themselves is measurable without binding anything.
+The perceptual gain and the statistical residual are the same quantity seen twice.
+
+**One battery is one draw, so here are seven.** The audit is itself a random sample, and a
+single clean report proves less than it appears to. Running the `rising` ladder at seven
+independent seeds, 240 trials each:
+
+| | seeds |
+|---|---|
+| shipped (band 13, 26 tones/channel) | 0.658, 0.403, 0.966, 0.289, 0.096, 0.744, 0.621 |
+| the same at 20 tones/channel | 0.658, 0.206, 0.143, 0.203, **0.001**, 0.616, 0.694 |
+| unbanded, 20 tones/channel | 0.281, 0.855, 0.202, 0.623 |
+
+The shipped row has no rejection and no obvious left shift; the 20-tone row does. Three of the
+seven shipped draws showed one learnt-observer flag apiece, on a *different* feature each time
+and with inconsistent sign -- the signature of the learnt observers' own false-positive rate
+(they are calibrated at SD 0.14 on null data, so |d'| = 0.33 is 2.4 SD, and five observers are
+run per battery), not of a stable cue. The properly multiplicity-corrected test is the global
+permutation, and it does not reject at any seed.
 
 State it honestly: the mechanism has not been removed, it has been driven below what a
 240-trial audit can detect. A much larger audit would find it again. The size that matters is
@@ -365,7 +415,7 @@ lower in the recurring interval); the maximum number of S channels sounding at o
 element's own channels, because a recurring channel holds 25 background tones where a
 redrawn one holds about 30. None of these are visible to an observer that does not know S.
 
-**Momentary silences.** With 6.8 tones sounding on average the cloud is sparse, and the
+**Momentary silences.** With 8.8 tones sounding on average the cloud is moderately dense, and the
 instantaneous count reaches zero briefly in most intervals (row "tones sounding: min", which
 the battery reports as exactly equal between the two intervals of every trial). It does so
 equally in both, so it is texture rather than a cue -- but it is texture, and a listener will

@@ -58,10 +58,10 @@ class Config:
     # ---- tones ---------------------------------------------------------------
     tone_dur_ms: float = 45.0
     ramp_ms: float = 5.0                 # raised-cosine onset and offset ramps
-    tone_amplitude: float = 0.028        # linear peak amplitude of one tone, all channels equal
+    tone_amplitude: float = 0.026        # linear peak amplitude of one tone, all channels equal
 
     # ---- background ----------------------------------------------------------
-    tones_per_channel: int = 20          # fixed budget per channel per interval (figure tones included)
+    tones_per_channel: int = 26          # fixed budget per channel per interval (figure tones included)
     interval_dur_ms: float = 4000.0
 
     # ---- figure --------------------------------------------------------------
@@ -85,6 +85,12 @@ class Config:
     lead_min_ms: float = 350.0           # first element onset, drawn uniformly
     lead_max_ms: float = 600.0
     tail_min_ms: float = 350.0           # guaranteed background after the last element ends
+    figure_band_channels: Optional[int] = 13
+    # None -> an element's components are drawn from the whole pool, so it spans nearly the whole
+    #         spectrum and has no register: two elements on completely disjoint channels then
+    #         cover the same range and sound alike.
+    # int  -> each element is confined to a contiguous band of this many pool channels, which
+    #         gives it a register, so elements can differ in PITCH and not only in membership.
     matched_incidence: bool = True
     # True -> both intervals carry BOTH the target's channels and the foil's channels at every
     #         element; only which of the two is time-aligned differs. Per-channel counts, channel
@@ -370,6 +376,17 @@ def validate(cfg: Config) -> Derived:
         errs.append("anchored_fraction must be in [0, 1]")
     if cfg.anchored_fraction < 1.0 and cfg.figure_anchor_seed is None:
         errs.append("anchored_fraction < 1 needs figure_anchor_seed set: there is nothing to anchor to")
+    if cfg.figure_band_channels is not None:
+        B = cfg.figure_band_channels
+        need_b = (N - 1) * cfg.figure_min_spacing_channels + 1
+        if B < need_b:
+            errs.append(f"figure_band_channels={B} cannot hold {N} components "
+                        f"{cfg.figure_min_spacing_channels} apart; raise it to >= {need_b}")
+        if B > d.n_channels:
+            errs.append(f"figure_band_channels={B} exceeds the {d.n_channels}-channel pool")
+        elif 2 * B > d.n_channels:
+            errs.append(f"figure_band_channels={B} leaves no room for a foil band clear of the "
+                        f"figure's: the pool has {d.n_channels} channels and needs at least {2 * B}")
     if cfg.matched_incidence:
         gap = cfg.figure_min_spacing_channels
         U = cfg.foil_universe_size or (K * N)

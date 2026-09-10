@@ -92,6 +92,7 @@ def test_pilot_config_validates_and_is_audible():
 def _legacy():
     """The pre-matched-incidence construction, which foil_subpool_size belongs to."""
     return DEFAULT.replace(matched_incidence=False, foil_universe_size=None,
+                           figure_band_channels=None,
                            anchored_fraction=1.0, figure_min_spacing_channels=2,
                            steps_ms=(0.0, 4.0, 8.0, 12.0, 15.0, 18.0),
                            control_cells=(("ungrouped", 0.0), ("onechannel", 0.0)))
@@ -161,19 +162,39 @@ def _pilot():
     return config.Config.from_dict(json.loads(p.read_text()))
 
 
-def test_foil_elements_share_no_pitch_with_the_target_or_with_each_other():
-    """'sam sam sam' vs 'bob kim she': no foil element may contain a target pitch, and consecutive
-    foil elements must be disjoint. Both are guaranteed by construction, so this is exact."""
+def test_foil_elements_share_no_pitch_with_the_target():
+    """'sam sam sam' vs 'bob kim she': no foil element may contain a target pitch. Guaranteed by
+    construction, so this is exact."""
     cfg = _pilot()
     d = validate(cfg)
     for seed in range(1, 26):
         tr = stimulus.make_trial(cfg, seed, 0.0, "rising", d=d)
         S = set(tr.recurring.figure_set.tolist())
-        sets = [set(x.tolist()) for x in tr.other.element_sets]
-        for k, g in enumerate(sets):
-            assert not (g & S), f"seed {seed} element {k}: foil element reuses a target pitch"
-        for k, (a, b) in enumerate(zip(sets, sets[1:])):
-            assert not (a & b), f"seed {seed} elements {k},{k+1}: consecutive foil elements overlap"
+        for k, g in enumerate(tr.other.element_sets):
+            assert not (set(g.tolist()) & S), f"seed {seed} element {k}: reuses a target pitch"
+
+
+def test_elements_differ_in_REGISTER_not_only_in_membership():
+    """Disjoint channels are not enough. Components drawn from the whole pool span nearly the
+    whole spectrum, so two elements on completely different channels still cover the same range
+    and sound alike; what the ear compares is register. Each element must therefore be narrow
+    relative to the distance between elements."""
+    cfg = _pilot()
+    if cfg.figure_band_channels is None:
+        pytest.skip("this pilot does not band its elements")
+    d = validate(cfg)
+    oct_ = np.log2(d.channel_freqs_hz)
+    spread, jump, from_target = [], [], []
+    for seed in range(1, 41):
+        tr = stimulus.make_trial(cfg, seed, 0.0, "rising", d=d)
+        S = tr.recurring.figure_set
+        spread.append(oct_[S].max() - oct_[S].min())
+        c = [float(oct_[g].mean()) for g in tr.other.element_sets]
+        jump += [abs(a - b) for a, b in zip(c, c[1:])]
+        from_target += [abs(x - float(oct_[S].mean())) for x in c]
+    assert np.mean(spread) < 2.6, "an element that wide has no register to compare"
+    assert np.mean(jump) > 1.2, "consecutive foil elements must land in different registers"
+    assert np.mean(from_target) > 1.5, "the foil must sit clear of the target's register"
 
 
 def test_matched_incidence_gives_the_two_intervals_identical_per_channel_counts():

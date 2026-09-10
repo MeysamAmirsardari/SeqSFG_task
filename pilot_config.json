@@ -7,8 +7,8 @@
  "min_beat_rate_hz": 40.0,
  "tone_dur_ms": 45.0,
  "ramp_ms": 5.0,
- "tone_amplitude": 0.028,
- "tones_per_channel": 20,
+ "tone_amplitude": 0.026,
+ "tones_per_channel": 26,
  "interval_dur_ms": 4000.0,
  "n_components": 7,
  "figure_repeats": 1,
@@ -81,5 +81,6 @@
  "alpha": 0.05,
  "matched_incidence": true,
  "foil_universe_size": 23,
- "anchored_fraction": 0.5
+ "anchored_fraction": 0.5,
+ "figure_band_channels": 13
 }
