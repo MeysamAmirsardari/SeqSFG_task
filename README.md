@@ -709,3 +709,69 @@ demo/                example trials as WAV
 
 Parameters are overridden with `--set key=value` (JSON values) or `--config file.json`,
 and every command validates the result first.
+
+## 9. The single-interval yes/no task
+
+A second task, in `seqsfg/yesno.py`, sharing the same stimulus machinery and leaving the
+two-interval experiment untouched. The listener hears **one** sound and answers whether a
+figure was there.
+
+**Yes/no is a stricter matching problem than forced choice, and the difference is easy to
+underestimate.** In 2IFC only the two intervals of a trial have to be indistinguishable, and
+anything common to both cancels. In yes/no the listener answers from memory of what these
+sounds are usually like, so any property whose *distribution* differs between the classes is a
+criterion -- a mean shift of 0.2 dB, or one extra envelope burst on average, or the same mean
+with a wider spread. The audit therefore tests both, and the test statistic is a rank-sum AUC
+converted to the d' of the best criterion on that feature.
+
+**The absent class has to be chosen, not assumed.** A yes/no task contrasting "coherent onsets
+present" with "coherent onsets absent" cannot be envelope-matched, because synchrony *is* an
+envelope event: seven tones starting together concentrate the same energy into a shorter window
+than seven tones spread across the element, and no arrangement of the same tones avoids it.
+Three absent classes are implemented and all three were measured, 60 present and 60 absent
+trials at each of six steps:
+
+| absent class | what it is | permutation p | largest single feature | learnt observer |
+|---|---|---|---|---|
+| **`roving`** (default) | elements bound, but on a fresh band every element, so nothing recurs | **0.180** | 0.23 (`ch:frac_ioi_in_iei:sd`) | **d' = -0.04, 49.3% correct** |
+| `scattered` | same channels at the same element times, components scattered so nothing binds | 0.000 | 0.42 (`env:ac_peak_iei`) | d' = +0.55, 60.8% |
+| `plain` | a plain cloud, no element structure at all -- the classic SFG detection task | 0.000 | 1.79 (`env:ac_peak_iei`) | **d' = +2.60, 90.4%** |
+
+Only `roving` survives. Against a plain cloud an ideal observer that never hears a group gets
+**90% of the trials right from the envelope alone**, and at step 0 it gets 100%: the giveaway is
+envelope autocorrelation at element lags and modulation power in the 3-10 Hz band, both of which
+are just "a chord arrives every 316 ms". Against `scattered` the same observer still gets 61%.
+Both are fatal, and neither is fixable, because the cue is the manipulation.
+
+`roving` works because both classes contain exactly one bound chord per element -- the question
+becomes "did **one** figure keep coming back?", the single-interval form of the two-interval
+task. Pooled over the ladder, the cues a listener would reach for first:
+
+| | present | absent | yes/no d' |
+|---|---|---|---|
+| long-term RMS (dB) | -25.930 +- 0.007 | -25.930 +- 0.007 | +0.07 |
+| peak amplitude | 0.258 +- 0.020 | 0.261 +- 0.022 | +0.10 |
+| envelope peaks above 3 SD | 4.472 +- 4.977 | 4.317 +- 4.389 | +0.10 |
+| envelope peaks above 5 SD | 0.019 +- 0.138 | 0.028 +- 0.195 | +0.01 |
+| tallest burst (SD units) | 3.602 +- 0.581 | 3.604 +- 0.585 | +0.05 |
+| crest factor | 1.659 +- 0.110 | 1.658 +- 0.113 | +0.02 |
+| envelope kurtosis | 4.474 +- 0.695 | 4.436 +- 0.659 | +0.05 |
+| modulation power, element-rate band (dB) | 20.660 +- 1.538 | 20.622 +- 1.587 | +0.04 |
+
+Level is not merely matched, it is *constant*: every interval of either class carries exactly
+`tones_per_channel` tones in every one of the 30 active channels, so total tone count is not a
+random variable at all. That is checked by a test, not by inspection.
+
+Two things the analysis insists on. **d', not percent correct**, because the listener chooses
+the criterion; percent correct confounds sensitivity with bias. And **the criterion is reported
+and watched**: `analyse` prints c overall and per step, the proportion of "yes" responses, and c
+in the first versus the second half, because a drifting criterion is the commonest yes/no
+artefact and it inflates or deflates the pooled d' silently.
+
+```
+seqsfg yesno-verify --config pilot_config.json --absent all     # audit all three classes
+seqsfg yesno-run    --config pilot_config.json --code P01       # run a session
+seqsfg yesno-analyze data/P01/session_01
+```
+
+Reports for all three classes are in `verification/yesno_*_report.txt`.

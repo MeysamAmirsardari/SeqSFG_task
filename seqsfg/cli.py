@@ -163,6 +163,42 @@ def cmd_participants(args):
         print(code, {k: v for k, v in row.items() if k != "code"})
 
 
+def cmd_yesno_verify(args):
+    from . import yesno
+    cfg = load_config(args)
+    validate(cfg)
+    kinds = [k.strip() for k in args.absent.split(",")] if args.absent != "all" else list(yesno.ABSENT_KINDS)
+    for k in kinds:
+        if k not in yesno.ABSENT_KINDS:
+            raise SystemExit(f"unknown absent class {k!r}; choose from {', '.join(yesno.ABSENT_KINDS)}")
+        res = yesno.run_audit(cfg, n_trials=args.trials, seed=args.seed, absent=k,
+                              n_perm=args.perm, verbose=not args.quiet)
+        text = yesno.report(res)
+        print(text)
+        if args.out:
+            from pathlib import Path
+            path = Path(args.out) if len(kinds) == 1 else Path(args.out).with_name(
+                Path(args.out).stem + f"_{k}" + Path(args.out).suffix)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text + "\n")
+            print(f"written to {path}")
+
+
+def cmd_yesno_run(args):
+    from . import yesno
+    cfg = load_config(args)
+    validate(cfg)
+    r = yesno.YesNoRunner(cfg, args.data, args.device, audio=not args.no_audio,
+                          absent=args.absent, auto=args.auto, fast=args.fast)
+    r.run(code=args.code, session_index=args.session)
+
+
+def cmd_yesno_analyze(args):
+    from . import yesno
+    for s in args.sessions:
+        print(yesno.analyse(s))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="seqsfg", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -217,6 +253,30 @@ def main(argv=None):
 
     q = sub.add_parser("participants", help="list the participants table"); q.add_argument("--data", default="data")
     q.set_defaults(fn=cmd_participants)
+
+    q = sub.add_parser("yesno-verify", help="single-interval yes/no: can anything separate present from absent?")
+    add_common(q)
+    q.add_argument("--absent", default="roving",
+                   help="absent class: roving | scattered | plain | all (default: roving)")
+    q.add_argument("--trials", type=int, default=60, help="present AND absent trials per step")
+    q.add_argument("--seed", type=int, default=4242)
+    q.add_argument("--perm", type=int, default=20000)
+    q.add_argument("--quiet", action="store_true")
+    q.add_argument("--out", help="write the report here")
+    q.set_defaults(fn=cmd_yesno_verify)
+
+    q = sub.add_parser("yesno-run", help="run a single-interval yes/no session"); add_common(q)
+    q.add_argument("--data", default="data"); q.add_argument("--code")
+    q.add_argument("--session", type=int); q.add_argument("--device")
+    q.add_argument("--no-audio", action="store_true")
+    q.add_argument("--absent", default="roving", help="absent class (default: roving)")
+    q.add_argument("--auto", type=float, default=None, metavar="TAU_MS",
+                   help="simulated listener; pipeline test only")
+    q.add_argument("--fast", action="store_true")
+    q.set_defaults(fn=cmd_yesno_run)
+
+    q = sub.add_parser("yesno-analyze", help="d', criterion and bias diagnostics for a yes/no session")
+    q.add_argument("sessions", nargs="+"); q.set_defaults(fn=cmd_yesno_analyze)
 
     args = p.parse_args(argv)
     try:

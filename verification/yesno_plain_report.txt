@@ -1,0 +1,64 @@
+====================================================================================================
+YES/NO SINGLE-INTERVAL AUDIT   absent class = 'plain'   60 present + 60 absent per step
+====================================================================================================
+A yes/no listener answers from ONE sound, so any property whose distribution differs
+between the classes -- in mean OR in spread -- is a usable criterion. Everything below
+is measured on single intervals, never on pairs.
+
+[1] the cues a listener would try first, pooled over the ladder
+    feature                                            present            absent  yes/no d
+    long-term RMS (dB)                         -25.930+-0.007    -25.930+-0.007      +0.09
+    peak amplitude                               0.260+-0.023      0.245+-0.015      +0.77
+    envelope level (dB)                        -25.930+-0.007    -25.930+-0.007      +0.09
+    crest factor                                 1.668+-0.118      1.577+-0.072      +0.90
+    envelope peaks above 3 SD                    4.600+-4.767      2.006+-1.641      +0.56
+    envelope peaks above 5 SD                    0.022+-0.147      0.003+-0.053      +0.03
+    mean burst height (SD)                       3.019+-1.059      2.741+-1.303      +0.26
+    tallest burst (SD)                           3.655+-0.615      3.405+-0.460      +0.42
+    envelope kurtosis                            4.464+-0.643      4.838+-0.795      +0.50
+    envelope modulation depth                    0.211+-0.017      0.189+-0.009      +1.67
+    modulation power, element rate band (dB)    20.735+-1.617     18.179+-1.198      +1.77
+    envelope autocorrelation at element lags     0.145+-0.078      0.032+-0.047      +1.79
+    spectral peakedness (dB)                     0.159+-0.026      0.157+-0.029      +0.19
+    tones sounding, mean                         7.826+-0.010      7.826+-0.010      +0.04
+    mean +- SD of the single-trial distribution. Both must match: a shift is a
+    criterion, and so is a difference in spread.
+
+[2] every one of the 64 features, largest yes/no d' first
+    feature                                        d     AUC  what differs
+    env:ac_peak_iei                             1.79   0.897         shift
+    env_ac_peak_iei                             1.79   0.897         shift
+    env:mod_3_10Hz                              1.77   0.895         shift
+    env:mod_depth                               1.67   0.881         shift
+    env_mod_depth                               1.67   0.881         shift
+    env:ac_peak_100_1000                        1.36   0.832         shift
+    ch:ioi_sd:mean                              1.26   0.186         shift
+    ch:ioi_max:mean                             1.20   0.199         shift
+    count_audio_max                             1.13   0.789         shift
+    ch:ioi_cv:mean                              1.11   0.217         shift
+    ch:ioi_mean:mean                            0.99   0.242         shift
+    env:crest                                   0.90   0.737         shift
+
+[3] can ANY of them separate the classes?  max-statistic permutation over class labels
+    largest d' observed           1.792  (env:ac_peak_iei)
+    largest under relabelling     95th percentile 0.263
+    p (any feature separates)     0.000
+    -> THE CLASSES ARE SEPARABLE WITHOUT HEARING A FIGURE
+
+[4] an ideal observer that has LEARNT the best linear criterion (leave-one-out,
+    fitted within each step, held-out decisions pooled)
+    hit rate 0.900   false-alarm rate 0.092   d' = +2.599   90.4% correct
+    This is the ceiling for a listener who never hears a group and only learns what
+    these sounds are usually like. It must be at chance.
+
+[5] per step
+    step (ms)     permutation p   largest d   learnt d   learnt hit/fa
+    0                     0.000        6.72      +4.80    1.00/0.00   
+    4                     0.000        4.08      +4.37    1.00/0.02   
+    7                     0.000        2.92      +2.92    0.92/0.05   
+    11                    0.000        1.47      +1.83    0.83/0.18   
+    14                    0.000        1.80      +2.33    0.87/0.10   
+    17                    0.000        1.42      +1.59    0.78/0.20   
+
+built in 64s; config hash 7f8f210f0f5000b3
+====================================================================================================
