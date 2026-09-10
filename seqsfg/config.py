@@ -85,6 +85,18 @@ class Config:
     lead_min_ms: float = 150.0           # first element onset, drawn uniformly
     lead_max_ms: float = 250.0
     tail_min_ms: float = 100.0           # guaranteed background after the last element ends
+    matched_incidence: bool = False
+    # True -> both intervals carry BOTH the target's channels and the foil's channels at every
+    #         element; only which of the two is time-aligned differs. Per-channel counts, channel
+    #         recurrence and element-rate structure are then identical by construction, so the
+    #         foil's elements can be made maximally unlike each other without reopening the
+    #         single-channel periodicity cue that foil_subpool_size was invented to close.
+    foil_universe_size: Optional[int] = None
+    # size of the channel universe the foil elements are drawn from, disjoint from the figure set.
+    # Larger -> more dissimilar consecutive foil elements. Defaults to n_elements*n_components.
+    anchored_fraction: float = 1.0
+    # fraction of trials that use the anchored (learnable) figure set; the rest draw a fresh one.
+    # 0.5 gives a within-session contrast between a familiar figure and a novel one.
     foil_subpool_size: Optional[int] = None
     # None -> the foil draws its element channels from the WHOLE pool, so its channels are each
     #         used ~K*N/P times while the target's are used K times. That asymmetry is the
@@ -188,6 +200,7 @@ class Derived:
     """Quantities computed from the config. Read them here; never re-derive elsewhere."""
     channel_freqs_hz: np.ndarray        # ascending
     n_channels: int
+    n_active_channels: int               # channels carrying tones in a trial
     tone_dur_grid: int
     spans_ms: Tuple[float, ...]         # element span per step, (N-1)*step + D
     max_span_ms: float
@@ -220,17 +233,25 @@ def derive(cfg: Config) -> Derived:
     P = len(freqs)
     N, D, T, M, K = cfg.n_components, cfg.tone_dur_ms, cfg.interval_dur_ms, cfg.tones_per_channel, cfg.n_elements
     R = cfg.figure_repeats
-    spans = tuple((N - 1) * s + R * D for s in cfg.steps_ms)
+    # Only the figure set plus the foil universe carry tones; a wide pool costs nothing.
+    U = cfg.foil_universe_size or (K * N)
+    P_act = min(P, N + U) if cfg.matched_incidence else P
+    # A matched-incidence element also holds the scattered counterpart tones, which are spread
+    # over one element-duration, so its footprint is at least 2*R*D whatever the step is.
+    scat = R * D if cfg.matched_incidence else 0.0
+    spans = tuple((N - 1) * s + R * D + scat for s in cfg.steps_ms)
     # 'scattered' spreads its components over one element-duration instead of using the step,
     # so its element is 2*R*D wide regardless of the step. Budget for that.
-    control_spans = tuple((2 * R * D if v == "scattered" else (N - 1) * s + R * D)
+    control_spans = tuple((2 * R * D if v == "scattered" else (N - 1) * s + R * D + scat)
                           for v, s in tuple(cfg.control_cells) + tuple(cfg.practice_cells))
     max_span = max(spans + control_spans) if (spans or control_spans) else D
     sched_max = cfg.lead_max_ms + (K - 1) * cfg.iei_max_ms + max_span + cfg.tail_min_ms
     occ = M * D / T
-    mean_sim = P * occ
+    mean_sim = P_act * occ
     # background count is ~binomial(P, occ) at any instant; add the whole element on top
-    max_sim_bound = int(min(P, math.ceil(mean_sim + 4.0 * math.sqrt(max(mean_sim, 1.0)))) + N)
+    # a matched-incidence element window holds the aligned set AND its scattered counterpart
+    max_sim_bound = int(min(P_act, math.ceil(mean_sim + 4.0 * math.sqrt(max(mean_sim, 1.0))))
+                        + (2 * N if cfg.matched_incidence else N))
     peak_bound = cfg.tone_amplitude * max_sim_bound
     erb_low = _pool.erb_width_hz(freqs[0]) if P else float("nan")
     ladder = []
@@ -248,11 +269,12 @@ def derive(cfg: Config) -> Derived:
     n_breaks = (n_main + n_ctrl) // max(cfg.break_every, 1) + 2   # + block transitions
     est = cfg.setup_minutes + (n_trials * trial_dur + n_breaks * cfg.break_s) / 60.0
     return Derived(
-        channel_freqs_hz=freqs, n_channels=P, tone_dur_grid=int(round(D / cfg.grid_ms)),
+        channel_freqs_hz=freqs, n_channels=P, n_active_channels=P_act, tone_dur_grid=int(round(D / cfg.grid_ms)),
         spans_ms=spans, max_span_ms=max_span, schedule_max_ms=sched_max,
         occupancy_per_channel=occ, mean_simultaneous=mean_sim,
         max_simultaneous_bound=max_sim_bound, peak_bound=peak_bound,
-        min_beat_rate_hz=erb_low * cfg.pool_spacing_erb,
+        min_beat_rate_hz=erb_low * cfg.pool_spacing_erb * (cfg.figure_min_spacing_channels
+                                                          if cfg.matched_incidence else 1),
         n_valid_figure_sets=_n_valid_sets(P, N, cfg.figure_min_spacing_channels),
         ladder=tuple(ladder), n_main_trials=n_main, n_practice_trials=n_prac, n_control_trials=n_ctrl,
         main_cells=main_cells,
@@ -343,6 +365,33 @@ def validate(cfg: Config) -> Derived:
         errs.append(f"schedule does not fit: lead_max + (K-1)*iei_max + widest span + tail = "
                     f"{d.schedule_max_ms:.0f} ms > interval_dur_ms={T:.0f}. Raise interval_dur_ms to >= "
                     f"{d.schedule_max_ms:.0f} (the jitter is never clipped by a rejection rule)")
+    if not (0.0 <= cfg.anchored_fraction <= 1.0):
+        errs.append("anchored_fraction must be in [0, 1]")
+    if cfg.anchored_fraction < 1.0 and cfg.figure_anchor_seed is None:
+        errs.append("anchored_fraction < 1 needs figure_anchor_seed set: there is nothing to anchor to")
+    if cfg.matched_incidence:
+        gap = cfg.figure_min_spacing_channels
+        U = cfg.foil_universe_size or (K * N)
+        if U < N:
+            errs.append(f"foil_universe_size={U} is smaller than n_components={N}: a foil element "
+                        f"cannot be drawn")
+        elif U < 2 * N:
+            errs.append(f"foil_universe_size={U} < 2*n_components={2 * N}: consecutive foil elements "
+                        f"cannot be disjoint, which is the point of matched_incidence; raise it")
+        if (N + U) * gap > d.n_channels:
+            errs.append(f"matched_incidence needs {(N + U) * gap} pool channels to lay out "
+                        f"{N}+{U} channels {gap} apart, but the pool has {d.n_channels}; widen "
+                        f"pool_low_hz..pool_high_hz, reduce pool_spacing_erb, or lower "
+                        f"foil_universe_size")
+        if cfg.foil_subpool_size is not None:
+            errs.append("foil_subpool_size and matched_incidence are two different answers to the "
+                        "same problem; set foil_subpool_size to null when matched_incidence is on")
+        reuse = int(math.ceil(K * N / max(U, 1)))
+        need_m = int(math.ceil(max(K, reuse) * cfg.figure_repeats * 1.25)) + 2
+        if M < need_m:
+            errs.append(f"tones_per_channel={M} is too small for matched_incidence: every active "
+                        f"channel carries element tones in BOTH intervals (up to "
+                        f"{max(K, reuse) * cfg.figure_repeats}); raise it to >= {need_m}")
     if cfg.foil_subpool_size is not None:
         Q = cfg.foil_subpool_size
         n_spaced = (d.n_channels + cfg.figure_min_spacing_channels - 1) // cfg.figure_min_spacing_channels

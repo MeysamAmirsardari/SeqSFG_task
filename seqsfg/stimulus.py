@@ -21,6 +21,7 @@ differ is *when* channels sound.
 from __future__ import annotations
 
 import math
+import zlib
 from dataclasses import dataclass, field, replace
 from typing import List, Optional, Tuple
 
@@ -70,6 +71,7 @@ class Trial:
     recurring: Interval             # A, the target ("kept coming back at the same pitches")
     other: Interval                 # B (redrawn) or C (ungrouped)
     n_rebuilds: int = 0             # how many reseeds it took to satisfy every constraint
+    anchored: bool = True           # did this trial use the fixed, learnable figure set?
 
 
 # ----------------------------------------------------------------------------
@@ -118,6 +120,66 @@ def sample_redrawn_sets(rng: np.random.Generator, cfg: Config, n_channels: int, 
                 break
         if ok:
             sets.append(cand)
+    return sets
+
+
+def sample_foil_universe(rng: np.random.Generator, cfg: Config, n_channels: int,
+                        S: np.ndarray, size: int, max_tries: int = 400) -> np.ndarray:
+    """`size` channels, mutually >= spacing apart and >= spacing from every channel of S.
+
+    Every foil element is drawn from this universe, so no foil element can contain a channel of
+    the target figure: "there is no sam in the second interval" is true by construction, not on
+    average.
+    """
+    gap = cfg.figure_min_spacing_channels
+    cand = np.array([c for c in range(n_channels)
+                     if np.all(np.abs(S - c) >= gap)], dtype=int)
+    if cand.size < size:
+        raise PlacementError(f"only {cand.size} channels lie clear of the figure set; "
+                             f"foil_universe_size={size} needs more pool")
+    for _ in range(max_tries):
+        # Walk the candidates in ascending order from a random start (wrapping), taking every
+        # channel that clears the ones already taken. Ascending packing is near-maximal, so this
+        # succeeds even when the universe needs almost every spaced slot the pool has; a random
+        # permutation would not. The random start is what varies the lattice between trials.
+        start = int(rng.integers(cand.size))
+        order = np.concatenate([cand[start:], cand[:start]])
+        taken: List[int] = []
+        for c in order:
+            if all(abs(int(c) - t) >= gap for t in taken):
+                taken.append(int(c))
+        if len(taken) >= size:
+            keep = np.sort(rng.choice(len(taken), size=size, replace=False))
+            return np.sort(np.array(taken, dtype=int)[keep])
+    raise PlacementError(f"could not lay out {size} spaced foil-universe channels")
+
+
+def sample_foil_sets_dissimilar(rng: np.random.Generator, cfg: Config, universe: np.ndarray,
+                                k: int) -> List[np.ndarray]:
+    """k N-subsets of `universe`, each as unlike its predecessor as the universe allows.
+
+    Random draws are not enough: with N components out of U channels two consecutive draws share
+    N^2/U by chance, and at N=7 that felt like repetition even though nothing repeated. Here each
+    element is chosen greedily -- heavily penalising any channel used by the previous element,
+    lightly penalising channels used earlier -- so consecutive elements are disjoint whenever the
+    universe is big enough to allow it.
+    """
+    N, U = cfg.n_components, universe.size
+    uses = np.zeros(U, dtype=float)                  # how many elements have used this channel
+    last = np.full(U, -1000.0)                       # element index of its last use
+    sets: List[np.ndarray] = []
+    for e in range(k):
+        # k*N slots over U channels forces some reuse whenever U < k*N, and no schedule can avoid
+        # it: pairwise-disjoint elements would need k*n_components channels, far more ERBs than
+        # hearing has. So rule the previous element out outright, then balance usage and break
+        # ties at RANDOM. Deterministic tie-breaks (longest-since-used, decaying recency) cycle
+        # through the universe and pile the whole unavoidable overlap onto one lag -- which
+        # sounds like exactly the repetition the foil is supposed to lack.
+        score = 100.0 * (last == e - 1) + 10.0 * uses + rng.uniform(0.0, 5.0, size=U)
+        pick = np.argsort(score, kind="stable")[:N]
+        sets.append(np.sort(universe[pick]))
+        uses[pick] += 1.0
+        last[pick] = e
     return sets
 
 
@@ -227,12 +289,19 @@ def build_recurring(rng: np.random.Generator, cfg: Config, d: Derived, step_ms: 
                      [S.copy() for _ in range(K)], patterns)
 
 
-def _fill_background(rng: np.random.Generator, cfg: Config, d: Derived, fig_onset: np.ndarray, fig_chan: np.ndarray):
-    """Per channel, place (budget - figure count) background tones uniformly among free positions."""
+def _fill_background(rng: np.random.Generator, cfg: Config, d: Derived, fig_onset: np.ndarray,
+                     fig_chan: np.ndarray, active: Optional[np.ndarray] = None):
+    """Per channel, place (budget - figure count) background tones uniformly among free positions.
+
+    Only `active` channels are filled; the rest are silent in BOTH intervals, so the active set is
+    a property of the trial and never of the interval. This is what lets the pool be wide enough
+    for genuinely dissimilar foil elements without the background getting any denser: density is
+    len(active) * tones_per_channel, not pool size * tones_per_channel.
+    """
     P, M, D = d.n_channels, cfg.tones_per_channel, d.tone_dur_grid
     n_onsets = cfg.n_grid - D + 1
     onset, chan = [], []
-    for c in range(P):
+    for c in (range(P) if active is None else [int(x) for x in active]):
         fixed = np.sort(fig_onset[fig_chan == c])
         if fixed.size > 1 and np.min(np.diff(fixed)) < D:
             raise PlacementError("figure tones overlap within a channel (validator should prevent this)")
@@ -281,6 +350,112 @@ def build_ungrouped(rng: np.random.Generator, cfg: Config, d: Derived, A: Interv
     return _assemble("ungrouped", A, empty, empty, empty, empty, b_onset, b_chan, rng, [], [])
 
 
+# ----------------------------------------------------------------------------
+# matched-incidence pair (the two intervals differ ONLY in what is time-aligned)
+# ----------------------------------------------------------------------------
+def build_matched(role: str, rng: np.random.Generator, cfg: Config, d: Derived, step_ms: float,
+                  variant: str, t_el: np.ndarray, S: np.ndarray, foil_sets: List[np.ndarray],
+                  patterns: List[np.ndarray], active: np.ndarray, aligned: str) -> Interval:
+    """One interval of a matched pair. `aligned` is 'S', 'foil' or 'none'.
+
+    Every element k puts one tone on each channel of S AND one on each channel of foil_sets[k],
+    in EVERY interval. What differs is which of the two is time-aligned into a group: the aligned
+    set starts at t_k + pattern[i]*step, the other is scattered inside the element window and so
+    never binds. Both intervals therefore have identical per-channel tone counts, identical
+    channel recurrence, and identical element-rate structure -- the classic single-channel
+    periodicity cue is matched by construction rather than by tuning a subpool.
+    """
+    N, K, D, R = cfg.n_components, cfg.n_elements, d.tone_dur_grid, cfg.figure_repeats
+    step = cfg.ms_to_grid(step_ms)
+    window = max(1, R * D)
+    S_by_element = [S] * K
+    if aligned == "S":
+        grp, scat_sets = S_by_element, (foil_sets,)
+    elif aligned == "foil":
+        grp, scat_sets = foil_sets, (S_by_element,)
+    elif aligned == "none":
+        grp, scat_sets = None, (S_by_element, foil_sets)
+    else:
+        raise ValueError(f"aligned must be 'S', 'foil' or 'none', not {aligned!r}")
+
+    # The aligned group gets ONE jitter per element, shared by all of its components so they stay
+    # perfectly coincident, drawn from the same distribution as the scattered offsets. Without it
+    # an aligned channel's inter-onset intervals would be exactly the IEI while a scattered
+    # channel's carry an extra +-window of jitter, and "the channel with the least variable IOI"
+    # would separate the intervals without anyone having to hear a group.
+    a_off = rng.integers(0, window, size=K)
+    f_onset: List[int] = []; f_chan: List[int] = []; f_elem: List[int] = []; f_comp: List[int] = []
+    if grp is not None:
+        for k in range(K):
+            for i in range(len(grp[k])):
+                for r in range(R):
+                    f_onset.append(int(t_el[k] + a_off[k] + patterns[k][i] * step + r * D))
+                    f_chan.append(int(grp[k][i])); f_elem.append(k); f_comp.append(i)
+    # scattered element tones: one random offset per (element, component), repeats stay adjacent
+    s_onset: List[int] = []; s_chan: List[int] = []
+    for sets in scat_sets:
+        for k in range(K):
+            for i in range(len(sets[k])):
+                off = int(rng.integers(0, window))
+                for r in range(R):
+                    s_onset.append(int(t_el[k] + off + r * D)); s_chan.append(int(sets[k][i]))
+
+    fig_onset = np.array(f_onset, dtype=int); fig_chan = np.array(f_chan, dtype=int)
+    sc_onset = np.array(s_onset, dtype=int); sc_chan = np.array(s_chan, dtype=int)
+    fixed_onset = np.concatenate([fig_onset, sc_onset]) if sc_onset.size or fig_onset.size else fig_onset
+    fixed_chan = np.concatenate([fig_chan, sc_chan]) if sc_chan.size or fig_chan.size else fig_chan
+    if fixed_onset.size and fixed_onset.max() + D > cfg.n_grid:
+        raise PlacementError("element runs past the end of the interval (validator should prevent this)")
+    b_onset, b_chan = _fill_background(rng, cfg, d, fixed_onset, fixed_chan, active=active)
+    # the scattered element tones are background: they are not a group and are not labelled one
+    b_onset = np.concatenate([sc_onset, b_onset]); b_chan = np.concatenate([sc_chan, b_chan])
+    proto = Interval(role, variant, step_ms, np.zeros(0, int), np.zeros(0, int), np.zeros(0),
+                     np.zeros(0, int), np.zeros(0, int), np.zeros(0, int), t_el, [], [], S)
+    el_sets = ([] if grp is None else [np.asarray(g).copy() for g in grp])
+    return _assemble(role, proto, fig_onset, fig_chan,
+                     np.array(f_elem, dtype=int), np.array(f_comp, dtype=int),
+                     b_onset, b_chan, rng, el_sets,
+                     [] if grp is None else [p.copy() for p in patterns])
+
+
+def _anchored_for(cfg: Config, seed: int) -> bool:
+    """Whether this trial uses the anchored (learnable) figure set. Deterministic in the seed."""
+    if cfg.figure_anchor_seed is None:
+        return False
+    if cfg.anchored_fraction >= 1.0:
+        return True
+    if cfg.anchored_fraction <= 0.0:
+        return False
+    return (zlib.crc32(f"anchor{int(seed)}".encode()) % 10000) < int(round(cfg.anchored_fraction * 10000))
+
+
+def make_matched_trial(cfg: Config, d: Derived, rng: np.random.Generator, seed: int,
+                       step_ms: float, variant: str) -> "Trial":
+    P, N, K = d.n_channels, cfg.n_components, cfg.n_elements
+    anchored = _anchored_for(cfg, seed)
+    set_rng = np.random.default_rng([int(cfg.figure_anchor_seed), 0xF16]) if anchored else rng
+    if variant == "onechannel":
+        S = np.array([int(set_rng.integers(P))])
+        patterns = [np.zeros(1, dtype=int) for _ in range(K)]
+    else:
+        S = sample_figure_set(set_rng, P, N, cfg.figure_min_spacing_channels)
+        patterns = sample_patterns(rng, cfg, variant)
+    U = cfg.foil_universe_size or (K * N)
+    universe = sample_foil_universe(rng, cfg, P, S, U)
+    foil_sets = sample_foil_sets_dissimilar(rng, cfg, universe, K)
+    if variant == "onechannel":
+        foil_sets = [g[:1].copy() for g in foil_sets]
+    active = np.sort(np.concatenate([S, universe]))
+    t_el = sample_schedule(rng, cfg)
+    A = build_matched("recurring", rng, cfg, d, step_ms, variant, t_el, S, foil_sets, patterns,
+                      active, aligned="S")
+    B = build_matched("redrawn" if variant not in ("ungrouped", "onechannel") else "ungrouped",
+                      rng, cfg, d, step_ms, variant, t_el, S, foil_sets, patterns, active,
+                      aligned="none" if variant in ("ungrouped", "onechannel") else "foil")
+    return Trial(seed=seed, variant=variant, step_ms=step_ms, recurring=A, other=B,
+                 n_rebuilds=0, anchored=anchored)
+
+
 def make_trial(cfg: Config, seed: int, step_ms: float, variant: str, max_rebuilds: int = 50,
                d: Optional[Derived] = None) -> Trial:
     """Deterministic in (cfg, seed, step_ms, variant). Reseeds on a placement failure and counts it."""
@@ -290,6 +465,9 @@ def make_trial(cfg: Config, seed: int, step_ms: float, variant: str, max_rebuild
     for attempt in range(max_rebuilds):
         rng = np.random.default_rng([int(seed), attempt, 0xA5F6])
         try:
+            if cfg.matched_incidence and variant != "scattered":
+                tr = make_matched_trial(cfg, d, rng, seed, step_ms, variant)
+                return replace(tr, n_rebuilds=attempt)
             A = build_recurring(rng, cfg, d, step_ms, variant)
             other = (build_ungrouped(rng, cfg, d, A) if variant in ("ungrouped", "onechannel")
                      else build_redrawn(rng, cfg, d, A))   # 'scattered' uses redrawn: same scatter, new channels

@@ -45,6 +45,43 @@ class IntervalMeasures:
     oracle: Dict[str, float]
 
 
+def _bound_set_constancy(cfg: Config, iv, span_grid: int) -> float:
+    """Oracle: how constant is the BOUND set of channels across elements, 0..n_components.
+
+    'Channels active in every element window' answers a question the matched-incidence design
+    deliberately gives the same answer to in both intervals: the target's channels recur in both,
+    bound in one and scattered in the other. The question that separates them is which channels
+    form the group, and whether it is the same group each time. This is given the element
+    schedule, the step and the delay patterns -- everything the listener is not given -- and for
+    each element it finds the onset offset at which the most channels line up into the pattern,
+    then reports the mean overlap of those channel sets across element pairs.
+    """
+    if not iv.patterns or not len(iv.element_onsets):
+        return 0.0
+    step = cfg.ms_to_grid(iv.step_ms)
+    wins = _element_windows(cfg, iv, span_grid)
+    sets = []
+    for k, (a, b) in enumerate(wins):
+        pat = iv.patterns[min(k, len(iv.patterns) - 1)]
+        m = (iv.onset >= a) & (iv.onset < b)
+        on, ch = iv.onset[m], iv.channel[m]
+        if on.size == 0:
+            sets.append(set()); continue
+        best, best_set = -1, set()
+        for off in np.unique(on):
+            got = set()
+            for i in range(pat.size):
+                t = off + int(pat[i]) * step
+                got.update(int(c) for c in ch[on == t])
+            if len(got) > best:
+                best, best_set = len(got), got
+        sets.append(best_set)
+    if len(sets) < 2:
+        return 0.0
+    ov = [len(sets[i] & sets[j]) for i in range(len(sets)) for j in range(i + 1, len(sets))]
+    return float(np.mean(ov)) if ov else 0.0
+
+
 def _element_windows(cfg: Config, iv: Interval, span_grid: int) -> List[Tuple[int, int]]:
     return [(int(t), int(t) + span_grid) for t in iv.element_onsets]
 
@@ -116,6 +153,7 @@ def measure_interval(cfg: Config, d: Derived, iv: Interval, x: np.ndarray, S: np
         per_chan_all &= np.array([np.any((iv.onset[iv.channel == c] >= a) & (iv.onset[iv.channel == c] < b))
                                   for c in range(P)])
     oracle = {"channels_active_in_every_element_window": float(per_chan_all.sum())}
+    oracle["recurring_bound_channels"] = _bound_set_constancy(cfg, iv, span_grid)
     return IntervalMeasures(sc, spec, occ, ef, sc_sched, sc_audio, locked, oracle)
 
 
@@ -301,6 +339,8 @@ def feature_sets(m: IntervalMeasures, cfg: Config) -> Dict[str, Tuple[np.ndarray
     out["all of the above"] = (np.concatenate([v[0] for v in out.values()]), float("nan"))
     out["oracle: knows element windows"] = (np.array([m.oracle["channels_active_in_every_element_window"]]),
                                             m.oracle["channels_active_in_every_element_window"])
+    out["oracle: knows the schedule, finds the bound set"] = (
+        np.array([m.oracle["recurring_bound_channels"]]), m.oracle["recurring_bound_channels"])
     return out
 
 

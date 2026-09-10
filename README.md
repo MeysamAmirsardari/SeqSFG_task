@@ -57,18 +57,32 @@ figures it refers to are in `verification/figures/`.
 
 ## 1. The design in one paragraph
 
-Both intervals of a trial contain the same 744 tones, 31 in every channel of a 24-channel
-pool, arriving over 2.25 s. In the target interval, six figure *elements* of seven
-components each arrive at 3 to 5 Hz, always on the same seven channels. What the other
-interval holds is the manipulation: on the `rising` ladder it holds six elements too, each
-on seven freshly drawn channels, so the listener must hear which set *returns*; on the
-`ungrouped` ladder it holds no elements at all, so the listener need only hear that
-something groups. Figure tones are never added to the background, they are scheduled out
-of each channel's fixed budget, so every channel carries the same number of tones in every
-interval and the long-term spectrum is flat by construction. That is what makes
-grouped-versus-grouped spectrally matchable, and it is why the only thing distinguishing
-the `rising` target is the *conjunction* of channels and relative timing, which is what
-binding means.
+Both intervals of a trial contain the same 330 tones, 11 in every channel of a 30-channel
+pool spaced 1 ERB apart from 200 to 9486 Hz, arriving over 3.2 s. Seven figure *elements*
+of seven components each arrive at 3.1 to 4.0 Hz, so the target is a continuous stream at
+a speech-like rate rather than a few isolated events.
+
+The two intervals are built by a **matched-incidence** construction. Every element puts one
+tone on each of the target's seven channels AND one on each of that element's seven foil
+channels, in *both* intervals. What differs is which of the two is time-aligned: the aligned
+set starts together at the element onset and binds into a group, the other is scattered
+inside the element window and never binds. In the target interval the aligned set is the
+same seven channels every time ("sam, sam, sam"); in the other interval it is seven fresh
+channels each time, drawn so that consecutive elements are *disjoint* and no element shares
+a single pitch with the target set ("bob, kim, she", with no sam anywhere).
+
+That construction is what makes the two intervals comparable. Per-channel tone counts are
+identical, so the long-term spectrum is identical. Every channel that recurs in one interval
+recurs just as often in the other, so single-channel periodicity at the element rate is
+matched channel by channel rather than tuned to match on average. The aligned group also
+takes one shared jitter per element, drawn from the same distribution as the scattered
+offsets, so an aligned channel's inter-onset intervals carry the same jitter a scattered
+one does. What is left over as the only difference between the intervals is the
+*conjunction* of channels and relative timing, which is what binding means.
+
+Half the trials use one fixed figure, the same in every session, so it can be learned; the
+other half draw a fresh figure each trial. The contrast between them is a within-session
+measure of whether a learned regularity helps.
 
 ## 2. Decisions that were genuinely difficult, and what was traded
 
@@ -281,26 +295,39 @@ rejected 8-element configuration it returned p < 0.001 on the same statistic.
 
 This is the section to read first.
 
-**Single-channel periodicity at the element rate.** A channel that recurs in six
-elements carries six quasi-periodic onsets at about 4 Hz; in the redrawn interval no
-channel does. This is not a flaw of the implementation, it *is* recurrence, seen one
-channel at a time, and no construction that keeps "new pitches every time" can remove it.
-It is the one property of the two intervals that the battery cannot drive to zero, and
-§2 shows how it was traded down.
+**Synchrony shows up in across-channel dispersion, and cannot be removed.** The target's
+seven channels are aligned, so they share their onset times exactly and their per-channel
+timing statistics are perfectly correlated. The foil's seven counterpart channels are
+scattered independently, so theirs are not. Any statistic that takes a **max or an SD across
+channels** therefore separates the intervals, even though every channel-averaged statistic
+matches.
 
-Its size at the adopted configuration. The channel-averaged count of same-channel onset
-pairs at element-rate lags is 0.5% higher in the recurring interval, on an effect that is
-itself about 4% (`single_channel.png`). As a fixed rule that gives d' = +0.34, uncorrected
-p = 0.005, which is the largest of the 62 features audited and inside the band the largest
-of 62 reaches by chance (permutation p = 0.14). The learnt single-channel observer is at
-chance (d' = 0.00). The statistic does not vary with `step`, so it can only add a constant
-floor to the psychometric function; it cannot shape it, and a threshold estimated from the
-fall-off is unaffected by a constant. It is measured empirically in a listener by the
-**onechannel** control cell (one channel recurring at the element times against a plain
-background), where it is the only cue available. At 3 to 5 Hz that cell matters more than
-it did at 1.5 Hz: a single channel pulsing at 4 Hz is the kind of regularity listeners are
-known to extract from noise, and the cell's result bounds how much of the main task can be
-done that way.
+The evidence is direct. Measured over 40 trials at step 0, the count of same-channel onset
+pairs at element-rate lags averages 2.242 over the target's channels in the recurring
+interval and 2.248 in the other -- matched to three decimals. But the SD *across* those
+seven channels is 0.32 in the recurring interval and 0.53 in the other, and the max over all
+thirty channels is 2.83 against 3.02. That is the entire leak, and the battery finds it:
+`ch:pairs_iei_norm:max` at d' = -0.53 is the largest of the 62 features, the global
+permutation test over all 62 rejects at p = 0.000, and the combined "all of the above"
+observer reaches d' = +0.31 (Holm p = 0.040). Every individual blind observer is at chance
+(Holm p = 0.700), and no observer x condition cell survives correction.
+
+This is irreducible rather than unfixed. To match the dispersion, the scattered channels
+would have to be correlated too -- each one's onset would have to be a common per-element
+jitter plus a constant per channel -- and a set of channels with a fixed relative timing
+pattern repeated every element is precisely a bound figure. Removing the statistic means
+removing the manipulation. Two constructions that tried were built and measured and are
+worse: making every channel fire at the element rate ("dense incidence") raised the learnt
+single-channel observer to d' = +0.95 with six surviving cells, and the earlier
+`foil_subpool_size` approach, which matched the foil's channel reuse instead, cost so much
+pitch overlap that the task became unlistenable (see §2).
+
+How to read a result against it. An observer computing max-across-channel timing dispersion
+is a synchrony detector: it does not offer a route to the answer that bypasses grouping, it
+detects grouping by a cruder statistic than a listener would. It is not evidence that a
+listener is doing something other than hearing a figure. It does bound the claim: with the
+bound-set oracle at d' = 4.05, this residual is 13% of the available signal, and any
+listener performance below about d' = 0.5 should not be read as figure perception at all.
 
 **Oracle-only differences.** Rows that need to know S differ and must: the union
 occupancy of S (a chord's seven tones overlap in time, so at step 0 the union is 0.04

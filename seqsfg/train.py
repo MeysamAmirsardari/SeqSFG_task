@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import time
+from dataclasses import replace
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -90,6 +91,10 @@ def run_training(cfg: Config, audio, stages: Optional[Sequence[Tuple[str, float]
     """
     if stages is None:
         stages = tuple(cfg.practice_cells)
+    cfg_anchored_fraction = cfg.anchored_fraction
+    # Training always uses the anchored figure, even when the session itself only anchors a
+    # fraction of its trials: you cannot learn a target that changes while you are learning it.
+    cfg = replace(cfg, anchored_fraction=1.0)
     d = validate(cfg)
     rng = np.random.default_rng(seed)
     S = make_trial(cfg, 1, 0.0, "rising", d=d).recurring.figure_set
@@ -99,7 +104,7 @@ def run_training(cfg: Config, audio, stages: Optional[Sequence[Tuple[str, float]
     print("TRAINING.  Nothing here is recorded as data -- this is for your ears.")
     print("=" * 68)
     if cfg.figure_anchor_seed is not None:
-        print(f"\nThe figure is the SAME in every trial. Its {len(S)} pitches, in Hz:")
+        print(f"\nThe figure is the SAME in every trial here. Its {len(S)} pitches, in Hz:")
         print(f"   {freqs}")
         print("Listen to it on its own first, until you can hum the shape.")
         if pause:
@@ -108,7 +113,11 @@ def run_training(cfg: Config, audio, stages: Optional[Sequence[Tuple[str, float]
             make_trial(cfg, 1, 0.0, "rising", d=d).recurring, FIGURE), d)
         for _ in range(3):
             audio.play(fig_only)
-        print("That shape is what you are hunting for in every trial from now on.")
+        print("That shape is what you are hunting for.")
+        if cfg_anchored_fraction < 1.0:
+            print(f"In the real session only {cfg_anchored_fraction:.0%} of trials use THIS figure; the rest\n"
+                  "use a different one drawn fresh. The task is the same either way: which sound\n"
+                  "keeps coming back on the same pitches.")
 
     cleared_all = True
     for si, (variant, step) in enumerate(stages, start=1):

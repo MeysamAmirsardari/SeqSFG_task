@@ -132,4 +132,59 @@ def test_pilot_config_is_at_speech_rate():
     validate(cfg)
     assert 1000.0 / cfg.iei_max_ms >= 3.0, "element rate fell below 3 Hz"
     assert 1000.0 / cfg.iei_min_ms <= 5.0
-    assert cfg.foil_subpool_size is not None, "the subpool is what makes 3-5 Hz affordable"
+    assert cfg.matched_incidence, "matched incidence is what makes 3-5 Hz affordable at n_components=7"
+    assert cfg.n_components >= 7, "7 components is the floor the SFG literature works at"
+
+
+def _pilot():
+    import json, pathlib
+    p = pathlib.Path(__file__).resolve().parent.parent / "pilot_config.json"
+    if not p.exists():
+        pytest.skip("pilot_config.json not present")
+    return config.Config.from_dict(json.loads(p.read_text()))
+
+
+def test_foil_elements_share_no_pitch_with_the_target_or_with_each_other():
+    """'sam sam sam' vs 'bob kim she': no foil element may contain a target pitch, and consecutive
+    foil elements must be disjoint. Both are guaranteed by construction, so this is exact."""
+    cfg = _pilot()
+    d = validate(cfg)
+    for seed in range(1, 26):
+        tr = stimulus.make_trial(cfg, seed, 0.0, "rising", d=d)
+        S = set(tr.recurring.figure_set.tolist())
+        sets = [set(x.tolist()) for x in tr.other.element_sets]
+        for k, g in enumerate(sets):
+            assert not (g & S), f"seed {seed} element {k}: foil element reuses a target pitch"
+        for k, (a, b) in enumerate(zip(sets, sets[1:])):
+            assert not (a & b), f"seed {seed} elements {k},{k+1}: consecutive foil elements overlap"
+
+
+def test_matched_incidence_gives_the_two_intervals_identical_per_channel_counts():
+    """Every channel carries the same number of tones in both intervals, so the long-term spectrum
+    is identical by construction and cannot be what a listener uses."""
+    cfg = _pilot()
+    d = validate(cfg)
+    for seed in range(1, 26):
+        for variant in ("rising", "ungrouped"):
+            tr = stimulus.make_trial(cfg, seed, 0.0, variant, d=d)
+            a = np.bincount(tr.recurring.channel, minlength=d.n_channels)
+            b = np.bincount(tr.other.channel, minlength=d.n_channels)
+            assert np.array_equal(a, b), f"{variant} seed {seed}: per-channel counts differ"
+            assert a.sum() == d.n_active_channels * cfg.tones_per_channel
+
+
+def test_half_the_trials_use_the_anchored_figure():
+    """anchored_fraction=0.5 splits trials between the learnable figure and a fresh one, so a
+    familiar-vs-novel contrast is available within the session."""
+    cfg = _pilot()
+    if cfg.anchored_fraction >= 1.0:
+        pytest.skip("this pilot anchors every trial")
+    d = validate(cfg)
+    trials = [stimulus.make_trial(cfg, s, 0.0, "rising", d=d) for s in range(1, 201)]
+    anchored = [t for t in trials if t.anchored]
+    assert 0.35 * len(trials) < len(anchored) < 0.65 * len(trials)
+    fixed = {tuple(t.recurring.figure_set.tolist()) for t in anchored}
+    assert len(fixed) == 1, "anchored trials must all use the SAME figure"
+    fresh = {tuple(t.recurring.figure_set.tolist()) for t in trials if not t.anchored}
+    assert len(fresh) > 0.5 * (len(trials) - len(anchored)), "unanchored trials must vary"
+    assert not (fixed & fresh), "an unanchored trial happened to reuse the anchored figure"

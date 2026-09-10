@@ -1,38 +1,38 @@
 {
  "sample_rate": 48000,
  "grid_ms": 1.0,
- "pool_low_hz": 250.0,
- "pool_high_hz": 6000.0,
+ "pool_low_hz": 200.0,
+ "pool_high_hz": 10000.0,
  "pool_spacing_erb": 1.0,
  "min_beat_rate_hz": 40.0,
  "tone_dur_ms": 60.0,
  "ramp_ms": 10.0,
  "tone_amplitude": 0.028,
- "tones_per_channel": 22,
+ "tones_per_channel": 11,
  "interval_dur_ms": 3200.0,
- "n_components": 5,
+ "n_components": 7,
  "figure_repeats": 1,
- "figure_min_spacing_channels": 2,
+ "figure_min_spacing_channels": 1,
  "figure_anchor_seed": 20260909,
  "steps_ms": [
   0.0,
-  5.0,
-  9.0,
-  14.0,
-  18.0,
-  23.0
+  4.0,
+  8.0,
+  12.0,
+  16.0,
+  21.0
  ],
  "main_variants": [
   "rising",
   "ungrouped"
  ],
  "n_elements": 7,
- "iei_min_ms": 200.0,
- "iei_max_ms": 333.0,
+ "iei_min_ms": 250.0,
+ "iei_max_ms": 320.0,
  "lead_min_ms": 350.0,
  "lead_max_ms": 600.0,
  "tail_min_ms": 350.0,
- "foil_subpool_size": 12,
+ "foil_subpool_size": null,
  "max_shared_consecutive": 5,
  "max_shared_any": 5,
  "isi_ms": 400.0,
@@ -58,12 +58,8 @@
  "feedback_control": true,
  "control_cells": [
   [
-   "scattered",
-   14.0
-  ],
-  [
    "redrawn",
-   14.0
+   12.0
   ],
   [
    "onechannel",
@@ -82,5 +78,8 @@
  "calibration_dur_s": 5.0,
  "bootstrap_n": 1000,
  "threshold_pc": 0.75,
- "alpha": 0.05
+ "alpha": 0.05,
+ "matched_incidence": true,
+ "foil_universe_size": 23,
+ "anchored_fraction": 0.5
 }
