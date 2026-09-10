@@ -2,8 +2,14 @@
 
 [![Open the playground in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_playground.ipynb)
 
-**Two runnable notebooks.** [`SeqSFG_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_playground.ipynb)
-is the skeptic's notebook (below). [`SeqSFG_strategy.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_strategy.ipynb)
+**Runnable notebooks.** [`SeqSFG_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_playground.ipynb)
+is the skeptic's notebook for the two-interval task (below).
+[`SeqSFG_yesno_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_yesno_playground.ipynb)
+is the same treatment for the single-interval yes/no task of section 9: it plays the naive
+figure-versus-cloud version, shows the envelope cue that makes it 90% solvable without hearing a
+figure, runs the audit live on all three absent classes, lets you take the task yourself, and
+plants a 0.1 dB cue to check the audit catches it.
+[`SeqSFG_strategy.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_strategy.ipynb)
 is the strategy notebook: the crossover hypothesis made quantitative, the ordered-versus-reshuffled
 contrast played aloud, a demonstration that the current design forbids the cross-trial learning the
 hypothesis needs, a **working rate-STDP model prototype**, a power analysis for the order x asynchrony
@@ -774,4 +780,6 @@ seqsfg yesno-run    --config pilot_config.json --code P01       # run a session
 seqsfg yesno-analyze data/P01/session_01
 ```
 
-Reports for all three classes are in `verification/yesno_*_report.txt`.
+Reports for all three classes are in `verification/yesno_*_report.txt`, and
+[`SeqSFG_yesno_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_yesno_playground.ipynb)
+walks through the whole argument with audio.
