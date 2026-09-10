@@ -47,6 +47,19 @@ def envelope_features(env: np.ndarray, frame_ms: float, lag_lo_ms: float, lag_hi
                          (30.0, 150.0, "mod_30_150Hz")):
         sel = (freqs >= lo) & (freqs < hi)
         feats[name] = float(db(np.mean(spec[sel]) if sel.any() else EPS))
+    # explicit burst statistics: a synchronous onset of several tones is a level event, so if the
+    # two intervals differ in how often the envelope spikes, or how hard, that is a cue no
+    # listener needs to hear a figure to use. Counted from the envelope alone, no schedule.
+    med = float(np.median(env))
+    mad = float(np.median(np.abs(env - med))) or EPS
+    interior = env[1:-1]
+    ispeak = (interior > env[:-2]) & (interior >= env[2:])
+    z = (interior - med) / (1.4826 * mad)
+    for thr, tag in ((3.0, "n_bursts_3sd"), (5.0, "n_bursts_5sd")):
+        feats[tag] = float(np.count_nonzero(ispeak & (z > thr)))
+    tall = z[ispeak & (z > 3.0)]
+    feats["burst_height_mean"] = float(tall.mean()) if tall.size else 0.0
+    feats["burst_height_max"] = float(z[ispeak].max()) if np.any(ispeak) else 0.0
     ac = np.correlate(dev, dev, mode="full")[len(dev) - 1:]
     ac = ac / max(ac[0], EPS)
     lags = np.arange(len(ac)) * frame_ms

@@ -50,51 +50,51 @@ class Config:
     grid_ms: float = 1.0                 # onset-time resolution of the schedule
 
     # ---- tone pool -----------------------------------------------------------
-    pool_low_hz: float = 250.0           # lowest channel
-    pool_high_hz: float = 6000.0         # no channel above this
+    pool_low_hz: float = 200.0           # lowest channel
+    pool_high_hz: float = 10000.0        # no channel above this
     pool_spacing_erb: float = 1.0        # channel spacing in ERB units (critical-band rule)
     min_beat_rate_hz: float = 40.0       # adjacent channels must beat faster than this ("throb" rule)
 
     # ---- tones ---------------------------------------------------------------
     tone_dur_ms: float = 30.0
     ramp_ms: float = 5.0                 # raised-cosine onset and offset ramps
-    tone_amplitude: float = 0.031        # linear peak amplitude of one tone, all channels equal
+    tone_amplitude: float = 0.028        # linear peak amplitude of one tone, all channels equal
 
     # ---- background ----------------------------------------------------------
-    tones_per_channel: int = 31          # fixed budget per channel per interval (figure tones included)
-    interval_dur_ms: float = 2250.0
+    tones_per_channel: int = 16          # fixed budget per channel per interval (figure tones included)
+    interval_dur_ms: float = 3400.0
 
     # ---- figure --------------------------------------------------------------
     n_components: int = 7
     figure_repeats: int = 1              # tone-slots each component occupies: the element's DURATION.
                                          # 1 = a single pip (isolated blip); >1 = a sustained figure, as in
                                          # the published stimulus where the figure spans consecutive chords.
-    figure_min_spacing_channels: int = 2 # components of one element at least this many channels apart
-    figure_anchor_seed: Optional[int] = None
+    figure_min_spacing_channels: int = 1 # components of one element at least this many channels apart
+    figure_anchor_seed: Optional[int] = 20260909
     # None  -> the figure occupies FRESH channels on every trial (nothing can be learned across
     #          trials; only the K repetitions inside one trial are available).
     # int   -> the figure occupies the SAME channels on every trial, so a listener accumulates
     #          K x n_trials exposures to one pattern. Required for any claim about implicit
     #          learning. The foil interval still redraws its channels every element, so the
     #          within-trial comparison is unchanged and the per-channel budget still matches.
-    steps_ms: Tuple[float, ...] = (0.0, 5.0, 10.0, 15.0, 20.0, 28.0)
-    main_variants: Tuple[str, ...] = ("rising", "ungrouped")   # one psychometric function each
-    n_elements: int = 6
-    iei_min_ms: float = 200.0            # inter-element onset interval, drawn uniformly: 3-5 Hz
+    steps_ms: Tuple[float, ...] = (0.0, 4.0, 8.0, 12.0, 15.0, 18.0)
+    main_variants: Tuple[str, ...] = ("rising", "redrawn")   # one psychometric function each
+    n_elements: int = 7
+    iei_min_ms: float = 300.0            # inter-element onset interval, drawn uniformly: 3-5 Hz
     iei_max_ms: float = 333.0
-    lead_min_ms: float = 150.0           # first element onset, drawn uniformly
-    lead_max_ms: float = 250.0
-    tail_min_ms: float = 100.0           # guaranteed background after the last element ends
-    matched_incidence: bool = False
+    lead_min_ms: float = 350.0           # first element onset, drawn uniformly
+    lead_max_ms: float = 600.0
+    tail_min_ms: float = 350.0           # guaranteed background after the last element ends
+    matched_incidence: bool = True
     # True -> both intervals carry BOTH the target's channels and the foil's channels at every
     #         element; only which of the two is time-aligned differs. Per-channel counts, channel
     #         recurrence and element-rate structure are then identical by construction, so the
     #         foil's elements can be made maximally unlike each other without reopening the
     #         single-channel periodicity cue that foil_subpool_size was invented to close.
-    foil_universe_size: Optional[int] = None
+    foil_universe_size: Optional[int] = 23
     # size of the channel universe the foil elements are drawn from, disjoint from the figure set.
     # Larger -> more dissimilar consecutive foil elements. Defaults to n_elements*n_components.
-    anchored_fraction: float = 1.0
+    anchored_fraction: float = 0.5
     # fraction of trials that use the anchored (learnable) figure set; the rest draw a fresh one.
     # 0.5 gives a within-session contrast between a familiar figure and a novel one.
     foil_subpool_size: Optional[int] = None
@@ -105,15 +105,15 @@ class Config:
     #         recur ~K*N/Q times and the periodicity of the two intervals is far closer. The
     #         foil's figure still lands on a DIFFERENT set every element, so the manipulation
     #         (does the set recur?) is preserved.
-    max_shared_consecutive: int = 1      # redrawn sets: channels in common with the previous set
-    max_shared_any: int = 2              # redrawn sets: channels in common with any earlier set
+    max_shared_consecutive: int = 5      # redrawn sets: channels in common with the previous set
+    max_shared_any: int = 5              # redrawn sets: channels in common with any earlier set
 
     # ---- trial ---------------------------------------------------------------
     isi_ms: float = 400.0
     lead_silence_ms: float = 50.0
 
     # ---- experiment ----------------------------------------------------------
-    trials_per_condition: int = 14       # main block, per (variant, step) cell; must be even
+    trials_per_condition: int = 10       # main block, per (variant, step) cell; must be even
     max_condition_run: int = 2           # consecutive trials sharing a (variant, step) cell
     max_variant_run: int = 4             # consecutive trials sharing a ladder
     practice_cells: Tuple[Tuple[str, float], ...] = (("ungrouped", 0.0), ("rising", 0.0))
@@ -123,11 +123,10 @@ class Config:
     break_every: int = 40
     feedback_main: bool = True
     feedback_control: bool = True
-    control_cells: Tuple[Tuple[str, float], ...] = (
-        ("scrambled", 15.0), ("scrambled", 28.0),
-        ("redrawn", 15.0), ("redrawn", 28.0),
-        ("onechannel", 0.0),
-    )
+    control_cells: Tuple[Tuple[str, float], ...] = (("ungrouped", 0.0), ("onechannel", 0.0))
+    # 'scattered' used to sit here -- a figure whose components recur on the same channels but
+    # never line up. Matched incidence builds that control into every trial: the interval without
+    # the recurring group still carries the target's channels at every element, scattered.
     control_trials_per_cell: int = 8     # must be even
     max_session_minutes: float = 40.0
     response_allowance_s: float = 1.2    # for the duration estimate only
@@ -238,11 +237,13 @@ def derive(cfg: Config) -> Derived:
     P_act = min(P, N + U) if cfg.matched_incidence else P
     # A matched-incidence element also holds the scattered counterpart tones, which are spread
     # over one element-duration, so its footprint is at least 2*R*D whatever the step is.
-    scat = R * D if cfg.matched_incidence else 0.0
-    spans = tuple((N - 1) * s + R * D + scat for s in cfg.steps_ms)
+    # matched incidence: the element holds the aligned group AND a scattered counterpart of the
+    # same extent, one after the other in the worst case, so its footprint is twice the span.
+    mult = 2.0 if cfg.matched_incidence else 1.0
+    spans = tuple(mult * ((N - 1) * s + R * D) for s in cfg.steps_ms)
     # 'scattered' spreads its components over one element-duration instead of using the step,
     # so its element is 2*R*D wide regardless of the step. Budget for that.
-    control_spans = tuple((2 * R * D if v == "scattered" else (N - 1) * s + R * D + scat)
+    control_spans = tuple((2 * R * D if v == "scattered" else mult * ((N - 1) * s + R * D))
                           for v, s in tuple(cfg.control_cells) + tuple(cfg.practice_cells))
     max_span = max(spans + control_spans) if (spans or control_spans) else D
     sched_max = cfg.lead_max_ms + (K - 1) * cfg.iei_max_ms + max_span + cfg.tail_min_ms

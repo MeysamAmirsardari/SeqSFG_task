@@ -5,11 +5,11 @@
  "pool_high_hz": 10000.0,
  "pool_spacing_erb": 1.0,
  "min_beat_rate_hz": 40.0,
- "tone_dur_ms": 60.0,
- "ramp_ms": 10.0,
+ "tone_dur_ms": 30.0,
+ "ramp_ms": 5.0,
  "tone_amplitude": 0.028,
- "tones_per_channel": 11,
- "interval_dur_ms": 3200.0,
+ "tones_per_channel": 16,
+ "interval_dur_ms": 3400.0,
  "n_components": 7,
  "figure_repeats": 1,
  "figure_min_spacing_channels": 1,
@@ -19,16 +19,16 @@
   4.0,
   8.0,
   12.0,
-  16.0,
-  21.0
+  15.0,
+  18.0
  ],
  "main_variants": [
   "rising",
-  "ungrouped"
+  "redrawn"
  ],
  "n_elements": 7,
- "iei_min_ms": 250.0,
- "iei_max_ms": 320.0,
+ "iei_min_ms": 300.0,
+ "iei_max_ms": 333.0,
  "lead_min_ms": 350.0,
  "lead_max_ms": 600.0,
  "tail_min_ms": 350.0,
@@ -58,8 +58,8 @@
  "feedback_control": true,
  "control_cells": [
   [
-   "redrawn",
-   12.0
+   "ungrouped",
+   0.0
   ],
   [
    "onechannel",

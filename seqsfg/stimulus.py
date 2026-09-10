@@ -367,7 +367,12 @@ def build_matched(role: str, rng: np.random.Generator, cfg: Config, d: Derived, 
     """
     N, K, D, R = cfg.n_components, cfg.n_elements, d.tone_dur_grid, cfg.figure_repeats
     step = cfg.ms_to_grid(step_ms)
-    window = max(1, R * D)
+    # The scattered counterpart spans exactly what the aligned group spans, so extent is
+    # matched at every rung and the ONLY thing the step changes is whether the relative
+    # timing is consistent from element to element. A fixed window would make the group
+    # wider than its scattered counterpart at the top of the ladder -- the target would be
+    # the more smeared of the two, which inverts what the ladder is supposed to measure.
+    window = max(1, (N - 1) * step + R * D)
     S_by_element = [S] * K
     if aligned == "S":
         grp, scat_sets = S_by_element, (foil_sets,)
@@ -530,7 +535,10 @@ def check_invariants(cfg: Config, trial: Trial, d: Optional[Derived] = None) -> 
     ca = np.bincount(A.channel, minlength=d.n_channels)
     co = np.bincount(O.channel, minlength=d.n_channels)
     out["same_channel_counts"] = bool(np.array_equal(ca, co))
-    out["budget_exact"] = bool(np.all(ca == cfg.tones_per_channel))
+    # Every channel the trial uses carries exactly the budget; channels it does not use are
+    # silent in BOTH intervals, so the active set is a property of the trial and never a cue.
+    out["budget_exact"] = bool(np.all(ca[ca > 0] == cfg.tones_per_channel))
+    out["same_active_channels"] = bool(np.array_equal(ca > 0, co > 0))
 
     def no_overlap(iv):
         for c in range(d.n_channels):

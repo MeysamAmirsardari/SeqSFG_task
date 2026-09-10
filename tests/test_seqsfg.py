@@ -63,13 +63,24 @@ def test_trial_invariants(variant, step):
         # by construction its components are placed at random times, not at pattern*step
         assert np.all(np.diff(A.figure_set) >= cfg.figure_min_spacing_channels)
         return
-    # element structure: component i of element k on S[i] at t_k + pattern[i]*step
+    # Element structure: component i of element k sits on S[i] at base_k + pattern[i]*step.
+    # Under matched incidence the whole group also takes one shared jitter per element, drawn from
+    # the same distribution as its scattered counterpart's offsets, so base_k is not t_k itself --
+    # but it is common to every component, which is exactly what makes them a group.
+    # the element window is the same for every variant (derive budgets it from
+    # cfg.n_components), so onechannel's single component still sits inside the full one
+    window = (cfg.n_components - 1) * cfg.ms_to_grid(step) + cfg.figure_repeats * d.tone_dur_grid
     for k in range(cfg.n_elements):
+        bases = set()
         for i in range(n_comp):
             j = np.flatnonzero((A.element == k) & (A.component == i))
             assert j.size == 1
             assert A.channel[j[0]] == A.figure_set[i]
-            assert A.onset[j[0]] == A.element_onsets[k] + A.patterns[k][i] * cfg.ms_to_grid(step)
+            bases.add(int(A.onset[j[0]] - A.patterns[k][i] * cfg.ms_to_grid(step)))
+        assert len(bases) == 1, "components of one element must share a base onset"
+        base = bases.pop()
+        lo = int(A.element_onsets[k])
+        assert lo <= base <= lo + (window if cfg.matched_incidence else 0)
     # figure set spacing
     assert np.all(np.diff(A.figure_set) >= cfg.figure_min_spacing_channels)
     if variant not in ("ungrouped", "onechannel"):

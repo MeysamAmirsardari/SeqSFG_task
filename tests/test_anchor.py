@@ -8,7 +8,7 @@ from seqsfg.stimulus import FIGURE, make_trial
 
 
 def test_anchor_fixes_the_figure_across_trials():
-    cfg = DEFAULT.replace(figure_anchor_seed=12345)
+    cfg = DEFAULT.replace(figure_anchor_seed=12345, anchored_fraction=1.0)
     d = validate(cfg)
     sets = {tuple(make_trial(cfg, 500 + t, 10.0, "rising", d=d).recurring.figure_set.tolist())
             for t in range(12)}
@@ -16,7 +16,7 @@ def test_anchor_fixes_the_figure_across_trials():
 
 
 def test_no_anchor_redraws_every_trial():
-    cfg = DEFAULT.replace(figure_anchor_seed=None)
+    cfg = DEFAULT.replace(figure_anchor_seed=None, anchored_fraction=1.0)
     d = validate(cfg)
     sets = {tuple(make_trial(cfg, 500 + t, 10.0, "rising", d=d).recurring.figure_set.tolist())
             for t in range(12)}
@@ -40,7 +40,7 @@ def test_anchor_leaves_the_foil_free():
 
 @pytest.mark.parametrize("anchor", [None, 999])
 def test_anchor_preserves_every_invariant(anchor):
-    cfg = DEFAULT.replace(figure_anchor_seed=anchor)
+    cfg = DEFAULT.replace(figure_anchor_seed=anchor, anchored_fraction=1.0)
     d = validate(cfg)
     for t in range(6):
         inv = stimulus.check_invariants(cfg, make_trial(cfg, 800 + t, 16.0, "rising", d=d), d)
@@ -49,9 +49,9 @@ def test_anchor_preserves_every_invariant(anchor):
 
 
 def test_anchored_figure_is_reproducible_from_the_seed():
-    a = DEFAULT.replace(figure_anchor_seed=4242)
-    b = DEFAULT.replace(figure_anchor_seed=4242)
-    c = DEFAULT.replace(figure_anchor_seed=4243)
+    a = DEFAULT.replace(figure_anchor_seed=4242, anchored_fraction=1.0)
+    b = DEFAULT.replace(figure_anchor_seed=4242, anchored_fraction=1.0)
+    c = DEFAULT.replace(figure_anchor_seed=4243, anchored_fraction=1.0)
     d = validate(a)
     Sa = make_trial(a, 1, 10.0, "rising", d=d).recurring.figure_set
     Sb = make_trial(b, 9, 10.0, "rising", d=d).recurring.figure_set
@@ -63,7 +63,9 @@ def test_anchored_figure_is_reproducible_from_the_seed():
 def test_figure_repeats_default_reproduces_prior_behaviour():
     assert DEFAULT.figure_repeats == 1
     d = validate(DEFAULT)
-    assert d.spans_ms[0] == DEFAULT.tone_dur_ms
+    # under matched incidence an element also holds its scattered counterpart, so the span is
+    # twice the tone duration at step 0, not once.
+    assert d.spans_ms[0] == 2 * DEFAULT.tone_dur_ms
 
 
 def test_pilot_config_validates_and_is_audible():
@@ -75,19 +77,34 @@ def test_pilot_config_validates_and_is_audible():
     cfg = config.Config.from_dict(json.loads(p.read_text()))
     d = validate(cfg)
     assert cfg.figure_anchor_seed is not None
-    assert cfg.tone_dur_ms >= 50.0, "the pilot config exists because 30 ms tones were inaudible"
+    assert cfg.tone_dur_ms == 30.0, "the pilot runs 30 ms tones"
+    # 30 ms tones were inaudible under the old dense pool; audibility is a masking question, so
+    # assert the thing that actually matters rather than a proxy duration.
+    from seqsfg import pool as pool_mod
+    exc, own = pool_mod.excitation_from_pool(d.channel_freqs_hz, cfg.tone_level_db_spl,
+                                             d.occupancy_per_channel)
+    assert float(np.min(own - exc)) >= 6.0, "a figure tone must clear the pool's own excitation"
     assert d.est_session_minutes <= cfg.max_session_minutes
     assert d.peak_bound < 0.99
 
 
-# ---- the foil subpool, which is what restored the speech rate ----
+# ---- the foil subpool: superseded by matched incidence, kept working and tested ----
+def _legacy():
+    """The pre-matched-incidence construction, which foil_subpool_size belongs to."""
+    return DEFAULT.replace(matched_incidence=False, foil_universe_size=None,
+                           anchored_fraction=1.0, figure_min_spacing_channels=2,
+                           steps_ms=(0.0, 4.0, 8.0, 12.0, 15.0, 18.0),
+                           control_cells=(("ungrouped", 0.0), ("onechannel", 0.0)))
+
+
+
 def test_foil_subpool_concentrates_the_foil_channels():
     """A restricted subpool makes the foil's channels recur nearly as often as the target's,
     which is what removes the single-channel periodicity residual."""
     import numpy as np
     from seqsfg.stimulus import make_trial
-    wide = DEFAULT.replace(foil_subpool_size=None)
-    tight = DEFAULT.replace(foil_subpool_size=12, max_shared_any=5, max_shared_consecutive=5)
+    wide = _legacy()
+    tight = _legacy().replace(foil_subpool_size=12, max_shared_any=5, max_shared_consecutive=5)
     reuse = {}
     for label, cfg in (("wide", wide), ("tight", tight)):
         d = validate(cfg)
@@ -102,7 +119,7 @@ def test_foil_subpool_concentrates_the_foil_channels():
 def test_foil_still_redraws_within_the_subpool():
     """Concentrating the foil must not make it recur, or the manipulation disappears."""
     from seqsfg.stimulus import make_trial
-    cfg = DEFAULT.replace(foil_subpool_size=12, max_shared_any=5, max_shared_consecutive=5)
+    cfg = _legacy().replace(foil_subpool_size=12, max_shared_any=5, max_shared_consecutive=5)
     d = validate(cfg)
     tr = make_trial(cfg, 5, 10.0, "rising", d=d)
     sets = [tuple(s.tolist()) for s in tr.other.element_sets]
@@ -111,14 +128,14 @@ def test_foil_still_redraws_within_the_subpool():
 
 @pytest.mark.parametrize("Q,shared,needle", [
     (7, 5, "must exceed n_components"),
-    (20, 5, "exceeds the"),
+    (16, 5, "exceeds the"),
     (10, 2, "share at least"),
 ])
 def test_validator_refuses_impossible_subpools(Q, shared, needle):
     from seqsfg.config import ConfigError
     with pytest.raises(ConfigError) as e:
-        validate(DEFAULT.replace(foil_subpool_size=Q, max_shared_any=shared,
-                                 max_shared_consecutive=shared))
+        validate(_legacy().replace(foil_subpool_size=Q, max_shared_any=shared,
+                                   max_shared_consecutive=shared))
     assert needle in str(e.value)
 
 
