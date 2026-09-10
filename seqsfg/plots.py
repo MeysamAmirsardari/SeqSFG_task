@@ -141,7 +141,10 @@ def raster_controls(cfg: Config, d: Derived, path: Path, seed: int = 21) -> None
     cells += [(v, s if v != "onechannel" else 0.0,
                {"scrambled": "scrambled: fixed random delay order",
                 "redrawn": "redrawn: delay order new every element",
-                "onechannel": "onechannel: one channel recurs, no group"}.get(v, v))
+                "onechannel": "onechannel: one channel recurs, no group",
+                "scattered": "scattered: pitches recur, onsets never line up",
+                "ungrouped": "ungrouped: no group in B at all",
+                "rising": "rising: components in ascending order"}.get(v, f"{v}: {v}"))
               for v, s in sorted({(cv, mid if cv != "onechannel" else 0.0) for cv, _ in cfg.control_cells})]
     fig, axes = plt.subplots(len(cells), 2, figsize=(14, 2.35 * len(cells)), sharey=True, squeeze=False)
     for i, (variant, step, label) in enumerate(cells):
@@ -161,7 +164,7 @@ def raster_controls(cfg: Config, d: Derived, path: Path, seed: int = 21) -> None
                 ax.set_xlabel("Time (s)")
             for s in ("top", "right"):
                 ax.spines[s].set_visible(False)
-        axes[i][1].text(1.01, 0.5, label.split(": ")[1], transform=axes[i][1].transAxes, fontsize=9,
+        axes[i][1].text(1.01, 0.5, label.split(": ", 1)[-1], transform=axes[i][1].transAxes, fontsize=9,
                         rotation=270, va="center", color="0.35")
     fig.suptitle("The two main ladders (top) and the control variants", fontsize=12)
     fig.tight_layout(rect=(0, 0, 1, 0.975))

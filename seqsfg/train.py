@@ -46,13 +46,50 @@ def make_pair(cfg: Config, d: Derived, seed: int, step_ms: float, variant: str,
 
 DEFAULT_LEVELS = (-30.0, -24.0, -18.0, -12.0, -6.0, 0.0)
 
+STAGE_INTRO = {
+    "ungrouped": "one sound has the group, the other has NOTHING.",
+    "rising": "BOTH sounds have a group. Which one repeats on the SAME pitches?",
+    "scrambled": "BOTH sounds have a group, in a fixed order. Which repeats on the same pitches?",
+    "redrawn": "BOTH sounds have a group whose order changes. Which repeats on the same pitches?",
+    "scattered": "the group never lines up. Which sound's pitches keep coming back?",
+    "onechannel": "one PITCH keeps coming back, with no group at all. Which sound has it?",
+}
 
-def run_training(cfg: Config, audio, stages: Sequence[Tuple[str, float]] = (("ungrouped", 0.0),
-                                                                            ("rising", 0.0)),
+
+def _demo_stage(cfg: Config, d: Derived, audio, variant: str, step: float,
+                seed: int, pause=None, reps: int = 2) -> None:
+    """Both streams with the noise stripped out, labelled, so the contrast is unmistakable.
+
+    The background ladder makes the figure audible; it does not teach you WHICH difference to
+    listen for. For the discrimination stages that is the whole difficulty, so hear it clean first.
+    """
+    tr = make_trial(cfg, seed, step, variant, d=d)
+    tgt = render_interval(cfg, _subset(tr.recurring, FIGURE), d)
+    foil_iv = _subset(tr.other, FIGURE)
+    silent = foil_iv.n_tones == 0
+    foil = render_interval(cfg, foil_iv, d)
+    if pause:
+        pause("Press space to hear both streams with the noise removed, "
+              f"{reps} times each. [space=go, s=skip, q=quit]")
+    for _ in range(reps):
+        print("   [1] TARGET -- the same pitches, coming back over and over")
+        audio.play(tgt)
+        print("   [2] OTHER  -- " + ("no group at all (silence here)" if silent
+                                     else "a new set of pitches every time"))
+        audio.play(foil)
+    print("   That difference is what every trial in this stage asks about.")
+
+
+def run_training(cfg: Config, audio, stages: Optional[Sequence[Tuple[str, float]]] = None,
                  levels_db: Sequence[float] = DEFAULT_LEVELS, per_level: int = 5,
                  criterion: int = 4, max_rounds: int = 3, seed: int = 20260909,
-                 getkey=None, pause=None) -> bool:
-    """Walk up the levels for each stage. Returns True if the real stimulus (0 dB) was cleared."""
+                 getkey=None, pause=None, start_level: int = 0) -> bool:
+    """Walk up the levels for each stage. Returns True if the real stimulus (0 dB) was cleared.
+
+    's' skips the current level and moves on; 'q' quits. Both work at a prompt or mid-level.
+    """
+    if stages is None:
+        stages = tuple(cfg.practice_cells)
     d = validate(cfg)
     rng = np.random.default_rng(seed)
     S = make_trial(cfg, 1, 0.0, "rising", d=d).recurring.figure_set
@@ -75,32 +112,53 @@ def run_training(cfg: Config, audio, stages: Sequence[Tuple[str, float]] = (("un
 
     cleared_all = True
     for si, (variant, step) in enumerate(stages, start=1):
-        head = ("STAGE %d: one sound has the group, the other has NOTHING." % si
-                if variant == "ungrouped" else
-                "STAGE %d: BOTH sounds have a group. Which one repeats on the SAME pitches?" % si)
-        print(f"\n{'-'*68}\n{head}\n{'-'*68}")
-        li = 0
+        label = STAGE_INTRO.get(variant, variant)
+        print(f"\n{'-'*68}\nSTAGE {si} of {len(stages)} ('{variant}', {step:g} ms): {label}"
+              f"\n{'-'*68}")
+        _demo_stage(cfg, d, audio, variant, step, int(rng.integers(1, 2**31 - 1)), pause)
+        li = min(max(start_level, 0), len(levels_db) - 1)
         rounds = 0
+        passed_real = False
         while li < len(levels_db):
             gain = levels_db[li]
             tag = "the real stimulus" if gain == 0 else f"background {gain:+.0f} dB"
             if pause:
-                pause(f"\nLevel {li+1} of {len(levels_db)}: {tag}. {per_level} trials. Press space.")
+                k = pause(f"\nLevel {li+1} of {len(levels_db)}: {tag}. {per_level} trials. "
+                          f"[space=go, s=skip this level, q=quit]")
+                if k == "q":
+                    print("  training stopped.")
+                    return False
+                if k == "s":
+                    print("  skipped.")
+                    li += 1
+                    rounds = 0
+                    continue
             n_ok = 0
+            skipped = False
             for t in range(per_level):
                 tgt = int(rng.integers(1, 3))
                 x = make_pair(cfg, d, int(rng.integers(1, 2**31 - 1)), step, variant, gain, tgt)
                 print(f"  trial {t+1}/{per_level} ...", flush=True)
                 audio.play(x)
-                k = getkey({"1", "2", "q"}, "  which one? [1/2, q=quit]  ") if getkey else "q"
+                k = getkey({"1", "2", "s", "q"},
+                           "  which one? [1/2, s=skip level, q=quit]  ") if getkey else "q"
                 if k == "q":
                     print("  training stopped.")
                     return False
+                if k == "s":
+                    print("  skipped.")
+                    skipped = True
+                    break
                 ok = int(k) == tgt
                 n_ok += ok
                 print("   correct" if ok else f"   wrong - it was {tgt}")
+            if skipped:
+                li += 1
+                rounds = 0
+                continue
             print(f"  => {n_ok}/{per_level} at {tag}")
             if n_ok >= criterion:
+                passed_real = passed_real or gain == 0.0
                 li += 1
                 rounds = 0
                 if li < len(levels_db):
@@ -117,7 +175,11 @@ def run_training(cfg: Config, audio, stages: Sequence[Tuple[str, float]] = (("un
                 else:
                     print("  trying this level again.")
         else:
-            print(f"  STAGE {si} CLEARED at the real stimulus level.")
+            if passed_real:
+                print(f"  STAGE {si} CLEARED at the real stimulus level.")
+            else:
+                print(f"  STAGE {si} ended, but the real level was skipped rather than passed.")
+                cleared_all = False
     print("\n" + "=" * 68)
     print("Training done." + ("  You cleared the real level -- you are ready for the session."
                               if cleared_all else

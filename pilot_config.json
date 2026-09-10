@@ -10,7 +10,7 @@
  "tone_amplitude": 0.028,
  "tones_per_channel": 22,
  "interval_dur_ms": 3200.0,
- "n_components": 7,
+ "n_components": 5,
  "figure_repeats": 1,
  "figure_min_spacing_channels": 2,
  "figure_anchor_seed": 20260909,

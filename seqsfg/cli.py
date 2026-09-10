@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from .config import Config, ConfigError, DEFAULT, describe, validate
+from .config import VARIANTS, Config, ConfigError, DEFAULT, describe, validate
 
 
 def load_config(args) -> Config:
@@ -96,10 +96,18 @@ def cmd_train(args):
 
     def pause(msg):
         print(msg)
-        getkey({" "})
+        return getkey({" ", "s", "q"})
 
+    stages = None
+    if args.stages:
+        easiest = float(cfg.steps_ms[0])
+        stages = tuple((v.strip(), easiest) for v in args.stages.split(",") if v.strip())
+        for v, _ in stages:
+            if v not in VARIANTS:
+                raise SystemExit(f"unknown stage {v!r}; choose from {', '.join(VARIANTS)}")
     try:
-        run_training(cfg, audio, per_level=args.per_level, criterion=args.criterion,
+        run_training(cfg, audio, stages=stages, per_level=args.per_level,
+                     criterion=args.criterion, start_level=args.start_level,
                      getkey=getkey, pause=pause)
     except (QuitRequested, KeyboardInterrupt):
         print("\ntraining stopped. Nothing here is recorded, so just run it again when you want.")
@@ -181,6 +189,11 @@ def main(argv=None):
     q.add_argument("--device"); q.add_argument("--no-audio", action="store_true")
     q.add_argument("--per-level", type=int, default=5, help="trials at each background level")
     q.add_argument("--criterion", type=int, default=4, help="correct needed to move a level harder")
+    q.add_argument("--stages", help="comma-separated variants to train on, e.g. 'rising' for the "
+                                    "repeated-vs-different-pitch task only (default: the config's "
+                                    "practice stages)")
+    q.add_argument("--start-level", type=int, default=0,
+                   help="skip straight to this background level (0 = easiest)")
     q.set_defaults(fn=cmd_train)
 
     q = sub.add_parser("calibrate", help="loop the reference tone for level calibration"); add_common(q)
