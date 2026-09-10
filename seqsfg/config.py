@@ -56,13 +56,13 @@ class Config:
     min_beat_rate_hz: float = 40.0       # adjacent channels must beat faster than this ("throb" rule)
 
     # ---- tones ---------------------------------------------------------------
-    tone_dur_ms: float = 30.0
+    tone_dur_ms: float = 45.0
     ramp_ms: float = 5.0                 # raised-cosine onset and offset ramps
     tone_amplitude: float = 0.028        # linear peak amplitude of one tone, all channels equal
 
     # ---- background ----------------------------------------------------------
-    tones_per_channel: int = 16          # fixed budget per channel per interval (figure tones included)
-    interval_dur_ms: float = 3400.0
+    tones_per_channel: int = 20          # fixed budget per channel per interval (figure tones included)
+    interval_dur_ms: float = 4000.0
 
     # ---- figure --------------------------------------------------------------
     n_components: int = 7
@@ -77,9 +77,9 @@ class Config:
     #          K x n_trials exposures to one pattern. Required for any claim about implicit
     #          learning. The foil interval still redraws its channels every element, so the
     #          within-trial comparison is unchanged and the per-channel budget still matches.
-    steps_ms: Tuple[float, ...] = (0.0, 4.0, 8.0, 12.0, 15.0, 18.0)
+    steps_ms: Tuple[float, ...] = (0.0, 4.0, 7.0, 11.0, 14.0, 17.0)
     main_variants: Tuple[str, ...] = ("rising", "redrawn")   # one psychometric function each
-    n_elements: int = 7
+    n_elements: int = 9
     iei_min_ms: float = 300.0            # inter-element onset interval, drawn uniformly: 3-5 Hz
     iei_max_ms: float = 333.0
     lead_min_ms: float = 350.0           # first element onset, drawn uniformly

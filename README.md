@@ -57,10 +57,10 @@ figures it refers to are in `verification/figures/`.
 
 ## 1. The design in one paragraph
 
-Both intervals of a trial contain the same 480 tones, 16 in every channel of a 30-channel
-pool spaced 1 ERB apart from 200 to 9486 Hz, arriving over 3.4 s. Tones are 30 ms with 5 ms
-ramps. Seven figure *elements* of seven components each arrive at 3.0 to 3.3 Hz, so the
-target is a continuous stream at a speech-like rate rather than a few isolated events.
+Both intervals of a trial contain the same 600 tones, 20 in every channel of a 30-channel
+pool spaced 1 ERB apart from 200 to 9486 Hz, arriving over 4.0 s. Tones are 45 ms with 5 ms
+ramps. Nine figure *elements* of seven components each arrive at 3.0 to 3.3 Hz, so the target
+is a 2.5 s continuous stream at a speech-like rate rather than a few isolated events.
 
 The two intervals are built by a **matched-incidence** construction. Every element puts one
 tone on each of the target's seven channels AND one on each of that element's seven foil
@@ -92,10 +92,10 @@ measure of whether a learned regularity helps.
 compare two intervals that both contain bound elements. The obvious construction (add the
 figure's tones on top of a random background) fails immediately: the recurring interval
 piles extra tones into each of seven channels and the long-term spectrum reads it off
-without any binding. The fix is a fixed per-channel budget (16 tones per channel per
-3.4 s interval), out of which figure tones are scheduled rather than added. A recurring
-channel then has 7 element tones and 9 background tones; every channel the trial uses carries
-16 either way; the long-term spectrum is identical in the two intervals by construction, and
+without any binding. The fix is a fixed per-channel budget (20 tones per channel per
+4.0 s interval), out of which figure tones are scheduled rather than added. A recurring
+channel then has 9 element tones and 11 background tones; every channel the trial uses carries
+20 either way; the long-term spectrum is identical in the two intervals by construction, and
 the battery measures per-channel counts as exactly equal. The grouped-versus-grouped
 comparison is therefore used as the main experiment. The ungrouped comparison is kept as a
 second ladder, with its known envelope cue reported below.
@@ -141,13 +141,13 @@ is exactly the cue §4 says that foil affords.
 paradigm: a stream at a speech-like rate, not a few isolated events. The cost is the top of
 the ladder. Elements must not run into each other, and a matched-incidence element holds the
 aligned group *and* a scattered counterpart of the same extent, so its footprint is twice the
-span. With seven components of 30 ms that caps the step at 20 ms and the adopted ladder stops
-at 18 ms, an adjacent-component overlap of 0.40. Reaching zero overlap would need a step of
-30 ms, a 420 ms element footprint, and therefore an element period longer than 420 ms -- 2.4
-Hz, below the floor this paradigm exists to respect. That is a real limit, not an oversight:
-at 3 Hz with seven 30 ms components the ladder can span overlap 1.00 down to 0.40 and no
-further, and if a listener's psychometric function has not fallen by then the remaining lever
-is the background, not the step.
+span. With seven components of 45 ms that caps the step at 17 ms, an adjacent-component overlap of
+0.62. Tone duration and ladder reach trade directly against each other at a fixed rate,
+because the footprint is twice `(N-1)*step + D`: 30 ms tones reach overlap 0.33, 45 ms reach
+0.62, 60 ms reach 0.75. Forty-five is what this pilot runs, so the ladder spans 1.00 down to
+0.62 and no further, and the whole informative range is 0 to 17 ms. If a listener's
+psychometric function has not fallen by then the levers are shorter tones or the background,
+not a wider step.
 
 What the rate used to cost, and no longer does, was single-channel periodicity: a channel
 recurring at 3 Hz is a rhythm, and in the target interval seven channels had it while in the
@@ -175,27 +175,27 @@ some pitch reuse at longer lags is arithmetic rather than a choice (see section 
 
 **Equal amplitude, no loudness weighting.** Table [7] of the battery computes, per channel,
 the excitation produced by the rest of the pool (roex filters, Glasberg & Moore ERBs) against
-the absolute threshold (Terhardt). Masking exceeds absolute threshold by 27 to 49 dB in every
-channel, so masking and not audibility limits every channel, and every tone stands 15.6 to
-19.5 dB above the pool's excitation in its own filter. That headroom is why 30 ms tones work
+the absolute threshold (Terhardt). Masking exceeds absolute threshold by 29 to 51 dB in every
+channel, so masking and not audibility limits every channel, and every tone stands 13.6 to
+17.5 dB above the pool's excitation in its own filter. That headroom is why short tones work
 here: the earlier configuration that made them inaudible was denser, not shorter. An
 equal-loudness style correction (A-weighting is shown as the concrete example) would spread
 the levels *within one element* by up to 12.1 dB, which is the last thing components meant to
 bind by common onset should have.
 
-**Tone duration and the sweep, together.** With seven components of 30 ms, adjacent
-components stop overlapping at `step = 30 ms`. The ladder `0, 4, 8, 12, 15, 18 ms` runs
-adjacent-component overlap 1.00, 0.87, 0.73, 0.60, 0.50, 0.40; the maximum number of
-components sounding at once runs 7, 7, 4, 3, 2, 2 and the element span runs 30 to 138 ms. The
+**Tone duration and the sweep, together.** With seven components of 45 ms, adjacent
+components stop overlapping at `step = 45 ms`. The ladder `0, 4, 7, 11, 14, 17 ms` runs
+adjacent-component overlap 1.00, 0.91, 0.84, 0.76, 0.69, 0.62; the maximum number of
+components sounding at once runs 7, 7, 7, 5, 4, 3 and the element span runs 45 to 147 ms. The
 top of the ladder is set by the rate (see above), not by choice. The ladder is a configuration
 entry and should be re-centred after piloting; the analysis refuses to report a threshold that
 its own data do not bracket.
 
 **Element rate versus widest element.** Elements must not run into each other, so the minimum
-inter-element interval (300 ms) must exceed the widest element footprint (276 ms at
-`step = 18`, which is twice the 138 ms span because the element carries its scattered
-counterpart too). With seven elements, a jittered interval of U[300, 333] ms, a lead of
-U[350, 600] ms and a guaranteed 350 ms tail, the worst case is 3224 ms inside a 3400 ms
+inter-element interval (300 ms) must exceed the widest element footprint (294 ms at
+`step = 17`, which is twice the 147 ms span because the element carries its scattered
+counterpart too). With nine elements, a jittered interval of U[300, 333] ms, a lead of
+U[350, 600] ms and a guaranteed 350 ms tail, the worst case is 3908 ms inside a 4000 ms
 interval. The validator computes this and refuses anything that does not fit; nothing is ever
 clipped or rejected after being drawn, and the battery reports the realised inter-element
 interval distribution.
@@ -229,27 +229,27 @@ Between the two intervals of a trial, at every step:
 
 | property | how measured | result |
 |---|---|---|
-| total number of tones | schedule | 480 / 480, exact, every condition |
+| total number of tones | schedule | 600 / 600, exact, every condition |
 | tones sounding at any instant (mean, min, max) | schedule, 1 ms grid; and demodulated audio | mean and min exact; max within 0.35 +/- 0.24 |
-| long-term RMS | audio | differences under 0.005 dB, none beyond 2 SE |
-| long-term spectrum, band by band | complex demodulation at each channel frequency, 40 ms Hann | mean per-channel abs(A-B) 0.053 to 0.058 dB, worst channel 0.33 dB; peakedness matched |
+| long-term RMS | audio | differences under 0.005 dB |
+| long-term spectrum, band by band | complex demodulation at each channel frequency, 40 ms Hann | mean per-channel abs(A-B) 0.034 to 0.036 dB, worst channel 0.21 dB; peakedness matched |
 | per-channel tone counts | schedule | identical channel by channel, exact, by construction |
 | occupancy of every channel | audio on-states | identical to four decimals |
 | occupancy of the figure's channels | schedule and audio, per channel | identical by construction |
-| figure components sounding simultaneously | schedule, per element | 7.00 / 7.00 at step 0; matched to 0.33 at every step |
-| figure components starting in the same instant | schedule | 7 / 7 at step 0; matched to 0.06 elsewhere |
-| tones inside element windows | schedule | matched at every step, largest difference 0.12 +/- 0.13 |
+| figure components sounding simultaneously | schedule, per element | 7.00 / 7.00 at step 0; matched to 0.29 at every step |
+| figure components starting in the same instant | schedule | 7 / 7 at step 0, exact; matched to 0.03 elsewhere |
+| tones inside element windows | schedule | matched at every step, largest difference 0.15 +/- 0.06 |
 | broadband envelope: modulation depth, IEI-lag autocorrelation | 2 ms RMS frames | matched |
 | envelope bursts: count above 3 SD and 5 SD, mean and max height | 2 ms RMS frames, no schedule | matched; see section 4 |
-| element-locked envelope, averaged over elements | linear average of RMS frames | peak-to-trough matched at every step, largest difference 0.29 +/- 0.20 dB |
+| element-locked envelope, averaged over elements | linear average of RMS frames | peak-to-trough matched at every step, largest difference 0.19 +/- 0.12 dB |
 | element-to-element loudness variation | RMS per element window | matched |
 
 Every row above is for the `rising` ladder, which carries the inference. The `ungrouped`
 ladder does not match on envelope and cannot; that is section 4.
 
-Across conditions: seven elements per interval; inter-element interval mean 315 to 319 ms,
-sd 9 to 10 ms, min 300, max 333; element span 30 to 138 ms across the ladder; 16 tones in
-every channel the trial uses; 4.2 tones sounding on average; RMS identical to 0.005 dB.
+Across conditions: nine elements per interval; inter-element interval mean 316 to 317 ms,
+sd 10 ms, min 300, max 333; element span 45 to 147 ms across the ladder; 20 tones in every
+channel the trial uses; 6.8 tones sounding on average; RMS identical to 0.005 dB.
 
 ### The ideal observers
 
@@ -316,16 +316,23 @@ manipulation.
 
 What can be done is to put it under the noise. Each channel's timing statistics are estimated
 from that channel's own tones, so the background tones sharing the channel act as independent
-noise on the estimate. At `tones_per_channel = 11` the figure's seven tones dominated the
-estimate and the leak was plainly visible: the learnt single-channel observer reached
-d' = +0.50 (Holm p = 0.000), one observer x condition cell survived correction, and the
-global permutation test over all features rejected at p = 0.002. At 16 it is gone from the
-audit: every blind observer is at chance (largest d' = +0.19, Holm p = 0.532), no cell
-survives, the largest of the 66 features audited is `env:mod_3_10Hz` at d' = 0.33 against a
-relabelling 95th percentile of 0.374, and the global permutation test does not reject
-(p = 0.197). Sixteen is what the shipped config uses.
+noise on the estimate, and the leak's visibility tracks how many of them there are. It has
+surfaced twice and been buried twice by the same knob:
 
-State that honestly: the mechanism has not been removed, it has been driven below what a
+| tone duration | tones per channel | result on the `rising` ladder |
+|---|---|---|
+| 30 ms | 11 | learnt single-channel observer d' = +0.50 (Holm p = 0.000), 1 cell surviving, permutation p = 0.002 |
+| 30 ms | 16 | every observer at chance, no cell surviving, permutation p = 0.197 |
+| 45 ms | 16 | permutation p = 0.001, largest feature `ch_audio:pairs_iei_norm:sd` at 0.497 |
+| **45 ms** | **20 (shipped)** | **every observer at chance, no cell surviving, permutation p = 0.298** |
+
+Longer tones raise per-channel occupancy, which leaves `place_free` less room and makes
+background placement less independent of the element tones, so 45 ms needed more background
+tones than 30 ms did to hide the same thing. Extending the interval to 4.0 s and the stream to
+nine elements pays for those extra tones: density is 150 tones/s, against 176 if the same
+budget were packed into 3.4 s.
+
+State it honestly: the mechanism has not been removed, it has been driven below what a
 240-trial audit can detect. A much larger audit would find it again. The size that matters is
 the one a listener could exploit in a session of this length, and at this configuration that
 is bounded by the audit above.
@@ -333,15 +340,23 @@ is bounded by the audit above.
 **Envelope bursts specifically.** A synchronous onset of seven tones is a level event, so the
 first thing to check is whether the two intervals differ in how often the envelope spikes or
 how hard. They do not. Measured over 80 trials at step 0, the rung where the group is a
-perfect chord and bursts are most likely to differ: peaks above 3 SD number 28.6 in the
-target against 29.2 in the foil (d' = -0.11), peaks above 5 SD 5.61 against 5.26
-(d' = +0.08), mean peak height 4.27 against 4.25 (d' = +0.07), crest factor 2.706 against
-2.674 (d' = +0.13), kurtosis 5.11 against 5.07 (d' = +0.07), and overall level matches to
-0.000 dB (d' = -0.02). The reason is structural: *both* intervals contain exactly one aligned
-set of seven and one scattered set of seven per element, so a burst in one has a burst
-opposite it in the other. Modulation in the element-rate band is the largest envelope
-difference at d' = +0.28, still inside the band the largest of 66 features reaches by chance.
-All four burst statistics are part of the audited feature set, not a separate check.
+perfect chord and bursts are most likely to differ:
+
+| envelope statistic | target | foil | d' |
+|---|---|---|---|
+| peaks above 3 SD | 34.95 | 35.44 | -0.04 |
+| peaks above 5 SD | 1.66 | 1.70 | -0.02 |
+| mean peak height (SD units) | 3.744 | 3.747 | -0.02 |
+| max peak height (SD units) | 5.30 | 5.46 | -0.17 |
+| crest factor | 2.250 | 2.295 | -0.23 |
+| kurtosis | 4.41 | 4.46 | -0.12 |
+| level | -26.426 dB | -26.424 dB | -0.31 |
+
+The reason is structural: *both* intervals contain exactly one aligned set of seven and one
+scattered set of seven per element, so a burst in one has a burst opposite it in the other.
+All four burst statistics are part of the audited feature set, not a separate check, and the
+learnt envelope observer runs between -0.27 and +0.64 across the `rising` ladder and -0.54 to
++0.36 across `redrawn`.
 
 **Oracle-only differences.** Rows that need to know S differ and must: the union
 occupancy of S (a chord's seven tones overlap in time, so at step 0 the union is 0.04
@@ -350,7 +365,7 @@ lower in the recurring interval); the maximum number of S channels sounding at o
 element's own channels, because a recurring channel holds 25 background tones where a
 redrawn one holds about 30. None of these are visible to an observer that does not know S.
 
-**Momentary silences.** With 4.2 tones sounding on average the cloud is sparse, and the
+**Momentary silences.** With 6.8 tones sounding on average the cloud is sparse, and the
 instantaneous count reaches zero briefly in most intervals (row "tones sounding: min", which
 the battery reports as exactly equal between the two intervals of every trial). It does so
 equally in both, so it is texture rather than a cue -- but it is texture, and a listener will
@@ -367,10 +382,10 @@ onsets, which is giving it a group. The trichotomy is real: a foil is either gro
 What the battery measures, per step, for an observer with access to the broadband envelope
 and nothing else:
 
-| step | 0 ms | 4 ms | 8 ms | 12 ms | 15 ms | 18 ms |
+| step | 0 ms | 4 ms | 7 ms | 11 ms | 14 ms | 17 ms |
 |---|---|---|---|---|---|---|
-| `rising` ladder, envelope observer d' | +0.09 | -0.27 | +0.09 | +0.09 | +0.09 | +0.45 |
-| `redrawn` ladder, envelope observer d' | +0.36 | +0.45 | +0.18 | +0.09 | -0.27 | +0.36 |
+| `rising` ladder, envelope observer d' | +0.36 | -0.09 | +0.64 | -0.18 | -0.27 | +0.18 |
+| `redrawn` ladder, envelope observer d' | +0.18 | +0.00 | +0.36 | +0.00 | +0.36 | +0.09 |
 | `ungrouped` ladder, envelope observer d' | **+2.33** | **+1.47** | **+0.36** | **+0.95** | **+1.19** | **+1.63** |
 
 **This changed with matched incidence, and it changed for the worse.** In the earlier
@@ -387,10 +402,9 @@ rather than a contaminant: practice stage 1, where a listener has to hear that s
 groups at all, and one control cell at step 0. The second psychometric function is `redrawn`
 -- the figure returns on the same pitches but in a fresh delay order every element -- which
 asks whether a consistent *order* buys anything beyond a consistent *pitch set*, and which
-the battery finds clean at every step (envelope observer between -0.27 and +0.45, global
-permutation over all 66 features p = 0.571, no observer x condition cell surviving
-correction). Its one flag is the pooled "all of the above" observer at d' = +0.31, Holm
-p = 0.040, against a global permutation that does not reject; that is reported, not hidden.
+the battery finds clean at every step (envelope observer between -0.54 and +0.36, global
+permutation over all 66 features p = 0.622, no observer x condition cell surviving
+correction, no blind observer above chance).
 
 The `rising` ladder has no envelope route at any step, which is why it carries the inference
 and why the validator refuses a configuration that drops it.
@@ -419,13 +433,14 @@ Cells (3) and (4) change tone durations, so the per-channel budget must then be 
 in occupied time rather than tone count, and the battery must be rerun on them. They are
 proposed, not implemented.
 
-**The ladder stops short of non-overlap.** At 3 Hz the widest element footprint that fits is
-276 ms, so the largest step is 18 ms and adjacent components still overlap by 40%. If the
-psychometric function has not reached floor by 18 ms the experiment cannot say where it does.
-The arithmetic is in section 2: reaching zero overlap needs a 420 ms element footprint and
-therefore an element period above 420 ms, which is 2.4 Hz. The fixes are all configuration
-entries -- fewer components, shorter tones, or a rate floor below 3 Hz -- and each gives up
-something the paradigm was built to keep.
+**The ladder stops well short of non-overlap.** At 3 Hz with 45 ms tones the widest element
+footprint that fits is 294 ms, so the largest step is 17 ms and adjacent components still
+overlap by 62%. This is the sharpest limit in the design: the whole ladder lives in the upper
+third of the overlap range, and if the psychometric function has not fallen by 17 ms the
+experiment cannot say where it does. Tone duration is the lever, and it is a direct trade --
+30 ms tones reach overlap 0.33, 45 ms reach 0.62, 60 ms reach 0.75. The others are fewer
+components or a rate floor below 3 Hz, and each gives up something the paradigm was built to
+keep.
 
 **The single-channel and duration issues are the residue; everything else that could be
 named was matched and measured.** Rows in the report marked `*` outside the oracle rows
@@ -444,7 +459,7 @@ seeds.
    is whether the two need different psychometric functions at all. What a reviewer will
    press on instead is the asymmetry in what the two curves can be trusted to mean: the
    `rising` curve is clean at every step, the `ungrouped` curve is clean only from 10 ms
-   (§4). Expect to be asked to base any claim about the interplay on the 8 to 18 ms range,
+   (§4). Expect to be asked to base any claim about the interplay on the 7 to 17 ms range,
    or to add the envelope-observer curve to the figure as a reference.
 3. **Length and simultaneity are confounded with asynchrony** (above). The 2 × 2 is
    proposed, not implemented, and a reviewer will ask for at least cell (3).
@@ -452,9 +467,10 @@ seeds.
    11% jitter, temporal expectation can direct attention to the elements. Because both
    intervals share the schedule this is not a cue for the judgment, but it is a mechanism
    the discussion has to own: the recurring channels are sampled at predictable times.
-5. **The ladder is capped at 18 ms by the rate**, and the synchrony residual is driven
-   below the audit's noise floor rather than eliminated. Both are stated with numbers; a
-   reviewer can disagree with the trade but not discover it.
+5. **The ladder is capped at 17 ms by the rate and the 45 ms tone**, so it never leaves the
+   upper third of the overlap range, and the synchrony residual is driven below the audit's
+   noise floor rather than eliminated. Both are stated with numbers; a reviewer can disagree
+   with the trade but not discover it.
 6. **Group-level inference is not implemented.** The analysis is per listener (with
    pooling of a listener's sessions). Thresholds across listeners, or a mixed-effects
    logistic model of correctness on step and ladder, are needed for a paper and are a
@@ -529,14 +545,14 @@ their seeds; the rest reuse one run of the battery.
   changes, and in practice, when the foil has no group at all, nothing in it comes back. The
   listener never switches task.
 * **Practice runs in two stages**, each with feedback and a criterion of 10 of 12, up to
-  two attempts each. Stage 1 is `ungrouped` at step 0 (a chord against a plain background,
-  the clearest demonstration of the target percept); stage 2 is `rising` at step 0, which
-  teaches that both intervals can contain a group and only one repeats. A session that
+  two attempts each. Stage 1 is `ungrouped` at step 0 (a chord against a background with no
+  group in it, the clearest demonstration of the target percept); stage 2 is `rising` at
+  step 0, which teaches that both intervals can contain a group and only one repeats. A session that
   fails either stage stops and is recorded as `practice_criterion_not_met`, naming the
   stage that failed.
 * **Main block**: 2 ladders (`rising`, `redrawn`) × 6 steps × 10 trials = 120.
   **Control block**: 2 cells × 8 = 16 (`ungrouped` at 0 ms, `onechannel` at 0 ms).
-  Self-paced breaks every 40 trials and between blocks. Estimated session 33.7 minutes; the
+  Self-paced breaks every 40 trials and between blocks. Estimated session 36.9 minutes; the
   validator refuses a configuration that exceeds 40.
 * **Half of every cell uses the anchored figure**, the other half a figure drawn fresh for
   that trial. The split is deterministic in the trial seed, recorded per trial, and is the

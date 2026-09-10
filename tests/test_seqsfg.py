@@ -48,8 +48,13 @@ def test_config_roundtrip_and_hash():
     assert DEFAULT.hash() != DEFAULT.replace(tone_dur_ms=60.0).hash()
 
 
+# Steps come from the shipped ladder: a step wide enough to make elements collide is refused by
+# the validator, so hard-coding one only tests that the validator was bypassed.
+_LADDER = (DEFAULT.steps_ms[0], DEFAULT.steps_ms[len(DEFAULT.steps_ms) // 2], DEFAULT.steps_ms[-1])
+
+
 @pytest.mark.parametrize("variant", config.VARIANTS)
-@pytest.mark.parametrize("step", [0.0, 35.0, 75.0])
+@pytest.mark.parametrize("step", _LADDER)
 def test_trial_invariants(variant, step):
     cfg = DEFAULT
     d = derive(cfg)
@@ -313,7 +318,9 @@ def _tiny_battery(n_trials=6, seed=3):
     from seqsfg import verify
     cfg = DEFAULT
     return cfg, verify.run_battery(cfg, n_trials=n_trials, seed=seed,
-                                   conditions=[("rising", 0.0), ("rising", 75.0)], verbose=False)
+                                   conditions=[("rising", float(DEFAULT.steps_ms[0])),
+                                               ("rising", float(DEFAULT.steps_ms[-1]))],
+                                   verbose=False)
 
 
 def test_permutation_audit_is_calibrated_on_exchangeable_data():

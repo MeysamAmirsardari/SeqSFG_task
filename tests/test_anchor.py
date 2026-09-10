@@ -77,8 +77,8 @@ def test_pilot_config_validates_and_is_audible():
     cfg = config.Config.from_dict(json.loads(p.read_text()))
     d = validate(cfg)
     assert cfg.figure_anchor_seed is not None
-    assert cfg.tone_dur_ms == 30.0, "the pilot runs 30 ms tones"
-    # 30 ms tones were inaudible under the old dense pool; audibility is a masking question, so
+    assert cfg.tone_dur_ms == 45.0, "the pilot runs 45 ms tones"
+    # Short tones were inaudible under the old dense pool; audibility is a masking question, so
     # assert the thing that actually matters rather than a proxy duration.
     from seqsfg import pool as pool_mod
     exc, own = pool_mod.excitation_from_pool(d.channel_freqs_hz, cfg.tone_level_db_spl,
