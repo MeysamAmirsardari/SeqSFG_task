@@ -556,19 +556,35 @@ def _anchored_for(cfg: Config, seed: int) -> bool:
 
 
 def make_matched_trial(cfg: Config, d: Derived, rng: np.random.Generator, seed: int,
-                       step_ms: float, variant: str) -> "Trial":
+                       step_ms: float, variant: str, order: Optional[Sequence[int]] = None,
+                       figure_set: Optional[np.ndarray] = None) -> "Trial":
+    """`order` fixes the within-element onset order, `figure_set` fixes the channels.
+
+    Both default to None, which is the behaviour every existing caller gets: the order comes
+    from the variant and the channels from the anchor mechanism. They exist for experiments
+    that need ONE named sequence held constant across phases, where neither a per-variant rule
+    nor a per-trial anchor coin-flip is the right thing.
+    """
     P, N, K = d.n_channels, cfg.n_components, cfg.n_elements
     anchored = _anchored_for(cfg, seed)
     set_rng = np.random.default_rng([int(cfg.figure_anchor_seed), 0xF16]) if anchored else rng
     band = cfg.figure_band_channels
-    if variant == "onechannel":
+    if figure_set is not None:
+        S = np.asarray(figure_set, dtype=int).copy()
+    elif variant == "onechannel":
         S = np.array([int(set_rng.integers(P))])
-        patterns = [np.zeros(1, dtype=int) for _ in range(K)]
     elif band:
         S = sample_banded_figure_set(set_rng, cfg, P, band)
-        patterns = sample_patterns(rng, cfg, variant)
     else:
         S = sample_figure_set(set_rng, P, N, cfg.figure_min_spacing_channels)
+    if order is not None:
+        o = np.asarray(order, dtype=int)
+        if o.shape != (S.size,) or sorted(o.tolist()) != list(range(S.size)):
+            raise ValueError(f"order must be a permutation of range({S.size}), got {o.tolist()}")
+        patterns = [o.copy() for _ in range(K)]
+    elif variant == "onechannel":
+        patterns = [np.zeros(1, dtype=int) for _ in range(K)]
+    else:
         patterns = sample_patterns(rng, cfg, variant)
     U = cfg.foil_universe_size or (K * N)
     universe = sample_foil_universe(rng, cfg, P, S, U)
@@ -588,7 +604,8 @@ def make_matched_trial(cfg: Config, d: Derived, rng: np.random.Generator, seed: 
 
 
 def make_trial(cfg: Config, seed: int, step_ms: float, variant: str, max_rebuilds: int = 50,
-               d: Optional[Derived] = None) -> Trial:
+               d: Optional[Derived] = None, order: Optional[Sequence[int]] = None,
+               figure_set: Optional[np.ndarray] = None) -> Trial:
     """Deterministic in (cfg, seed, step_ms, variant). Reseeds on a placement failure and counts it."""
     if variant not in VARIANTS:
         raise ValueError(f"variant must be one of {VARIANTS}")
@@ -597,8 +614,11 @@ def make_trial(cfg: Config, seed: int, step_ms: float, variant: str, max_rebuild
         rng = np.random.default_rng([int(seed), attempt, 0xA5F6])
         try:
             if cfg.matched_incidence and variant != "scattered":
-                tr = make_matched_trial(cfg, d, rng, seed, step_ms, variant)
+                tr = make_matched_trial(cfg, d, rng, seed, step_ms, variant, order, figure_set)
                 return replace(tr, n_rebuilds=attempt)
+            if order is not None or figure_set is not None:
+                raise NotImplementedError("a fixed order or figure set needs matched_incidence=True "
+                                          "and a variant other than 'scattered'")
             A = build_recurring(rng, cfg, d, step_ms, variant)
             other = (build_ungrouped(rng, cfg, d, A) if variant in ("ungrouped", "onechannel")
                      else build_redrawn(rng, cfg, d, A))   # 'scattered' uses redrawn: same scatter, new channels

@@ -1,0 +1,149 @@
+SIMULATED SESSIONS - NOT DATA FROM LISTENERS
+===========================================
+Produced by:  seqsfg exposure-run --preset exposure_pilot.json --no-audio --auto 12 --fast --code SIM0n
+The --auto listener is a normal-variance detector whose sensitivity falls with the onset
+step and which is given a +0.6 d' bonus on the trained sequence at post, purely so that the
+pipeline and the analysis are exercised on a non-null case. It is not a model of hearing,
+of learning, or of anything else. Nothing here is evidence about the hypothesis.
+
+
+============================================================================================
+EXPOSURE EXPERIMENT
+============================================================================================
+
+--- /tmp/claude-502/-Users-eminent-Res-SeqSFG/3f321465-9661-4569-99dc-96341d44dba9/scratchpad/expo/SIM01/session_01
+    participant SIM01   status complete   phases completed: practice, pre, exposure, post
+    trained Q  heard order [3, 0, 5, 4, 2, 1, 6]   |  comparison P  heard order [0, 1, 3, 2, 5, 6, 4]
+    order overlap: 0/7 shared directed transitions, 0 shared adjacencies, 0 components in the same slot, tau +0.05
+    cumulative presentations in this session (BOTH sequences are presented during testing; only one gets the exposure phase):
+        P: 102 trials, 54 of them with the figure actually present
+        Q: 162 trials, 78 of them with the figure actually present
+
+    phase  role        delay    hits      false alarms      d'          95% CI            c
+    pre    trained        0    8/8           1/8        +2.56   [+1.18, +3.19]    -0.31
+    pre    trained        7    7/8           1/8        +1.93   [+0.59, +3.19]    -0.00
+    pre    trained       14    3/8           2/8        +0.31   [-0.97, +1.59]    +0.44
+    pre    untrained      0    8/8           2/8        +2.18   [+0.69, +3.19]    -0.50
+    pre    untrained      7    6/8           0/8        +2.18   [+0.87, +3.19]    +0.50
+    pre    untrained     14    4/8           1/8        +0.97   [-0.31, +2.18]    +0.48
+    post   trained        0    8/8           3/8        +1.88   [+0.38, +2.56]    -0.66
+    post   trained        7    7/8           1/8        +1.93   [+0.59, +3.19]    -0.00
+    post   trained       14    5/8           2/8        +0.87   [-0.31, +2.18]    +0.15
+    post   untrained      0    8/8           2/8        +2.18   [+0.69, +3.19]    -0.50
+    post   untrained      7    7/8           5/8        +0.69   [-0.63, +1.88]    -0.62
+    post   untrained     14    4/8           4/8        +0.00   [-1.25, +1.25]    -0.00
+
+    manipulation check at step 0, where P and Q are the same sound: d' trained +2.52 vs untrained +2.52, difference +0.00
+    a large difference here is a fault, not a finding: nothing distinguishes the designations at zero onset separation.
+
+    D = (post-pre | trained) - (post-pre | untrained), at each nonzero delay
+    resampled jointly over all eight counts; NOT by subtracting separate intervals
+          7 ms   D = +1.50  [-1.19, +3.81]   p = 0.330    (trained gain +0.00, comparison gain -1.50)
+         14 ms   D = +1.53  [-0.97, +4.02]   p = 0.245    (trained gain +0.56, comparison gain -0.97)
+      aggregate (mean_over_nonzero_delays, fixed before running): D = +1.51  [-0.39, +3.14]  p = 0.127
+
+--- /tmp/claude-502/-Users-eminent-Res-SeqSFG/3f321465-9661-4569-99dc-96341d44dba9/scratchpad/expo/SIM02/session_01
+    participant SIM02   status complete   phases completed: practice, pre, exposure, post
+    trained Q  heard order [3, 0, 5, 4, 2, 1, 6]   |  comparison P  heard order [0, 1, 3, 2, 5, 6, 4]
+    order overlap: 0/7 shared directed transitions, 0 shared adjacencies, 0 components in the same slot, tau +0.05
+    cumulative presentations in this session (BOTH sequences are presented during testing; only one gets the exposure phase):
+        P: 102 trials, 54 of them with the figure actually present
+        Q: 162 trials, 78 of them with the figure actually present
+
+    phase  role        delay    hits      false alarms      d'          95% CI            c
+    pre    trained        0    8/8           1/8        +2.56   [+1.18, +3.19]    -0.31
+    pre    trained        7    4/8           1/8        +0.97   [-0.31, +2.18]    +0.48
+    pre    trained       14    4/8           2/8        +0.59   [-0.59, +1.88]    +0.29
+    pre    untrained      0    7/8           2/8        +1.56   [+0.28, +2.56]    -0.19
+    pre    untrained      7    7/8           2/8        +1.56   [+0.28, +2.56]    -0.19
+    pre    untrained     14    4/8           3/8        +0.28   [-0.87, +1.56]    +0.14
+    post   trained        0    7/8           3/8        +1.25   [+0.00, +2.56]    -0.34
+    post   trained        7    6/8           2/8        +1.18   [+0.00, +2.56]    -0.00
+    post   trained       14    5/8           3/8        +0.56   [-0.59, +1.88]    -0.00
+    post   untrained      0    7/8           3/8        +1.25   [+0.00, +2.56]    -0.34
+    post   untrained      7    7/8           3/8        +1.25   [+0.00, +2.56]    -0.34
+    post   untrained     14    4/8           4/8        +0.00   [-1.25, +1.25]    -0.00
+
+    manipulation check at step 0, where P and Q are the same sound: d' trained +1.98 vs untrained +1.51, difference +0.47
+    a large difference here is a fault, not a finding: nothing distinguishes the designations at zero onset separation.
+
+    D = (post-pre | trained) - (post-pre | untrained), at each nonzero delay
+    resampled jointly over all eight counts; NOT by subtracting separate intervals
+          7 ms   D = +0.52  [-2.00, +2.94]   p = 0.719    (trained gain +0.21, comparison gain -0.31)
+         14 ms   D = +0.26  [-2.15, +2.77]   p = 0.865    (trained gain -0.03, comparison gain -0.28)
+      aggregate (mean_over_nonzero_delays, fixed before running): D = +0.39  [-1.33, +2.13]  p = 0.664
+
+--- /tmp/claude-502/-Users-eminent-Res-SeqSFG/3f321465-9661-4569-99dc-96341d44dba9/scratchpad/expo/SIM03/session_01
+    participant SIM03   status complete   phases completed: practice, pre, exposure, post
+    trained Q  heard order [3, 0, 5, 4, 2, 1, 6]   |  comparison P  heard order [0, 1, 3, 2, 5, 6, 4]
+    order overlap: 0/7 shared directed transitions, 0 shared adjacencies, 0 components in the same slot, tau +0.05
+    cumulative presentations in this session (BOTH sequences are presented during testing; only one gets the exposure phase):
+        P: 102 trials, 54 of them with the figure actually present
+        Q: 162 trials, 78 of them with the figure actually present
+
+    phase  role        delay    hits      false alarms      d'          95% CI            c
+    pre    trained        0    7/8           3/8        +1.25   [+0.00, +2.56]    -0.34
+    pre    trained        7    4/8           1/8        +0.97   [-0.31, +2.18]    +0.48
+    pre    trained       14    2/8           0/8        +1.00   [-0.63, +1.88]    +1.09
+    pre    untrained      0    8/8           3/8        +1.88   [+0.38, +2.56]    -0.66
+    pre    untrained      7    5/8           3/8        +0.56   [-0.59, +1.88]    -0.00
+    pre    untrained     14    3/8           3/8        +0.00   [-1.25, +1.25]    +0.28
+    post   trained        0    6/8           2/8        +1.18   [+0.00, +2.56]    -0.00
+    post   trained        7    7/8           4/8        +0.97   [-0.31, +2.18]    -0.48
+    post   trained       14    8/8           5/8        +1.31   [+0.00, +2.18]    -0.94
+    post   untrained      0    8/8           0/8        +3.19   [+1.56, +3.19]    +0.00
+    post   untrained      7    6/8           3/8        +0.87   [-0.31, +2.18]    -0.15
+    post   untrained     14    5/8           3/8        +0.56   [-0.59, +1.88]    -0.00
+
+    manipulation check at step 0, where P and Q are the same sound: d' trained +1.28 vs untrained +2.71, difference -1.43
+    a large difference here is a fault, not a finding: nothing distinguishes the designations at zero onset separation.
+
+    D = (post-pre | trained) - (post-pre | untrained), at each nonzero delay
+    resampled jointly over all eight counts; NOT by subtracting separate intervals
+          7 ms   D = -0.31  [-2.84, +2.16]   p = 0.829    (trained gain +0.00, comparison gain +0.31)
+         14 ms   D = -0.26  [-2.60, +2.00]   p = 0.833    (trained gain +0.31, comparison gain +0.56)
+      aggregate (mean_over_nonzero_delays, fixed before running): D = -0.28  [-1.99, +1.39]  p = 0.738
+
+--- /tmp/claude-502/-Users-eminent-Res-SeqSFG/3f321465-9661-4569-99dc-96341d44dba9/scratchpad/expo/SIM04/session_01
+    participant SIM04   status complete   phases completed: practice, pre, exposure, post
+    trained P  heard order [0, 1, 3, 2, 5, 6, 4]   |  comparison Q  heard order [3, 0, 5, 4, 2, 1, 6]
+    order overlap: 0/7 shared directed transitions, 0 shared adjacencies, 0 components in the same slot, tau +0.05
+    cumulative presentations in this session (BOTH sequences are presented during testing; only one gets the exposure phase):
+        P: 162 trials, 84 of them with the figure actually present
+        Q: 102 trials, 48 of them with the figure actually present
+
+    phase  role        delay    hits      false alarms      d'          95% CI            c
+    pre    trained        0    8/8           3/8        +1.88   [+0.38, +2.56]    -0.66
+    pre    trained        7    7/8           3/8        +1.25   [+0.00, +2.56]    -0.34
+    pre    trained       14    3/8           1/8        +0.69   [-0.63, +1.88]    +0.62
+    pre    untrained      0    7/8           1/8        +1.93   [+0.59, +3.19]    -0.00
+    pre    untrained      7    3/8           1/8        +0.69   [-0.63, +1.88]    +0.62
+    pre    untrained     14    3/8           3/8        +0.00   [-1.25, +1.25]    +0.28
+    post   trained        0    8/8           3/8        +1.88   [+0.38, +2.56]    -0.66
+    post   trained        7    7/8           3/8        +1.25   [+0.00, +2.56]    -0.34
+    post   trained       14    6/8           5/8        +0.31   [-0.97, +1.59]    -0.44
+    post   untrained      0    8/8           4/8        +1.59   [+0.28, +2.18]    -0.80
+    post   untrained      7    5/8           4/8        +0.28   [-0.87, +1.56]    -0.14
+    post   untrained     14    1/8           3/8        -0.69   [-1.88, +0.63]    +0.62
+
+    manipulation check at step 0, where P and Q are the same sound: d' trained +2.19 vs untrained +1.81, difference +0.38
+    a large difference here is a fault, not a finding: nothing distinguishes the designations at zero onset separation.
+
+    D = (post-pre | trained) - (post-pre | untrained), at each nonzero delay
+    resampled jointly over all eight counts; NOT by subtracting separate intervals
+          7 ms   D = +0.40  [-2.16, +2.82]   p = 0.807    (trained gain +0.00, comparison gain -0.40)
+         14 ms   D = +0.31  [-2.22, +2.78]   p = 0.815    (trained gain -0.38, comparison gain -0.69)
+      aggregate (mean_over_nonzero_delays, fixed before running): D = +0.36  [-1.37, +2.09]  p = 0.711
+
+--------------------------------------------------------------------------------------------
+training assignment across the sessions analysed: 1 trained on P, 3 trained on Q
+    NOT BALANCED. `trained: auto` is a deterministic function of the participant code, which is reproducible but only balances in expectation.
+    For a real sample, assign explicitly from a counterbalancing list (--exposure-set trained='"P"') and record it per participant.
+    Any property of one order rather than the other is confounded with training while the assignment is lopsided.
+
+--------------------------------------------------------------------------------------------
+participant-level summary over 4 participants (one aggregate D each)
+    mean D = +0.494   SD 0.747   95% CI [-0.695, +1.683]   t(3) = 1.32, p = 0.278
+    the participant is the unit of analysis here; the within-session intervals above describe one listener and do not generalise.
+    with 4 participants this is descriptive. Do not read the p value as a test.
+============================================================================================

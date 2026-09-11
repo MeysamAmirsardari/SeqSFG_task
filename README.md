@@ -9,6 +9,9 @@ is the same treatment for the single-interval yes/no task of section 9: it plays
 figure-versus-cloud version, shows the envelope cue that makes it 90% solvable without hearing a
 figure, runs the audit live on all three absent classes, lets you take the task yourself, and
 plants a 0.1 dB cue to check the audit catches it.
+[`SeqSFG_exposure_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_exposure_playground.ipynb)
+covers the pre/exposure/post experiment of section 10: the two orders, what a designation means,
+the step-0 identity, and the audit the estimand rests on.
 [`SeqSFG_strategy.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_strategy.ipynb)
 is the strategy notebook: the crossover hypothesis made quantitative, the ordered-versus-reshuffled
 contrast played aloud, a demonstration that the current design forbids the cross-trial learning the
@@ -783,3 +786,107 @@ seqsfg yesno-analyze data/P01/session_01
 Reports for all three classes are in `verification/yesno_*_report.txt`, and
 [`SeqSFG_yesno_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_yesno_playground.ipynb)
 walks through the whole argument with audio.
+
+## 10. The exposure experiment (pre / exposure / post)
+
+A third mode, in `seqsfg/exposure.py`, built on the single-interval yes/no task. Three phases:
+a pre-test, a block of extra exposure to **one** of two sequences, a post-test with freshly
+generated acoustics. The estimand, per participant:
+
+    D_i = (d'_post,trained - d'_pre,trained) - (d'_post,untrained - d'_pre,untrained)
+
+A positive D_i would say exposure helped *that sequence* beyond general practice. It would not
+show neural pre-activation, binding circuitry, implicit learning, or the absence of attention.
+
+**The two sequences.** P and Q are two onset orders over the *same* seven frequencies, so the
+only thing separating them is when each component starts. They are chosen to share as little as
+5040 permutations allow: zero shared directed transitions, counting the wrap from the last
+component of one repetition into the first of the next, with the strictly ascending and
+descending orders excluded from both (a monotone contour is a sweep, a different kind of object).
+Everything they still share is measured and printed -- shared unordered adjacencies, components
+in the same slot, rank correlation of the heard sequences -- because different permutations are
+not independent sequences.
+
+**What a designation means.** A trial's designation is which order governs whatever is aligned,
+and it is the same on yes and no trials:
+
+| | aligned set | answer |
+|---|---|---|
+| P-designated, present | the fixed set S, components starting in order P, every element | yes |
+| P-designated, absent | a fresh band each element, components starting in order P | no |
+
+Within a designation the order is identical on yes and no trials, so **order alone cannot reveal
+the answer**, and each designation carries its own false-alarm reference measured under its own
+order. The absent class is `roving`; the mode refuses `plain` and `scattered`, which section 9
+showed are separable from the envelope alone.
+
+**Interaction with the anchored/fresh mechanism, resolved.** This experiment needs one figure set
+held constant across phases, so the preset sets `anchored_fraction` to 1.0 and `check()` refuses
+anything else. Only the frequency set and the two orders persist; every trial draws its own
+background and element timing, and no stimulus seed is reused anywhere in a session, so a
+post-test gain cannot be recognition of a remembered waveform.
+
+**Step 0 is a shared reference, not a contrast.** With no onset separation P and Q are literally
+the same waveform (a test asserts the arrays are equal). It measures general practice and acts as
+a manipulation check -- a trained/untrained difference there is a fault, not a finding. D is
+computed only at nonzero delays, and the aggregate is fixed in advance as their unweighted mean,
+with the delay-specific values always retained.
+
+**Configuration.** `exposure_pilot.json` has two sections. The `config` section is an ordinary
+`Config`, hashed exactly as before. The `exposure` section holds this experiment's parameters and
+they are deliberately **not** `Config` fields: adding fields to `Config` would change the hash of
+every existing configuration and break resume on sessions already recorded. A test asserts the
+two field sets stay disjoint.
+
+**The audit.** `verification/exposure_audit_report.txt`. The section 9 results do not carry over,
+because this mode holds one figure set fixed for a whole session where the yes/no mode redrew it
+on half its trials. Two questions, each Holm-corrected across its own rows, with the step-0 P-vs-Q
+rows serving as a null check (at zero delay the designations are the same construction, so
+whatever the audit says there is its own false-positive rate):
+
+* *present vs absent, within a designation.* Clean at the nonzero delays. At step 0 a residual
+  survives correction (Holm 0.033, blind classifier ~59%), driven by the spread rather than the
+  mean of a per-channel timing statistic. It is the shared reference only.
+* *P vs Q, holding present/absent fixed* -- the one D rests on. Nothing separable at any delay
+  after correction; at the nonzero delays raw p runs 0.53 to 0.84.
+
+Since D is a difference of differences, a cue common to both designations and both phases cancels
+exactly. That is the argument, and it is why the P-vs-Q table is the one to read.
+
+**Uncertainty.** The eight counts entering D at a delay -- hits and false alarms, in each of pre
+and post, for each of trained and untrained -- are resampled together on every bootstrap draw and
+D recomputed. Subtracting the endpoints of four separately computed d' intervals would be a
+different quantity. Every cell uses the log-linear correction `(x+0.5)/(n+1)`, applied uniformly
+rather than only at the extremes, and the bootstrap resamples from the *corrected* rates, which
+is what stops a ceiling cell producing a zero-width interval. Empty cells are reported as NOT
+ESTIMABLE, interrupted sessions are analysed for whatever phases finished.
+
+**Running it.**
+
+```
+seqsfg exposure-design  --preset exposure_pilot.json --code P01     # design, overlap, duration
+seqsfg exposure-verify  --preset exposure_pilot.json --out verification/exposure_audit_report.txt
+seqsfg exposure-run     --preset exposure_pilot.json --code P01     # about 33 minutes
+seqsfg exposure-analyze data/P01/session_01
+seqsfg exposure-analyze data/*/session_01                            # participant-level summary
+```
+
+The pilot preset is 264 trials, about 33 minutes: 12 practice, 96 pre, 60 exposure, 96 post, with
+eight trials per phase x sequence x delay x answer at delays 0, 7 and 14 ms. That is sized to be
+run, not to be decisive: eight trials a cell makes each d' noisy and the delay-specific intervals
+are correspondingly wide. No sample size is claimed and no power calculation is offered.
+`verification/exposure_simulated_session.txt` is four clearly labelled simulated sessions through
+generation, logging and analysis.
+
+**What it cannot tell you.** Both sequences are presented during testing and only one gets the
+extra block, so the contrast is more exposure versus less, not exposure versus none; cumulative
+presentations are logged per trial. The exposure block is the same attended yes/no task, so it is
+practice with a particular sequence and should be described that way -- it does not isolate
+implicit learning and does not exclude attention. A behavioural effect of the onset step is not
+an STDP window: the step is an acoustic parameter, and the onset step, the element duration, the
+within-trial repetition count and the across-phase exposure are four different timescales.
+`trained: auto` is a deterministic function of the participant code and balances only in
+expectation; for a real sample assign explicitly and read the balance line the analysis prints.
+
+[`SeqSFG_exposure_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_exposure_playground.ipynb)
+walks through all of it with audio.

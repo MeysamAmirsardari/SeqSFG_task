@@ -199,6 +199,82 @@ def cmd_yesno_analyze(args):
         print(yesno.analyse(s))
 
 
+
+def _exposure_cfgs(args):
+    from .exposure import ExposureConfig, load_preset
+    if getattr(args, "preset", None):
+        cfg, ecfg = load_preset(args.preset)
+    else:
+        cfg, ecfg = load_config(args), ExposureConfig()
+    for kv in getattr(args, "exposure_set", None) or []:
+        k, _, v = kv.partition("=")
+        if not hasattr(ecfg, k):
+            raise SystemExit(f"unknown exposure parameter {k}")
+        try:
+            val = json.loads(v)
+        except json.JSONDecodeError:
+            val = v
+        if isinstance(val, list):
+            val = tuple(val)
+        ecfg = ExposureConfig(**{**ecfg.to_dict(), k: val})
+    validate(cfg)
+    return cfg, ecfg
+
+
+def cmd_exposure_design(args):
+    from .exposure import check, duration_estimate, heard_order, make_design
+    cfg, ecfg = _exposure_cfgs(args)
+    check(cfg, ecfg)
+    dz = make_design(cfg, ecfg, args.code or "P01", args.session or 1)
+    est = duration_estimate(cfg, ecfg)
+    print(f"participant {dz['participant_code']}  session {dz['session_index']}")
+    print(f"  trained    {dz['trained']}  onset order {dz['orders'][dz['trained']]} "
+          f"heard {dz['heard_order'][dz['trained']]}")
+    print(f"  comparison {dz['untrained']}  onset order {dz['orders'][dz['untrained']]} "
+          f"heard {dz['heard_order'][dz['untrained']]}")
+    print("  order overlap:")
+    for k, v in dz["order_overlap"].items():
+        print(f"      {k:<36} {v}")
+    print(f"  figure set (channels): {dz['figure_set']}")
+    for ph in ("practice", "pre", "exposure", "post"):
+        rows = dz["phases"][ph]
+        print(f"  {ph:<9} {len(rows):>4} trials", end="")
+        if rows:
+            pres = sum(r["present"] for r in rows)
+            seqs = {s: sum(1 for r in rows if r["sequence"] == s) for s in ("P", "Q")}
+            print(f"   present {pres}/{len(rows)}   P {seqs['P']}  Q {seqs['Q']}")
+        else:
+            print("")
+    print(f"  estimated session {est['minutes']:.0f} min ({est['trials']} trials at "
+          f"{est['trial_seconds']:.1f} s plus breaks)")
+    print(f"  config hash {cfg.hash()}   exposure hash {ecfg.hash()}   design hash {dz['design_hash']}")
+
+
+def cmd_exposure_verify(args):
+    from .exposure import audit, audit_report
+    cfg, ecfg = _exposure_cfgs(args)
+    res = audit(cfg, ecfg, n_trials=args.trials, seed=args.seed, n_perm=args.perm,
+                verbose=not args.quiet)
+    text = audit_report(res)
+    print(text)
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(text + "\n")
+        print(f"written to {args.out}")
+
+
+def cmd_exposure_run(args):
+    from .exposure import ExposureRunner
+    cfg, ecfg = _exposure_cfgs(args)
+    ExposureRunner(cfg, ecfg, args.data, device=args.device, audio=not args.no_audio,
+                   auto=args.auto, fast=args.fast).run(code=args.code, session_index=args.session)
+
+
+def cmd_exposure_analyze(args):
+    from .exposure import analyse
+    print(analyse([Path(p) for p in args.sessions]))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="seqsfg", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -277,6 +353,36 @@ def main(argv=None):
 
     q = sub.add_parser("yesno-analyze", help="d', criterion and bias diagnostics for a yes/no session")
     q.add_argument("sessions", nargs="+"); q.set_defaults(fn=cmd_yesno_analyze)
+
+    def add_exposure(q, with_preset=True):
+        add_common(q)
+        if with_preset:
+            q.add_argument("--preset", default="exposure_pilot.json",
+                           help="two-section preset file (config + exposure)")
+        q.add_argument("--exposure-set", action="append", metavar="KEY=VALUE",
+                       help="override one exposure parameter")
+
+    q = sub.add_parser("exposure-design", help="print the three-phase design and its duration")
+    add_exposure(q); q.add_argument("--code"); q.add_argument("--session", type=int)
+    q.set_defaults(fn=cmd_exposure_design)
+
+    q = sub.add_parser("exposure-verify", help="audit this mode's stimulus distributions")
+    add_exposure(q)
+    q.add_argument("--trials", type=int, default=50); q.add_argument("--seed", type=int, default=808)
+    q.add_argument("--perm", type=int, default=8000); q.add_argument("--quiet", action="store_true")
+    q.add_argument("--out"); q.set_defaults(fn=cmd_exposure_verify)
+
+    q = sub.add_parser("exposure-run", help="run a pre / exposure / post session")
+    add_exposure(q)
+    q.add_argument("--data", default="data"); q.add_argument("--code")
+    q.add_argument("--session", type=int); q.add_argument("--device")
+    q.add_argument("--no-audio", action="store_true")
+    q.add_argument("--auto", type=float, default=None, metavar="TAU_MS",
+                   help="simulated listener; pipeline test only")
+    q.add_argument("--fast", action="store_true"); q.set_defaults(fn=cmd_exposure_run)
+
+    q = sub.add_parser("exposure-analyze", help="cell table, D per delay, participant summary")
+    q.add_argument("sessions", nargs="+"); q.set_defaults(fn=cmd_exposure_analyze)
 
     args = p.parse_args(argv)
     try:

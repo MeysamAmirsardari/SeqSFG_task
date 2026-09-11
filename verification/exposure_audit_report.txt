@@ -1,0 +1,55 @@
+================================================================================================
+EXPOSURE MODE: ACOUSTIC AUDIT
+================================================================================================
+90 present and 90 absent trials per designation per delay.
+figure set (channels): [1, 5, 7, 9, 10, 11, 13]
+P onset order [0, 1, 3, 2, 6, 4, 5]  heard [0, 1, 3, 2, 5, 6, 4]
+Q onset order [1, 5, 4, 0, 3, 2, 6]  heard [3, 0, 5, 4, 2, 1, 6]
+
+[0] what the two orders still share
+      shared_directed_transitions          0
+      n_directed_transitions               7
+      shared_undirected_adjacencies        0
+      components_in_the_same_slot          0
+      spearman_between_orders              0.3571428571428572
+      direction_changes                    (3, 3)
+      mean_abs_slot_shift                  2.0
+      kendall_tau_of_heard_sequences       0.047619047619047616
+    Zero shared directed transitions does not make them independent; the rows above
+    are the residual similarity, reported rather than waved away.
+
+[1] the detection task: present vs absent, within a designation
+    (this is what a hit rate and its own false-alarm rate are measured against)
+      delay  seq   permutation p, independent samples         Holm  largest d   learnt d      pc
+          0    P   0.0055  0.0460                         0.033       0.63      +0.47   59.4%
+          0    Q   0.1549  0.0452                         0.136       0.48      +0.47   59.4%
+          7    P   0.0256  0.8603                         0.128       0.57      -0.11   47.8%
+          7    Q   0.0324  0.0966                         0.129       0.55      +0.06   51.1%
+         14    P   0.8865  0.5184                         0.518       0.34      +0.03   50.6%
+         14    Q   0.1070  0.3660                         0.214       0.50      -0.25   45.0%
+    The Holm column corrects across the rows of this table. Each permutation p is
+    already corrected across the 65 features; it is not corrected across delays,
+    designations and repeat samples, and at twelve tests roughly one in two audits
+    throws a p below 0.05 with nothing wrong. Read the Holm column.
+
+[2] P vs Q: can anything tell the designations apart, holding present/absent fixed?
+    If it can, a trained-minus-untrained difference need not be learning at all.
+      delay     class   permutation p     Holm   largest d   learnt d      pc
+          0    absent           0.079    0.393        0.52      +0.19   53.9%
+          0   present           0.011    0.065        0.60      +0.39   57.8%
+          7    absent           0.831    1.000        0.36      -0.03   49.4%
+          7   present           0.666    1.000        0.39      +0.28   55.6%
+         14    absent           0.534    1.000        0.41      +0.11   52.2%
+         14   present           0.839    1.000        0.36      -0.06   48.9%
+
+
+    The step-0 rows of table [2] are a NULL CHECK. At zero onset separation the two
+    designations are the same construction drawn with different seeds, so those two
+    rows are two independent samples from one distribution and their p values are
+    the audit's own false-positive behaviour, measured rather than assumed. Read
+    every other row against them.
+
+Chance performance here is not proof that no confound exists. It says that 65 named
+acoustic measures, and the best linear combination of them a leave-one-out classifier
+could find at this sample size, did not separate the classes.
+================================================================================================

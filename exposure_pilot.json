@@ -1,0 +1,117 @@
+{
+ "_README": [
+  "Preset for the pre-exposure / exposure / post-exposure experiment (seqsfg/exposure.py).",
+  "Two sections. 'config' is an ordinary seqsfg Config and is hashed exactly like any other,",
+  "so nothing about the existing tasks changes. 'exposure' holds this experiment's own",
+  "parameters; they are deliberately NOT Config fields, because adding fields to Config would",
+  "change the hash of every existing configuration and break resume on sessions already run.",
+  "The only difference from pilot_config.json is anchored_fraction 0.5 -> 1.0: this experiment",
+  "needs one figure set held constant across phases, not a per-trial mixture."
+ ],
+ "config": {
+  "sample_rate": 48000,
+  "grid_ms": 1.0,
+  "pool_low_hz": 200.0,
+  "pool_high_hz": 10000.0,
+  "pool_spacing_erb": 1.0,
+  "min_beat_rate_hz": 40.0,
+  "tone_dur_ms": 45.0,
+  "ramp_ms": 5.0,
+  "tone_amplitude": 0.026,
+  "tones_per_channel": 26,
+  "interval_dur_ms": 4000.0,
+  "n_components": 7,
+  "figure_repeats": 1,
+  "figure_min_spacing_channels": 1,
+  "figure_anchor_seed": 20260909,
+  "steps_ms": [
+   0.0,
+   4.0,
+   7.0,
+   11.0,
+   14.0,
+   17.0
+  ],
+  "main_variants": [
+   "rising",
+   "redrawn"
+  ],
+  "n_elements": 9,
+  "iei_min_ms": 300.0,
+  "iei_max_ms": 333.0,
+  "lead_min_ms": 350.0,
+  "lead_max_ms": 600.0,
+  "tail_min_ms": 350.0,
+  "foil_subpool_size": null,
+  "max_shared_consecutive": 5,
+  "max_shared_any": 5,
+  "isi_ms": 400.0,
+  "lead_silence_ms": 50.0,
+  "trials_per_condition": 10,
+  "max_condition_run": 2,
+  "max_variant_run": 4,
+  "practice_cells": [
+   [
+    "ungrouped",
+    0.0
+   ],
+   [
+    "rising",
+    0.0
+   ]
+  ],
+  "practice_n": 12,
+  "practice_criterion": 10,
+  "practice_max_rounds": 2,
+  "break_every": 40,
+  "feedback_main": true,
+  "feedback_control": true,
+  "control_cells": [
+   [
+    "ungrouped",
+    0.0
+   ],
+   [
+    "onechannel",
+    0.0
+   ]
+  ],
+  "control_trials_per_cell": 8,
+  "max_session_minutes": 40.0,
+  "response_allowance_s": 1.2,
+  "feedback_s": 0.4,
+  "iti_s": 0.5,
+  "break_s": 45.0,
+  "setup_minutes": 5.0,
+  "tone_level_db_spl": 60.0,
+  "calibration_freq_hz": 1000.0,
+  "calibration_dur_s": 5.0,
+  "bootstrap_n": 1000,
+  "threshold_pc": 0.75,
+  "alpha": 0.05,
+  "matched_incidence": true,
+  "foil_universe_size": 23,
+  "anchored_fraction": 1.0,
+  "figure_band_channels": 13
+ },
+ "exposure": {
+  "sequence_seed": 20260910,
+  "figure_set_seed": 20260909,
+  "trained": "auto",
+  "test_steps_ms": [
+   0.0,
+   7.0,
+   14.0
+  ],
+  "test_trials_per_cell": 8,
+  "exposure_trials": 60,
+  "exposure_steps_ms": null,
+  "exposure_present_fraction": 0.5,
+  "absent_class": "roving",
+  "feedback_test": false,
+  "feedback_exposure": true,
+  "practice_trials": 12,
+  "aggregate": "mean_over_nonzero_delays",
+  "n_boot": 4000
+ }
+}
