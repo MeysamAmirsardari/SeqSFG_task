@@ -42,8 +42,24 @@ def summarise(sdir: Path) -> dict:
     meta = json.loads((sdir / "session.json").read_text())
     cfg = meta.get("config", {})
     common = {"config_hash": meta.get("config_hash"), "status": meta.get("status"),
-              "steps_ms": cfg.get("steps_ms"), "n_trials_logged": len(rows)}
-    if "phase" in (rows[0] if rows else {}):                       # exposure log
+              "steps_ms": cfg.get("steps_ms"), "n_trials_logged": len(rows),
+              "settings": {k: cfg.get(k) for k in
+                           ("tone_dur_ms", "ramp_ms", "interval_dur_ms", "n_components",
+                            "n_elements", "tones_per_channel", "figure_band_channels",
+                            "iei_min_ms", "iei_max_ms", "matched_incidence",
+                            "practice_criterion", "practice_n")}}
+    prac = defaultdict(lambda: [0, 0])
+    for r in rows:
+        if r.get("block") != "practice":
+            continue
+        c = prac[r.get("variant", "?")]
+        c[0] += 1
+        c[1] += int(r["correct"])
+    if prac:
+        common["practice"] = {k: {"n": v[0], "n_correct": v[1]} for k, v in sorted(prac.items())}
+    if not rows:
+        return {**common, "task": "empty", "cells": {}}
+    if "phase" in rows[0]:                       # exposure log
         d = meta.get("design", {})
         main = [r for r in rows if r["phase"] in ("pre", "post")]
         return {**common, "task": "exposure",

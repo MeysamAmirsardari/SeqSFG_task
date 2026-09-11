@@ -1,7 +1,299 @@
 {
  "_note": "Per-cell counts only. No participant codes, timestamps, response times or per-trial rows. Written by tools/export_pilot_summary.py.",
  "sessions": {
-  "L1/session_06": {
+  "L1/session_01": {
+   "config_hash": "f7f66b7c934640a3",
+   "status": "practice_criterion_not_met",
+   "steps_ms": [
+    0.0,
+    5.0,
+    10.0,
+    15.0,
+    20.0,
+    28.0
+   ],
+   "n_trials_logged": 24,
+   "settings": {
+    "tone_dur_ms": 30.0,
+    "ramp_ms": 5.0,
+    "interval_dur_ms": 2250.0,
+    "n_components": 7,
+    "n_elements": 6,
+    "tones_per_channel": 31,
+    "figure_band_channels": null,
+    "iei_min_ms": 200.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": null,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "ungrouped": {
+     "n": 24,
+     "n_correct": 14
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L2/session_02": {
+   "config_hash": "15303141666bdc41",
+   "status": "practice_criterion_not_met",
+   "steps_ms": [
+    0.0,
+    8.0,
+    16.0,
+    24.0,
+    32.0,
+    40.0
+   ],
+   "n_trials_logged": 24,
+   "settings": {
+    "tone_dur_ms": 60.0,
+    "ramp_ms": 10.0,
+    "interval_dur_ms": 3000.0,
+    "n_components": 7,
+    "n_elements": 6,
+    "tones_per_channel": 21,
+    "figure_band_channels": null,
+    "iei_min_ms": 300.0,
+    "iei_max_ms": 450.0,
+    "matched_incidence": null,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "ungrouped": {
+     "n": 24,
+     "n_correct": 16
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L2/session_03": {
+   "config_hash": "9bc85fc5c9f153f7",
+   "status": "practice_criterion_not_met",
+   "steps_ms": [
+    0.0,
+    5.0,
+    9.0,
+    14.0,
+    18.0,
+    23.0
+   ],
+   "n_trials_logged": 36,
+   "settings": {
+    "tone_dur_ms": 60.0,
+    "ramp_ms": 10.0,
+    "interval_dur_ms": 3200.0,
+    "n_components": 7,
+    "n_elements": 7,
+    "tones_per_channel": 22,
+    "figure_band_channels": null,
+    "iei_min_ms": 200.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": null,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "rising": {
+     "n": 24,
+     "n_correct": 10
+    },
+    "ungrouped": {
+     "n": 12,
+     "n_correct": 11
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L2/session_04": {
+   "config_hash": "9bc85fc5c9f153f7",
+   "status": "practice_criterion_not_met",
+   "steps_ms": [
+    0.0,
+    5.0,
+    9.0,
+    14.0,
+    18.0,
+    23.0
+   ],
+   "n_trials_logged": 48,
+   "settings": {
+    "tone_dur_ms": 60.0,
+    "ramp_ms": 10.0,
+    "interval_dur_ms": 3200.0,
+    "n_components": 7,
+    "n_elements": 7,
+    "tones_per_channel": 22,
+    "figure_band_channels": null,
+    "iei_min_ms": 200.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": null,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "rising": {
+     "n": 24,
+     "n_correct": 12
+    },
+    "ungrouped": {
+     "n": 24,
+     "n_correct": 18
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L2/session_05": {
+   "config_hash": "9bc85fc5c9f153f7",
+   "status": "practice_criterion_not_met",
+   "steps_ms": [
+    0.0,
+    5.0,
+    9.0,
+    14.0,
+    18.0,
+    23.0
+   ],
+   "n_trials_logged": 48,
+   "settings": {
+    "tone_dur_ms": 60.0,
+    "ramp_ms": 10.0,
+    "interval_dur_ms": 3200.0,
+    "n_components": 7,
+    "n_elements": 7,
+    "tones_per_channel": 22,
+    "figure_band_channels": null,
+    "iei_min_ms": 200.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": null,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "rising": {
+     "n": 24,
+     "n_correct": 12
+    },
+    "ungrouped": {
+     "n": 24,
+     "n_correct": 18
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L3/session_01": {
+   "config_hash": "d7143610c4158017",
+   "status": "interrupted",
+   "steps_ms": [
+    0.0,
+    4.0,
+    7.0,
+    11.0,
+    14.0,
+    17.0
+   ],
+   "n_trials_logged": 16,
+   "settings": {
+    "tone_dur_ms": 45.0,
+    "ramp_ms": 5.0,
+    "interval_dur_ms": 4000.0,
+    "n_components": 7,
+    "n_elements": 9,
+    "tones_per_channel": 20,
+    "figure_band_channels": null,
+    "iei_min_ms": 300.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": true,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "ungrouped": {
+     "n": 16,
+     "n_correct": 9
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L3/session_02": {
+   "config_hash": "7f8f210f0f5000b3",
+   "status": "practice_criterion_not_met",
+   "steps_ms": [
+    0.0,
+    4.0,
+    7.0,
+    11.0,
+    14.0,
+    17.0
+   ],
+   "n_trials_logged": 24,
+   "settings": {
+    "tone_dur_ms": 45.0,
+    "ramp_ms": 5.0,
+    "interval_dur_ms": 4000.0,
+    "n_components": 7,
+    "n_elements": 9,
+    "tones_per_channel": 26,
+    "figure_band_channels": 13,
+    "iei_min_ms": 300.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": true,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "ungrouped": {
+     "n": 24,
+     "n_correct": 18
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L3/session_03": {
+   "config_hash": "7f8f210f0f5000b3",
+   "status": "practice_criterion_not_met",
+   "steps_ms": [
+    0.0,
+    4.0,
+    7.0,
+    11.0,
+    14.0,
+    17.0
+   ],
+   "n_trials_logged": 24,
+   "settings": {
+    "tone_dur_ms": 45.0,
+    "ramp_ms": 5.0,
+    "interval_dur_ms": 4000.0,
+    "n_components": 7,
+    "n_elements": 9,
+    "tones_per_channel": 26,
+    "figure_band_channels": 13,
+    "iei_min_ms": 300.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": true,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "ungrouped": {
+     "n": 24,
+     "n_correct": 16
+    }
+   },
+   "task": "2ifc",
+   "cells": {}
+  },
+  "L3/session_06": {
    "config_hash": "7f8f210f0f5000b3",
    "status": "complete",
    "steps_ms": [
@@ -13,6 +305,30 @@
     17.0
    ],
    "n_trials_logged": 160,
+   "settings": {
+    "tone_dur_ms": 45.0,
+    "ramp_ms": 5.0,
+    "interval_dur_ms": 4000.0,
+    "n_components": 7,
+    "n_elements": 9,
+    "tones_per_channel": 26,
+    "figure_band_channels": 13,
+    "iei_min_ms": 300.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": true,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "rising": {
+     "n": 12,
+     "n_correct": 10
+    },
+    "ungrouped": {
+     "n": 12,
+     "n_correct": 11
+    }
+   },
    "task": "2ifc",
    "cells": {
     "redrawn|0.0": {
@@ -65,7 +381,7 @@
     }
    }
   },
-  "L1/session_07": {
+  "L3/session_07": {
    "config_hash": "7f8f210f0f5000b3",
    "status": "complete",
    "steps_ms": [
@@ -77,6 +393,26 @@
     17.0
    ],
    "n_trials_logged": 132,
+   "settings": {
+    "tone_dur_ms": 45.0,
+    "ramp_ms": 5.0,
+    "interval_dur_ms": 4000.0,
+    "n_components": 7,
+    "n_elements": 9,
+    "tones_per_channel": 26,
+    "figure_band_channels": 13,
+    "iei_min_ms": 300.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": true,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
+   "practice": {
+    "yesno": {
+     "n": 12,
+     "n_correct": 7
+    }
+   },
    "task": "yesno",
    "cells": {
     "0.0": {
@@ -117,7 +453,7 @@
     }
    }
   },
-  "L1/session_08": {
+  "L3/session_08": {
    "config_hash": "e1679727066190fa",
    "status": "complete",
    "steps_ms": [
@@ -129,6 +465,20 @@
     17.0
    ],
    "n_trials_logged": 264,
+   "settings": {
+    "tone_dur_ms": 45.0,
+    "ramp_ms": 5.0,
+    "interval_dur_ms": 4000.0,
+    "n_components": 7,
+    "n_elements": 9,
+    "tones_per_channel": 26,
+    "figure_band_channels": 13,
+    "iei_min_ms": 300.0,
+    "iei_max_ms": 333.0,
+    "matched_incidence": true,
+    "practice_criterion": 10,
+    "practice_n": 12
+   },
    "task": "exposure",
    "orders": {
     "P": [
