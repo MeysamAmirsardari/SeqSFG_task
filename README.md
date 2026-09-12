@@ -890,3 +890,130 @@ expectation; for a real sample assign explicitly and read the balance line the a
 
 [`SeqSFG_exposure_playground.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_exposure_playground.ipynb)
 walks through all of it with audio.
+
+---
+
+## 11. Probing the limits of temporal coherence through onset asynchrony
+
+A third task, in `seqsfg/asynchrony.py`, driven by `asynchrony_config.json`. It shares the
+stimulus machinery and changes nothing about the two configurations already in use
+(`pilot_config.json` hashes to `7f8f210f0f5000b3` before and after; a test asserts it).
+
+**The question.** Temporal coherence explains segregation by binding attributes that move
+together, and it has mostly been probed through spectral synchrony. This task probes the
+*temporal* edge of it: how far apart can the onsets of a figure's components be pushed before
+they stop binding into one object? And does it matter whether the within-element timing pattern
+**recurs**? The listener hears one sound and says whether a figure was there.
+
+| | |
+|---|---|
+| ladder | 0, 4, 8, 12, 16, 20 ms between consecutive components |
+| tone | 40 ms, 5 ms ramps — so 20 ms is exactly half a tone, and the element spans 160 ms |
+| order | `fixed` (one permutation, reused by every element) vs `redrawn` (a fresh one each time) |
+| figure | 7 components, drawn afresh **every trial**: this measures binding, not learning |
+| design | 11 cells × 10 present + 10 absent = 220 trials, ~32 min |
+
+### Why the "no" trials look different from the old task's
+
+In the two-interval task each element was confined to a contiguous 13-channel band. A band
+gives an element a **register**, and a run of elements with registers is a melody — so the
+interval that was supposed to contain no recurring figure still sounded streamed. That was the
+right call there (the task was "which one *recurs*", and two figures had to be told apart by
+pitch) and the wrong one here.
+
+So this task sets `figure_band_channels: null` and draws every element from the whole pool.
+Measured over 300 draws:
+
+| | mean channel gap | span | most components in 4 adjacent channels |
+|---|---|---|---|
+| banded (old) | 1.7 | 1.9 octaves | 3.3 of 7 |
+| **scattered (this task)** | **3.9** | **4.3 octaves** | **2.5 of 7** |
+
+A typical set is `1-7-11-15-17-21-24`. Spread over four octaves an element has no pitch, so
+consecutive elements cannot form a melody, and the absent interval sounds like cloud. The
+figure's set and the other elements' sets come from distributions that a two-sample KS test
+cannot tell apart on any of those statistics (p ≥ 0.29) — which matters, because if they
+differed, *which* set is the aligned one would be legible from the spectrum before anything
+was heard.
+
+### What is identical between the classes
+
+Not on average — exactly, checked on the schedule for every pair:
+
+* the set of channels carrying any tone (all 30)
+* the number of tones in each channel (28, the budget, exactly)
+* the total tone count (840)
+* the element schedule and its jittered rate
+* under `roving`, the number of time-aligned groups per interval (8 in both)
+
+The only difference is **which** set of channels is the aligned one, and whether it is the same
+set at every element.
+
+### The absent class, measured rather than assumed
+
+40 present + 40 absent per cell, 11 cells, max-statistic permutation over class
+labels over all 65 features that vary, plus a leave-one-out ridge-logistic observer fitted within
+each cell:
+
+| absent class | what it is | permutation p | learnt observer | worst cell |
+|---|---|---|---|---|
+| **`roving`** (default) | an aligned group every element, on a fresh **scattered** set each time | **0.55** | **d' = −0.03, 49.4% correct** | +0.31 |
+| `incoherent` | nothing aligned anywhere: the purest cloud | 0.019 | d' = +0.30, 55.9% | **+1.55 at step 0** |
+| `plain` | a flat cloud, no element structure — the classic contrast | <0.001 | **d' = +2.51, 89.5%** | +4.50 at step 0 |
+
+`roving` holds across seeds (pooled p = 0.55, 0.57, 0.67, 0.04, 0.16 over five sweeps; learnt
+observer between −0.07 and +0.06 in all of them).
+
+**`incoherent` is the one the question literally asks for, and it is the one you cannot use.**
+Synchrony is an envelope event, so a cloud with nothing aligned differs from one with an
+aligned chord — and the size of that difference *shrinks as the step grows*, from d' = +1.55 at
+0 ms to nothing by 8 ms. The confound is largest exactly where the effect is largest and
+disappears exactly where the effect disappears, so a falling psychometric function would be
+partly the confound draining away. `roving` avoids it by putting an aligned chord in both
+classes and varying only whether it recurs.
+
+**`plain` is worth stating plainly**: the classic figure-present / cloud-absent contrast used in
+much of this literature is 89.5% solvable here by a machine that has never heard a group, and
+leaks at *every* rung. Any result from it is confounded with level.
+
+### The estimand
+
+d' = z(H) − z(F) per (step, order), log-linear corrected. From those:
+
+* **the asynchrony limit** — the step at which d' crosses 1.0, by linear interpolation, with a
+  joint bootstrap over every cell's counts and explicit reporting of resamples that fall
+  outside the measured range;
+* **the order contrast** — mean over the nonzero steps of d'(fixed) − d'(redrawn).
+
+At 0 ms every order is the same sound, so that rung is **one** cell shared by both ladders
+rather than two cells pretending to differ.
+
+### What one session buys
+
+At a true d' of 1, a cell's d' has SE 0.59 and the order contrast has SE 0.37, so one session
+catches a contrast of 1.04 at 80% power; 0.5 needs 5 listeners and 0.3 needs 13.
+`asynchrony-design` prints this before anyone is run. The ladder is the measurement; the limit
+and the contrast want a group.
+
+### Limits
+
+The 20 ms ceiling is not a preference. A matched-incidence element carries the aligned group
+*and* its scattered counterpart, each jittered over one span, so its footprint is
+`2·((N−1)·step + tone)` = 320 ms at the top rung, and elements would collide at anything faster
+than the 340–420 ms inter-element interval this config uses (2.4–2.9 Hz, slower than the
+pilot's 3.0–3.3). Going wider means going slower again; `check()` computes the ceiling and says
+so. The `rising` order is implemented but not in the default design: a sweep adds a
+frequency–time trajectory, which is a second grouping cue on top of the one being measured.
+Capping runs of the same answer at 4 leaves P(the next answer differs) at 0.54 rather than
+0.50 — there is no feedback in the main block, so a listener cannot track the true sequence,
+but the number is there to be checked.
+
+### Commands
+
+```
+python -m seqsfg asynchrony-design                      # cells, duration, what it can resolve
+python -m seqsfg asynchrony-verify --absent all         # the table above, rebuilt
+python -m seqsfg asynchrony-demo --out demo/asynchrony  # one figure and one cloud per step
+python -m seqsfg asynchrony-run --data data             # run a listener
+python -m seqsfg asynchrony-analyze data/P01/session_01
+```

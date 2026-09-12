@@ -200,6 +200,118 @@ def cmd_yesno_analyze(args):
 
 
 
+# ---- onset asynchrony -------------------------------------------------------
+def _async_cfgs(args):
+    from .asynchrony import AsyncConfig, check, load_preset
+    if getattr(args, "preset", None):
+        cfg, acfg = load_preset(args.preset)
+    else:
+        cfg, acfg = load_config(args), AsyncConfig()
+    for kv in getattr(args, "async_set", None) or []:
+        k, _, v = kv.partition("=")
+        if not hasattr(acfg, k):
+            raise SystemExit(f"unknown asynchrony parameter {k}")
+        try:
+            val = json.loads(v)
+        except json.JSONDecodeError:
+            val = v
+        if isinstance(val, list):
+            val = tuple(val)
+        acfg = AsyncConfig(**{**acfg.to_dict(), k: val})
+    validate(cfg)
+    check(cfg, acfg)
+    return cfg, acfg
+
+
+def cmd_async_design(args):
+    from .asynchrony import cells, duration_estimate, make_design, notes
+    cfg, acfg = _async_cfgs(args)
+    est = duration_estimate(cfg, acfg)
+    dz = make_design(cfg, acfg, args.code or "P01", args.session or 1)
+    print(f"participant {dz['participant_code']}  session {dz['session_index']}  "
+          f"design {dz['design_hash']}")
+    print(f"absent class         {acfg.absent_class}")
+    print(f"ladder               " + ", ".join(f"{s:g}" for s in cfg.steps_ms) + " ms"
+          f"   ({cfg.tone_dur_ms:g} ms tones, {cfg.n_components} components)")
+    print(f"orders               " + ", ".join(acfg.orders) +
+          "   (step 0 is one cell: at 0 ms every order is the same sound)")
+    print(f"cells                {est['n_cells']} x {acfg.trials_per_cell} present "
+          f"+ {acfg.trials_per_cell} absent = {est['n_main']} main trials")
+    print(f"practice             {est['n_practice']} trials at {acfg.practice_step_ms:g} ms")
+    print(f"one trial            {est['trial_s']:.2f} s")
+    print(f"estimated session    {est['minutes']:.0f} min "
+          f"({est['n_breaks']} breaks of {cfg.break_s:.0f} s)")
+    from .asynchrony import power_estimate
+    pw = power_estimate(cfg, acfg)
+    print(f"\nwhat one session resolves (at a true d' of {pw['at_dprime']:.1f}):")
+    print(f"  one cell's d'        SE {pw['se_cell']:.2f}")
+    if pw['se_contrast'] == pw['se_contrast']:
+        print(f"  the order contrast   SE {pw['se_contrast']:.2f}; one session catches an effect of "
+              f"{pw['mde_contrast']:.2f} or larger at 80% power")
+        for tgt in (0.5, 0.3):
+            print(f"                       {pw['listeners_for'](tgt):>2d} listeners to catch {tgt:.1f}")
+    print("  the ladder is the measurement; the limit and the contrast want several listeners.")
+    for n in notes(cfg, acfg):
+        print(f"note: {n}")
+    if args.json:
+        from .session import write_json
+        write_json(Path(args.json), dz)
+        print(f"design written to {args.json}")
+
+
+def cmd_async_verify(args):
+    from . import asynchrony as A
+    cfg, acfg = _async_cfgs(args)
+    kinds = list(A.ABSENT_KINDS) if args.absent == "all" else [k.strip() for k in args.absent.split(",")]
+    for k in kinds:
+        if k not in A.ABSENT_KINDS:
+            raise SystemExit(f"unknown absent class {k!r}; choose from {', '.join(A.ABSENT_KINDS)}")
+        res = A.run_audit(cfg, acfg, n_trials=args.trials, seed=args.seed, absent=k,
+                          n_perm=args.perm, verbose=not args.quiet)
+        text = A.report(res)
+        print(text)
+        if args.out:
+            path = Path(args.out) if len(kinds) == 1 else Path(args.out).with_name(
+                Path(args.out).stem + f"_{k}" + Path(args.out).suffix)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text + "\n")
+            print(f"written to {path}")
+
+
+def cmd_async_run(args):
+    from .asynchrony import AsyncRunner
+    cfg, acfg = _async_cfgs(args)
+    AsyncRunner(cfg, acfg, args.data, args.device, audio=not args.no_audio,
+                auto=args.auto).run(code=args.code, session_index=args.session)
+
+
+def cmd_async_analyze(args):
+    from .asynchrony import analyse
+    print(analyse(args.sessions))
+
+
+def cmd_async_demo(args):
+    import numpy as np
+    import soundfile as sf
+    from .asynchrony import build_interval, render, span_ms
+    cfg, acfg = _async_cfgs(args)
+    d = validate(cfg)
+    out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
+    steps = [float(s) for s in (args.steps.split(",") if args.steps else cfg.steps_ms)]
+    for step in steps:
+        for present in (True, False):
+            iv = build_interval(cfg, d, args.seed, step, args.order, present, acfg.absent_class)
+            name = out / f"step{step:g}_{'figure' if present else 'no-figure'}.wav"
+            sf.write(name, render(cfg, d, iv), cfg.sample_rate)
+            if present:
+                S = iv.figure_set
+                print(f"{step:5g} ms  channels {S.tolist()} -> "
+                      f"{np.round(d.channel_freqs_hz[S]).astype(int).tolist()} Hz, "
+                      f"element spans {span_ms(cfg, step):.0f} ms")
+    print(f"wrote {2 * len(steps)} files to {out}  (order '{args.order}', "
+          f"absent '{acfg.absent_class}', same seed throughout so the figure is the same set)")
+
+
 def _exposure_cfgs(args):
     from .exposure import ExposureConfig, load_preset
     if getattr(args, "preset", None):
@@ -383,6 +495,46 @@ def main(argv=None):
 
     q = sub.add_parser("exposure-analyze", help="cell table, D per delay, participant summary")
     q.add_argument("sessions", nargs="+"); q.set_defaults(fn=cmd_exposure_analyze)
+
+    def add_async(q):
+        add_common(q)
+        q.add_argument("--preset", default="asynchrony_config.json",
+                       help="two-section preset file (config + asynchrony)")
+        q.add_argument("--async-set", action="append", metavar="KEY=VALUE",
+                       help="override one asynchrony parameter")
+
+    q = sub.add_parser("asynchrony-design", help="print the asynchrony design and its duration")
+    add_async(q); q.add_argument("--code"); q.add_argument("--session", type=int)
+    q.add_argument("--json"); q.set_defaults(fn=cmd_async_design)
+
+    q = sub.add_parser("asynchrony-verify",
+                       help="can anything separate figure from no-figure without hearing it?")
+    add_async(q)
+    q.add_argument("--trials", type=int, default=40); q.add_argument("--seed", type=int, default=4242)
+    q.add_argument("--perm", type=int, default=20000)
+    q.add_argument("--absent", default="roving",
+                   help="roving | incoherent | plain | all (comma-separated)")
+    q.add_argument("--quiet", action="store_true"); q.add_argument("--out")
+    q.set_defaults(fn=cmd_async_verify)
+
+    q = sub.add_parser("asynchrony-run", help="run a single-interval onset-asynchrony session")
+    add_async(q)
+    q.add_argument("--data", default="data"); q.add_argument("--code")
+    q.add_argument("--session", type=int); q.add_argument("--device")
+    q.add_argument("--no-audio", action="store_true")
+    q.add_argument("--auto", type=float, default=None, metavar="TAU_MS",
+                   help="simulated listener; pipeline test only")
+    q.set_defaults(fn=cmd_async_run)
+
+    q = sub.add_parser("asynchrony-analyze", help="the ladder, the limit, and the order contrast")
+    q.add_argument("sessions", nargs="+"); q.set_defaults(fn=cmd_async_analyze)
+
+    q = sub.add_parser("asynchrony-demo", help="write one figure and one no-figure WAV per step")
+    add_async(q)
+    q.add_argument("--out", default="demo/asynchrony"); q.add_argument("--seed", type=int, default=7)
+    q.add_argument("--order", default="fixed"); q.add_argument("--steps",
+                   help="comma-separated, default the whole ladder")
+    q.set_defaults(fn=cmd_async_demo)
 
     args = p.parse_args(argv)
     try:

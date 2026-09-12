@@ -1,0 +1,88 @@
+====================================================================================================
+ONSET-ASYNCHRONY AUDIT   absent class 'roving'   40 present + 40 absent per cell
+====================================================================================================
+A yes/no listener answers from ONE sound, so any property whose distribution differs
+between the classes -- in mean OR in spread -- is a usable criterion, whether or not
+anyone hears a figure. Everything below is measured on single intervals.
+
+[0] construction, checked on the schedule over 40 matched pairs
+    same_n_tones                        ok
+    same_channel_counts                 ok
+    same_active_channels                ok
+    budget_exact                        ok
+    no_same_channel_overlap             ok
+    same_element_schedule               ok
+    elements_never_collide              ok
+    tones sounding at once, present  mean  7.81   sd  2.78   max  17.9
+    tones sounding at once, absent   mean  7.81   sd  2.83   max  18.1
+    time-aligned groups per interval   present 8   absent 8
+
+[1] how scattered an element's channels are (a band gives an element a register,
+    and a run of elements with registers streams -- which is a figure)
+                        mean gap (ch)   span (oct)   most in 4 ch  adjacent pair
+    figure                       3.85         4.33           2.50            84%
+    other elements               3.88         4.34           2.48            82%
+    the figure and the other elements must match here, or which set is the aligned
+    one is legible from the spectrum before anything is heard.
+
+[2] the cues a listener would try first, pooled over the ladder
+    feature                                              present            absent  yes/no d
+    long-term RMS (dB)                           -26.523+-0.007    -26.523+-0.007      +0.06
+    peak amplitude                                 0.245+-0.021      0.243+-0.020      +0.12
+    envelope level (dB)                          -26.523+-0.007    -26.523+-0.007      +0.06
+    crest factor                                   1.687+-0.116      1.697+-0.119      +0.08
+    envelope peaks above 3 SD                      3.791+-4.029      3.809+-4.131      +0.05
+    envelope peaks above 5 SD                      0.025+-0.183      0.030+-0.182      +0.01
+    tallest burst (SD)                             3.586+-0.571      3.638+-0.606      +0.09
+    envelope kurtosis                              4.216+-0.555      4.249+-0.563      +0.06
+    envelope modulation depth                      0.217+-0.016      0.218+-0.015      +0.10
+    modulation power, element-rate band (dB)      19.909+-1.508     19.981+-1.478      +0.06
+    envelope autocorrelation at element lags       0.121+-0.047      0.121+-0.048      +0.03
+    spectral peakedness (dB)                       0.185+-0.030      0.184+-0.028      +0.05
+    most irregular channel (IOI CV)                0.958+-0.100      0.953+-0.097      +0.03
+    channel IOI spread, mean (ms)                100.353+-3.010    100.105+-3.132      +0.06
+    tones sounding, mean                           6.868+-0.010      6.867+-0.009      +0.09
+
+[3] every one of the 65 features, largest yes/no d' first
+    feature                                          d     AUC  what differs
+    ch:frac_ioi_in_iei:mean                       0.18   0.473        spread
+    env:ac_peak_100_1000                          0.17   0.485        spread
+    env:burst_height_mean                         0.15   0.471        spread
+    ch:pairs_iei_norm:sd                          0.14   0.539         shift
+    ch_audio:pairs_iei_norm:sd                    0.13   0.538         shift
+    env:mod_30_150Hz                              0.13   0.494        spread
+    spec:max                                      0.13   0.536         shift
+    peak                                          0.12   0.532         shift
+    count_audio_max                               0.11   0.489        spread
+    ch:ioi_mean:sd                                0.11   0.510        spread
+    ch:frac_ioi_in_iei:sd                         0.10   0.470         shift
+    env:mod_depth                                 0.10   0.489        spread
+
+[4] can ANY of them separate the classes?  max-statistic permutation over labels
+    largest d' observed           0.180  (ch:frac_ioi_in_iei:mean)
+    largest under relabelling     95th percentile 0.240
+    p (any feature separates)     0.547
+    -> no measured property separates the classes
+
+[5] an ideal observer that has LEARNT the best linear criterion over every
+    feature (leave-one-out, fitted within each cell, held-out decisions pooled)
+    hit 0.509   false alarm 0.520   d' = -0.028   49.4% correct
+    This is the ceiling for someone who never hears a group and has only learnt
+    what these sounds are usually like. It must sit at chance.
+
+[6] per cell
+    step (ms)  order       permutation p   largest d   learnt d   learnt hit/fa
+    0          fixed               0.486        0.63      +0.06    0.55/0.53   
+    4          fixed               0.514        0.63      +0.00    0.55/0.55   
+    4          redrawn             0.882        0.53      +0.12    0.47/0.42   
+    8          fixed               0.934        0.50      -0.56    0.40/0.62   
+    8          redrawn             0.937        0.50      -0.12    0.50/0.55   
+    12         fixed               0.294        0.68      +0.18    0.55/0.47   
+    12         redrawn             0.697        0.58      -0.56    0.40/0.62   
+    16         fixed               0.162        0.74      +0.31    0.60/0.47   
+    16         redrawn             0.185        0.73      +0.18    0.55/0.47   
+    20         fixed               0.964        0.49      -0.06    0.50/0.53   
+    20         redrawn             0.961        0.48      +0.12    0.53/0.47   
+
+built in 63s; config 07156d5fdadab6f8; asynchrony da51bbefbf926054
+====================================================================================================

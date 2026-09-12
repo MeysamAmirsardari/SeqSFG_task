@@ -23,7 +23,7 @@ from __future__ import annotations
 import math
 import zlib
 from dataclasses import dataclass, field, replace
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
