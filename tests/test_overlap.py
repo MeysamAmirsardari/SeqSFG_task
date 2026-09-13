@@ -282,3 +282,55 @@ def test_duration_estimate_is_sane(preset):
     cfg, ocfg, d = preset
     est = O.duration_estimate(cfg, ocfg)
     assert est["n_main"] == 140 and 15 < est["minutes"] < 45
+
+
+# ---- main-block feedback ----------------------------------------------------
+def test_feedback_is_off_by_default(preset):
+    cfg, ocfg, d = preset
+    assert ocfg.feedback_main is False and ocfg.feedback_main_first == 0
+
+
+def test_feedback_on_every_trial_is_recorded_per_trial(tmp_path, preset):
+    import csv
+    cfg, ocfg, d = preset
+    fb = O.OverlapConfig(**{**ocfg.to_dict(), "trials_per_cell": 4, "practice_trials": 4,
+                            "feedback_main": True})
+    sdir = O.OverlapRunner(cfg, fb, tmp_path, audio=False, auto=150.0).run(code="FB", session_index=1)
+    rows = [r for r in csv.DictReader(open(sdir / "trials.csv")) if r["block"] == "main"]
+    assert rows and all(r["practice_round"] == "1" for r in rows)
+    from seqsfg.session import read_json
+    assert read_json(sdir / "session.json")["feedback_main"] is True
+    text = O.analyse([sdir])
+    assert "FEEDBACK WAS ON" in text and "the criterion does not" in text
+
+
+def test_feedback_on_the_first_n_only(tmp_path, preset):
+    import csv
+    cfg, ocfg, d = preset
+    fb = O.OverlapConfig(**{**ocfg.to_dict(), "trials_per_cell": 4, "practice_trials": 4,
+                            "feedback_main_first": 10})
+    sdir = O.OverlapRunner(cfg, fb, tmp_path, audio=False, auto=150.0).run(code="FB2", session_index=1)
+    rows = [r for r in csv.DictReader(open(sdir / "trials.csv")) if r["block"] == "main"]
+    got = [r["practice_round"] for r in rows]
+    assert got[:10] == ["1"] * 10 and set(got[10:]) == {"0"}
+
+
+def test_a_feedback_free_session_says_so(tmp_path, preset):
+    cfg, ocfg, d = preset
+    small = O.OverlapConfig(**{**ocfg.to_dict(), "trials_per_cell": 4, "practice_trials": 4})
+    sdir = O.OverlapRunner(cfg, small, tmp_path, audio=False, auto=150.0).run(code="NF", session_index=1)
+    text = O.analyse([sdir])
+    assert "no feedback in the main block" in text and "FEEDBACK WAS ON" not in text
+
+
+def test_notes_warn_when_feedback_is_on(preset):
+    cfg, ocfg, d = preset
+    on = O.OverlapConfig(**{**ocfg.to_dict(), "feedback_main": True})
+    assert any("feedback is on" in n for n in O.notes(cfg, on))
+    assert not any("feedback is on" in n for n in O.notes(cfg, ocfg))
+
+
+def test_feedback_lengthens_the_session_estimate(preset):
+    cfg, ocfg, d = preset
+    on = O.OverlapConfig(**{**ocfg.to_dict(), "feedback_main": True})
+    assert O.duration_estimate(cfg, on)["minutes"] > O.duration_estimate(cfg, ocfg)["minutes"]

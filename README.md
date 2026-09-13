@@ -1200,6 +1200,23 @@ synchronous cell at each duration is where a general duration benefit would appe
 remove the confound, and normalising the mixture RMS would not either — that equalises the scene,
 not the component.
 
+### Feedback in the main block
+
+Off by default, because feedback in a yes/no block is not neutral: it drives the listener towards
+the criterion that maximises accuracy, so `c` stops being a parameter you are measuring and
+becomes one the procedure imposed, and performance can drift over the session in a way that is
+confounded with trial order. d' tolerates it better than c does. For a feasibility run, keeping
+the listener calibrated may be worth that, so it is a switch rather than a rule:
+
+```
+python -m seqsfg overlap-run --overlap-set feedback_main=true --data data
+python -m seqsfg overlap-run --overlap-set feedback_main_first=20 --data data   # first 20 only
+```
+
+Whether feedback was on is written into `session.json`, marked **per trial** in `trials.csv`
+(the otherwise-unused `practice_round` column), and stated by `overlap-analyze` — which also
+warns not to pool fed-back sessions with feedback-free ones without saying so.
+
 ### Commands
 
 ```

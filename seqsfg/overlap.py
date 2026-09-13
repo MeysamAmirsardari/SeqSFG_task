@@ -131,6 +131,17 @@ class OverlapConfig:
     figure_amplitude: Optional[float] = None       # None -> cfg.tone_amplitude, i.e. the same
     jitter_ms: float = 120.0           # shared per-recurrence onset jitter, FIXED across cells
     practice_trials: int = 16          # split over the two synchronous cells, with feedback
+    feedback_main: bool = False
+    # Off by default. Feedback in a yes/no main block is not neutral: it drives the listener
+    # towards the criterion that maximises accuracy, so c stops being a free parameter you are
+    # measuring and becomes one the procedure imposed, and it lets performance drift over the
+    # session in a way that is confounded with trial order. d' survives it better than c does.
+    # It is a defensible choice for a feasibility run, where keeping the listener calibrated
+    # matters more than a clean criterion -- but the analysis has to say it was on, and it does.
+    feedback_main_first: int = 0
+    # A middle course: feedback on the first N main trials only, then silence. Calibrates the
+    # listener at the start without touching the rest of the block. Ignored when feedback_main
+    # is True, which feeds back on every trial.
     response_timeout_s: float = 4.0    # measured from the end of the sound; recorded as a miss
     max_class_run: int = 4
     max_cell_run: int = 2
@@ -243,6 +254,13 @@ def notes(cfg: Config, ocfg: OverlapConfig) -> List[str]:
         f"{geometry(cfg, 40.0, 20.0, cfg.n_components)['common_overlap_ms']:.0f} ms in the "
         "(40, 20) cell, not 20 ms. Only the synchronous cells have positive common overlap.",
     ]
+    if ocfg.feedback_main or ocfg.feedback_main_first:
+        where = "every main trial" if ocfg.feedback_main else \
+            f"the first {ocfg.feedback_main_first} main trials"
+        out.append(f"feedback is on for {where}. d' tolerates that; the criterion does not -- c "
+                   f"becomes a number the procedure imposed rather than one the listener chose. "
+                   f"Read c as a description of what happened, not as a free parameter, and read "
+                   f"the half-split in section [4] for drift.")
     if ocfg.absent_class == "roving":
         out.append("absent_class='roving' answers a different question from this pilot's: whether "
                    "a frequency set RECURS among other organised groups, not whether a pattern "
@@ -654,9 +672,12 @@ def duration_estimate(cfg: Config, ocfg: OverlapConfig) -> dict:
     n_main = 2 * ocfg.trials_per_cell * len(ocfg.cells)
     trial_s = ((cfg.interval_dur_ms + cfg.lead_silence_ms) / 1000.0
                + min(ocfg.response_timeout_s, cfg.response_allowance_s) + cfg.iti_s)
+    n_fb = n_main if ocfg.feedback_main else min(max(ocfg.feedback_main_first, 0), n_main)
+    main_extra = n_fb * cfg.feedback_s
     prac_s = ocfg.practice_trials * (trial_s + cfg.feedback_s)
     n_breaks = max(0, n_main // max(cfg.break_every, 1) - 1) + 1
-    total = cfg.setup_minutes * 60.0 + n_main * trial_s + prac_s + n_breaks * cfg.break_s
+    total = (cfg.setup_minutes * 60.0 + n_main * trial_s + main_extra + prac_s
+             + n_breaks * cfg.break_s)
     return dict(n_cells=len(ocfg.cells), n_main=n_main, n_practice=ocfg.practice_trials,
                 trial_s=trial_s, n_breaks=n_breaks, minutes=total / 60.0)
 
@@ -801,7 +822,10 @@ class OverlapRunner:
                   f"   wrong ({'a pattern recurred' if spec.present else 'nothing recurred'})")
         else:
             print("   ok")
-        self.log.write(dict(trial_index=spec.index, block=spec.block, practice_round=0,
+        # practice_round is otherwise unused here, so it carries whether THIS trial had feedback;
+        # that keeps the CSV schema identical to every other task's and still records it per trial
+        self.log.write(dict(trial_index=spec.index, block=spec.block,
+                            practice_round=1 if feedback else 0,
                             practice_stage=0, variant=cell_name(spec.tone_ms, spec.step_ms),
                             step_ms=spec.step_ms,
                             target_position=1 if spec.present else 2, seed=spec.seed,
@@ -834,6 +858,8 @@ class OverlapRunner:
                 "overlap_hash": ocfg.hash(), "absent": ocfg.absent_class,
                 "rt_reference": self.RT_REFERENCE,
                 "response_timeout_s": ocfg.response_timeout_s,
+                "feedback_main": bool(ocfg.feedback_main),
+                "feedback_main_first": int(ocfg.feedback_main_first),
                 "geometry": [geometry(cfg, t, s, cfg.n_components) for t, s in ocfg.cells],
                 "participant_code": code, "session_index": idx,
                 "session_seed": design["session_seed"], "design_hash": design["design_hash"],
@@ -853,10 +879,14 @@ class OverlapRunner:
             self.pause(f"Main block: {len(mn)} trials, no feedback. Same question each time.\n"
                        f"If you do not answer within {ocfg.response_timeout_s:.0f} s the trial is "
                        f"recorded as no response and moves on.")
+            n_fb = len(mn) if ocfg.feedback_main else max(0, int(ocfg.feedback_main_first))
+            if n_fb:
+                print(f"\n  feedback is on for {'every trial' if n_fb >= len(mn) else f'the first {n_fb} trials'}"
+                      f" of the main block; this is recorded in session.json and the analysis says so.")
             for i, s in enumerate(mn, 1):
                 if i > 1 and (i - 1) % cfg.break_every == 0:
                     self.pause("Take a break.")
-                self._trial(s, False, i, len(mn))
+                self._trial(s, i <= n_fb, i, len(mn))
             meta["status"] = "complete"
         except QuitRequested:
             meta["status"] = "interrupted"
@@ -932,6 +962,15 @@ def analyse(sessions: Sequence, n_boot: Optional[int] = None) -> str:
              f"no response {tot[4]}   d' = {_dp(tot):+.2f}")
     L.append(f"  response time measured from {meta.get('rt_reference', 'an unrecorded reference')}")
     L.append("  no-responses are counted separately and are NOT folded into 'no'.")
+    fb_all, fb_n = bool(meta.get("feedback_main")), int(meta.get("feedback_main_first") or 0)
+    n_fb_seen = sum(1 for r in rows if str(r.get("practice_round")) == "1")
+    if fb_all or fb_n or n_fb_seen:
+        L.append(f"  FEEDBACK WAS ON for {n_fb_seen} of {len(rows)} main trials. d' tolerates that;")
+        L.append("  the criterion does not -- c below describes the criterion the feedback drove the")
+        L.append("  listener to, not one they chose. Read the half-split in [4] for drift, and do not")
+        L.append("  pool these sessions with feedback-free ones without saying so.")
+    else:
+        L.append("  no feedback in the main block.")
 
     boots = _boot(counts, n_boot)
     L.append("\n[1] per cell")
