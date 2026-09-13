@@ -156,6 +156,65 @@ def test_fixed_order_recurs_and_redrawn_does_not(preset):
     assert len(set(shapes("redrawn"))) > 1, "a redrawn order must change between elements"
 
 
+def test_absent_order_redrawn_breaks_the_shape_without_breaking_the_match(preset):
+    """A permutation does not change the multiset of onset times, so the envelope survives it."""
+    cfg, acfg, d = preset
+
+    def shapes(iv):
+        f = iv.kind == FIGURE
+        out = []
+        for k in np.unique(iv.element[f]):
+            m = f & (iv.element == k)
+            r = np.argsort(np.argsort(iv.onset[m]))
+            out.append(tuple(r[np.argsort(iv.channel[m])].tolist()))
+        return out
+
+    def offsets(iv):
+        f = iv.kind == FIGURE
+        return {tuple((np.sort(iv.onset[f & (iv.element == k)])
+                       - iv.onset[f & (iv.element == k)].min()).tolist())
+                for k in np.unique(iv.element[f])}
+
+    same = A.build_interval(cfg, d, 31, 16.0, "rising", False, "roving", "same")
+    new_ = A.build_interval(cfg, d, 31, 16.0, "rising", False, "roving", "redrawn")
+    assert len(set(shapes(same))) == 1, "'same' must reuse one shape at every element"
+    assert len(set(shapes(new_))) > cfg.n_elements - 2, "'redrawn' must vary it"
+    # the thing that must NOT change: when the tones start
+    assert offsets(same) == offsets(new_)
+    pres = A.build_interval(cfg, d, 31, 16.0, "rising", True)
+    assert offsets(pres) == offsets(new_)
+    cp = np.bincount(pres.channel, minlength=d.n_channels)
+    cn = np.bincount(new_.channel, minlength=d.n_channels)
+    assert np.array_equal(cp, cn) and pres.n_tones == new_.n_tones
+
+
+def test_absent_order_leaves_the_default_untouched(preset):
+    cfg, acfg, d = preset
+    a = A.build_interval(cfg, d, 44, 12.0, "fixed", False, "roving")
+    b = A.build_interval(cfg, d, 44, 12.0, "fixed", False, "roving", "same")
+    assert np.array_equal(a.onset, b.onset) and np.array_equal(a.channel, b.channel)
+
+
+def test_nothing_in_an_absent_trial_recurs(preset):
+    """The load-bearing claim of the shipped preset: a 'no' trial repeats nothing."""
+    cfg, acfg, d = preset
+    r = A.absent_recurrence_check(cfg, A.AsyncConfig(**{**acfg.to_dict(), "orders": ["rising"],
+                                                        "absent_class": "roving",
+                                                        "absent_order": "redrawn"}), n=8, seed=2)
+    a = r["absent"]
+    assert a["repeated_sets"] == 0.0
+    assert a["consecutive_shared"] == 0.0
+    assert a["channels_in_a_row"] == 0.0
+    assert a["distinct_shapes"] > cfg.n_elements - 1.5
+    assert r["present"]["repeated_sets"] == cfg.n_elements - 1      # the reference: one set, reused
+
+
+def test_check_rejects_a_bad_absent_order(preset):
+    cfg, acfg, d = preset
+    with pytest.raises(ValueError, match="absent_order"):
+        A.check(cfg, A.AsyncConfig(absent_order="sideways"))
+
+
 def test_at_step_zero_every_order_is_one_sound(preset):
     cfg, acfg, d = preset
     a = A.build_interval(cfg, d, 4, 0.0, "fixed", True)

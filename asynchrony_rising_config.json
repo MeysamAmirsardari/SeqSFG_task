@@ -1,29 +1,34 @@
 {
  "_README": [
-  "Preset for the onset-asynchrony task run as RISING vs NOTHING (seqsfg/asynchrony.py).",
+  "Preset for the onset-asynchrony task run as RISING FIGURE vs NOTHING THAT RECURS.",
   "",
-  "Same stimulus machinery and the same Config as asynchrony_config.json -- only the two",
-  "task-level choices differ, and only the 'asynchrony' section changes:",
+  "Same Config as asynchrony_config.json; only the 'asynchrony' section differs:",
   "",
-  "  orders        ['rising']       one present condition: the element ascends in frequency,",
-  "                                 component i starting i*step after the lowest. There is no",
-  "                                 order contrast, so the whole session pays for one ladder",
-  "                                 and every cell gets twice the trials.",
-  "  absent_class  'incoherent'     no time-aligned group ANYWHERE. The figure's channels and",
-  "                                 the other elements' channels all carry their tones at a",
-  "                                 random time inside their own element window. A pure cloud.",
+  "  orders        ['rising']    one present condition: the element ascends in frequency,",
+  "                              component i starting i*step after the lowest. No order",
+  "                              contrast, so the whole session pays for one ladder and every",
+  "                              cell gets 20 present + 20 absent instead of 10.",
+  "  absent_class  'roving'      a 'no' trial carries one time-aligned group per element, on a",
+  "                              fresh set of channels drawn from the WHOLE pool each time. That",
+  "                              is what makes the two classes envelope-matched: a group starts",
+  "                              just as often in both, and only whether it RECURS differs.",
+  "  absent_order  'redrawn'     and that group's within-element order is drawn fresh at every",
+  "                              element too. A permutation does not change the multiset of",
+  "                              onset times inside an element, so the envelope stays matched to",
+  "                              the last sample -- but without it every group in a 'no' trial is",
+  "                              the same rising chirp on new pitches, and a run of identical",
+  "                              shapes is itself something to hear. With it, a 'no' trial has no",
+  "                              pitch that returns, no set that returns and no shape that",
+  "                              returns. Section [0b] of the audit measures all three.",
   "",
-  "Why this absent class, and what it costs. 'roving' (asynchrony_config.json) puts an aligned",
-  "group in both classes and varies only whether it recurs, so it is matched at every rung --",
-  "but it asks 'did a figure come back', not 'was anything bound'. 'incoherent' asks the",
-  "question this project is named after. Synchrony is an envelope event, so it cannot be",
-  "envelope-matched, and the size of that cue is largest at 0 ms and gone by the middle of the",
-  "ladder. Run `seqsfg asynchrony-verify --preset asynchrony_rising_config.json` and read",
-  "section [6]: the rungs where the learnt observer sits at chance are the ones that measure",
-  "hearing. Treat 0 ms as a manipulation check, not a data point.",
+  "The alternative absent class is 'incoherent' (no aligned group anywhere -- the purest cloud).",
+  "It is one flag away:  --async-set absent_class=incoherent  . It is not the default because",
+  "its machine ceiling is a U: a learnt observer reads it at d' = +1.34 at 0 ms and +0.62 at",
+  "4 ms (the present element is a chord and a chord is a level event), and again at +0.52 at",
+  "16 ms (an evenly spaced group is a regular pulse train and a random scatter is not). Only",
+  "8 and 12 ms are clean. See verification/asynchrony_rising_seed_sweep.txt.",
   "",
-  "Everything in the 'config' section is identical to asynchrony_config.json, so the two can be",
-  "compared rung for rung, and pilot_config.json is untouched by either."
+  "pilot_config.json and asynchrony_config.json are untouched by this file."
  ],
  "config": {
   "sample_rate": 48000,
@@ -114,7 +119,7 @@
   "orders": [
    "rising"
   ],
-  "absent_class": "incoherent",
+  "absent_class": "roving",
   "trials_per_cell": 20,
   "practice_trials": 12,
   "practice_step_ms": 0.0,
@@ -123,6 +128,7 @@
   "max_class_run": 4,
   "max_cell_run": 2,
   "threshold_dprime": 1.0,
-  "n_boot": 4000
+  "n_boot": 4000,
+  "absent_order": "redrawn"
  }
 }

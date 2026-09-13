@@ -87,6 +87,16 @@ class AsyncConfig:
     """
     orders: Tuple[str, ...] = ("fixed", "redrawn")
     absent_class: str = "roving"
+    absent_order: str = "same"
+    # "same"    -> the absent interval's aligned group uses the SAME within-element order as the
+    #              present one. Under 'rising' that makes every group in a 'no' trial the same
+    #              rising chirp on new pitches, and a run of identical shapes is itself something
+    #              to hear, even though no pitch ever returns.
+    # "redrawn" -> that group's order is drawn fresh at every element. A permutation does not
+    #              change the MULTISET of onset times inside an element, so the envelope stays
+    #              matched to the last sample, but the 'no' loses its repeating shape as well as
+    #              its repeating pitches. Only meaningful for absent_class='roving'; the other
+    #              two have no aligned group to reorder.
     trials_per_cell: int = 10          # present trials per (step, order); absent gets the same
     practice_trials: int = 12
     practice_step_ms: float = 0.0
@@ -146,6 +156,8 @@ def check(cfg: Config, acfg: AsyncConfig) -> None:
                     f"so elements are drawn from the whole pool")
     if acfg.absent_class not in ABSENT_KINDS:
         errs.append(f"absent_class={acfg.absent_class!r}; choose from {ABSENT_KINDS}")
+    if acfg.absent_order not in ("same", "redrawn"):
+        errs.append(f"absent_order={acfg.absent_order!r}; choose 'same' or 'redrawn'")
     if not acfg.orders:
         errs.append("orders must name at least one condition")
     for o in acfg.orders:
@@ -199,6 +211,9 @@ def notes(cfg: Config, acfg: AsyncConfig) -> List[str]:
     if acfg.absent_class != "roving":
         out.append(f"absent_class={acfg.absent_class!r} is not the matched one; read section [3] "
                    f"of the audit before running a listener on it.")
+    if acfg.absent_order == "redrawn" and acfg.absent_class != "roving":
+        out.append(f"absent_order='redrawn' does nothing with absent_class="
+                   f"{acfg.absent_class!r}: that class has no aligned group to reorder.")
     if acfg.feedback_main:
         out.append("feedback in the main block moves the criterion during the run; d' survives "
                    "that but c does not, and the half-split diagnostic will show it.")
@@ -212,7 +227,7 @@ _ALIGNED = {"present": "S", "roving": "foil", "incoherent": "none"}
 
 
 def _build(cfg: Config, d: Derived, seed: int, step_ms: float, order: str, aligned: str,
-           max_rebuilds: int = 50) -> Interval:
+           foil_order: str = "same", max_rebuilds: int = 50) -> Interval:
     """One interval of an asynchrony trial. `aligned` is 'S', 'foil' or 'none'.
 
     The structure a trial shares across its three possible sides -- the figure's channels, the
@@ -243,8 +258,13 @@ def _build(cfg: Config, d: Derived, seed: int, step_ms: float, order: str, align
             active = np.unique(np.concatenate([S, universe] + [np.asarray(g) for g in foil_sets]))
             rng = np.random.default_rng([int(seed), attempt, oi, ai, 0x5A6F])
             role = {"S": "recurring", "foil": "redrawn", "none": "ungrouped"}[aligned]
+            pat = patterns
+            if aligned == "foil" and foil_order == "redrawn":
+                # its own stream, so 'same' stays byte-for-byte what it was
+                pr = np.random.default_rng([int(seed), attempt, oi, 0xF011])
+                pat = [pr.permutation(N) for _ in range(K)]
             return build_matched(role, rng, cfg, d, step_ms, variant, t_el, S, foil_sets,
-                                 patterns, active, aligned=aligned)
+                                 pat, active, aligned=aligned)
         except PlacementError as e:                                   # pragma: no cover - rare
             last = e
             continue
@@ -253,7 +273,7 @@ def _build(cfg: Config, d: Derived, seed: int, step_ms: float, order: str, align
 
 
 def build_interval(cfg: Config, d: Derived, seed: int, step_ms: float, order: str, present: bool,
-                   absent: str = "roving") -> Interval:
+                   absent: str = "roving", absent_order: str = "same") -> Interval:
     """One interval. `present` selects the class, `order` the temporal pattern, `absent` the foil.
 
     At step 0 every order is the same sound: the delays are all multiplied by zero. The design
@@ -269,7 +289,7 @@ def build_interval(cfg: Config, d: Derived, seed: int, step_ms: float, order: st
         # no element structure at all: the same channels at the same budget, placed at random
         iv = _build(cfg, d, seed, step_ms, order, "S")
         return _plain_like(cfg, d, iv, np.random.default_rng([int(seed), 0xC10D]))
-    return _build(cfg, d, seed, step_ms, order, _ALIGNED[absent])
+    return _build(cfg, d, seed, step_ms, order, _ALIGNED[absent], foil_order=absent_order)
 
 
 def render(cfg: Config, d: Derived, iv: Interval) -> np.ndarray:
@@ -457,7 +477,7 @@ class AsyncRunner:
         from .runner import QuitRequested
         from .session import now_iso
         iv = build_interval(self.cfg, self.d, spec.seed, spec.step_ms, spec.order,
-                            spec.present, self.acfg.absent_class)
+                            spec.present, self.acfg.absent_class, self.acfg.absent_order)
         x = render(self.cfg, self.d, iv)
         print(f"  trial {i}/{n} ...", end="", flush=True)
         t0 = _t.time()
@@ -742,7 +762,8 @@ def construction_check(cfg: Config, acfg: AsyncConfig, n: int = 40, seed: int = 
         order = acfg.orders[j % len(acfg.orders)]
         s = int(np.random.default_rng([seed, j]).integers(2 ** 31 - 1))
         A_ = build_interval(cfg, d, s, step, order, True)
-        B_ = build_interval(cfg, d, s, step, order, False, acfg.absent_class)
+        B_ = build_interval(cfg, d, s, step, order, False, acfg.absent_class,
+                            acfg.absent_order)
         ca = np.bincount(A_.channel, minlength=P); cb = np.bincount(B_.channel, minlength=P)
         fails["same_n_tones"] += A_.n_tones != B_.n_tones
         fails["same_channel_counts"] += not np.array_equal(ca, cb)
@@ -805,6 +826,48 @@ def scatter_table(cfg: Config, n: int = 300, seed: int = 31) -> dict:
     return {k: np.array(v) for k, v in rows.items()}
 
 
+def absent_recurrence_check(cfg: Config, acfg: AsyncConfig, n: int = 60, seed: int = 515) -> dict:
+    """Is there anything in a 'no' trial that comes back? There must not be.
+
+    A 'roving' absent interval carries one time-aligned group per element -- that is what keeps
+    the envelope matched -- so it cannot sound like literally nothing. What it must never do is
+    REPEAT: no pitch that returns, no set that returns, no shape that returns. Each of those is
+    measured here on the schedule, against the present interval as the reference for what
+    repetition looks like when it is deliberate.
+    """
+    d = validate(cfg)
+    out = {}
+    for tag, present in (("present", True), ("absent", False)):
+        sets_rep, cons, worst, shapes, chan_runs = [], [], [], [], []
+        for j in range(n):
+            step = float(cfg.steps_ms[1 + j % max(len(cfg.steps_ms) - 1, 1)])   # never step 0
+            order = acfg.orders[j % len(acfg.orders)]
+            sd = int(np.random.default_rng([seed, j]).integers(2 ** 31 - 1))
+            iv = build_interval(cfg, d, sd, step, order, present, acfg.absent_class,
+                                acfg.absent_order)
+            if not iv.element_sets:
+                continue
+            st = [tuple(sorted(int(x) for x in g)) for g in iv.element_sets]
+            sets_rep.append(len(st) - len(set(st)))                   # sets that came back
+            cons.append(np.mean([len(set(st[i]) & set(st[i + 1])) for i in range(len(st) - 1)]))
+            worst.append(max(len(set(a) & set(b)) for i, a in enumerate(st) for b in st[i + 1:]))
+            f = iv.kind == FIGURE
+            sh = []
+            for k in np.unique(iv.element[f]):
+                m = f & (iv.element == k)
+                r = np.argsort(np.argsort(iv.onset[m]))
+                sh.append(tuple(r[np.argsort(iv.channel[m])].tolist()))
+            shapes.append(len(set(sh)))
+            # a channel used by two elements in a row is a pitch heard twice at the element rate
+            chan_runs.append(sum(1 for i in range(len(st) - 1) for c in st[i] if c in st[i + 1]))
+        out[tag] = dict(n=len(sets_rep), repeated_sets=float(np.mean(sets_rep)),
+                        consecutive_shared=float(np.mean(cons)), worst_pair=float(np.mean(worst)),
+                        distinct_shapes=float(np.mean(shapes)),
+                        channels_in_a_row=float(np.mean(chan_runs)))
+    out["n_elements"] = cfg.n_elements
+    return out
+
+
 @dataclass
 class CellResult:
     step_ms: float
@@ -842,7 +905,8 @@ def run_audit(cfg: Config, acfg: AsyncConfig, n_trials: int = 40, seed: int = 42
                 s = int(np.random.default_rng([seed, tag, int(step * 1000),
                                                ORDERS.index(order), int(present), j])
                         .integers(2 ** 31 - 1))
-                iv = build_interval(cfg, d, s, float(step), order, present, absent)
+                iv = build_interval(cfg, d, s, float(step), order, present, absent,
+                                    acfg.absent_order)
                 x = render_interval(cfg, iv, d)
                 m = measure_interval(cfg, d, iv, x, iv.figure_set, span_ms(cfg, step), ref)
                 rows[present].append(scalar_features(m))
@@ -868,6 +932,9 @@ def run_audit(cfg: Config, acfg: AsyncConfig, n_trials: int = 40, seed: int = 42
                 construction=construction_check(cfg, acfg.__class__(**{**acfg.to_dict(),
                                                                       "absent_class": absent,
                                                                       "orders": list(acfg.orders)})),
+                recurrence=absent_recurrence_check(cfg, acfg.__class__(**{**acfg.to_dict(),
+                                                                         "absent_class": absent,
+                                                                         "orders": list(acfg.orders)})),
                 scatter=scatter_table(cfg), elapsed_s=time.time() - t0)
 
 
@@ -908,6 +975,24 @@ def report(res: dict) -> str:
     L.append(f"    time-aligned groups per interval   present {c['aligned_groups']['present']:.0f}"
              f"   absent {c['aligned_groups']['absent']:.0f}")
     L.append("")
+
+    r = res.get("recurrence")
+    if r and r.get("absent", {}).get("n"):
+        K = r["n_elements"]
+        L.append(f"[0b] does anything in a 'no' trial come back?  {r['absent']['n']} trials, "
+                 f"{K} groups each, step > 0")
+        L.append(f"    {'':<40}{'present':>12}{'absent':>12}   {'wanted in the absent':<30}")
+        for key, lab, want in (
+                ("repeated_sets", "channel sets that occur twice", "0 - no set ever returns"),
+                ("consecutive_shared", "channels shared, group to group", "0 - no pitch carries over"),
+                ("worst_pair", "channels shared by the worst pair", "well under 7"),
+                ("channels_in_a_row", "channels used in two groups running", "0"),
+                ("distinct_shapes", "distinct within-group orders", f"{K} - every shape new")):
+            L.append(f"    {lab:<40}{r['present'][key]:>12.2f}{r['absent'][key]:>12.2f}   {want:<30}")
+        L.append("    the present column is the reference: that is what deliberate repetition looks")
+        L.append("    like. A 'no' trial still carries one aligned group per element -- that is what")
+        L.append("    matches the envelope -- but nothing about it may recur.")
+        L.append("")
 
     s = res["scatter"]
     L.append("[1] how scattered an element's channels are (a band gives an element a register,")

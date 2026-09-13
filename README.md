@@ -1018,43 +1018,56 @@ python -m seqsfg asynchrony-run --data data             # run a listener
 python -m seqsfg asynchrony-analyze data/P01/session_01
 ```
 
-### Running it as rising vs nothing
+### The shipped single-ladder preset: a rising figure against nothing that recurs
 
-`asynchrony_rising_config.json` is the same Config with two different task choices:
-`orders: ["rising"]` and `absent_class: "incoherent"`. One present condition, so there is no
-order contrast and the whole session pays for one ladder: 6 cells × 20 present + 20 absent =
-240 trials, ~35 min, and a cell's d' has SE 0.41 instead of 0.59.
+`asynchrony_rising_config.json` — `orders: ["rising"]`, `absent_class: "roving"`,
+`absent_order: "redrawn"`. One present condition, so there is no order contrast and the whole
+session pays for one ladder: 6 cells × 20 present + 20 absent = 240 trials, ~35 min, and a
+cell's d' has SE 0.41 instead of 0.59.
 
-This is the version that matches the title. `roving` asks whether a figure *recurred*;
-`incoherent` asks whether anything was bound at all, which is what "how far can onsets be
-separated and still group" means. It costs a confound, and the confound is a **U**, not a
-single leak. Leave-one-out observer over all 65 features, 60+60 per cell, five seeds:
+**Why the absent group's order is redrawn.** A roving absent interval must carry one
+time-aligned group per element — that is what makes a group start just as often in both classes,
+and it is the whole reason this contrast is envelope-matched where a plain cloud is not. But
+with the order held fixed, all eight of those groups are the *same shape*: under `rising`, eight
+identical chirps on new pitches. Nothing recurs and yet there is plainly something to hear.
+Redrawing costs nothing — a permutation does not change the multiset of onset times inside an
+element, so the envelope, the per-channel counts and the count trace stay matched to the last
+sample, while the "no" loses its repeating shape as well as its repeating pitches.
+
+**Does the "no" repeat anything?** Section `[0b]` of the audit measures it, with the present
+interval as the reference for what deliberate repetition looks like:
+
+| over 8 groups, 60 trials | present | absent |
+|---|---|---|
+| channel sets that occur twice | 7.00 | **0.00** |
+| channels shared, group to group | 7.00 | **0.00** |
+| channels used in two groups running | 49.00 | **0.00** |
+| distinct within-group orders | 1.00 | **7.98** of 8 |
+| channels shared by the worst pair | 7.00 | 4.17 |
+
+4.17 is chance for this universe — eight 7-channel groups from 23 channels share 7²/23 = 2.1 on
+average and the largest of 28 pairs lands near 4 — and those two are never adjacent, so no pitch
+is ever heard twice at the element rate.
+
+**The machine ceiling, five seeds, 60+60 per cell** (null cell SD 0.23):
 
 | step | 0 | 4 | 8 | 12 | 16 | 20 |
 |---|---|---|---|---|---|---|
-| mean learnt d' | **+1.34** | **+0.62** | +0.07 | −0.11 | **+0.52** | +0.23 |
-| seeds with p<0.05 | 5/5 | 4/5 | 1/5 | 0/5 | 2/5 | 2/5 |
+| mean learnt d' | +0.02 | −0.15 | −0.08 | −0.07 | −0.22 | +0.02 |
+| seeds with p<0.05 | 0/5 | 1/5 | 0/5 | 0/5 | 1/5 | 0/5 |
 
-Both arms have one cause: the present element's onsets sit on an **even grid** and the absent's
-are placed at random inside the same window.
+Pooled permutation p across the five: 0.196, 0.371, 0.652, 0.485, 0.748. Every rung at chance at
+every seed.
 
-* At 0 and 4 ms the grid is a chord. `env:n_bursts_3sd` is 15.2 present against 10.0 absent at
-  0 ms — synchrony *is* an envelope event and no arrangement of the same tones avoids it.
-* At 16 and 20 ms the grid is a regular 62 Hz / 50 Hz pulse train inside the element while the
-  absent scatter is irregular, so the regularity is readable. Smaller, and marginal at 20 ms,
-  but positive at all five seeds at 16.
-* 8 and 12 ms are clean: wide enough that the chord is gone, narrow enough that seven random
-  placements look like seven evenly spaced ones.
-
-So report the whole ladder with that table beside it. 0 and 4 ms are upper bounds rather than
-measurements — treat 0 ms as a manipulation check. 8 and 12 ms are the clean measurement. The
-wide end could be cleaned without changing the question, by drawing the seven within-element
-offsets once per trial from a uniform distribution over the span and holding them fixed across
-elements rather than putting them on a grid; sorted onto ascending channels that is still a
-rising sweep, and both classes would then draw offsets from the same distribution. It does not
-help at 0 ms, where the span is zero and the two classes collapse together. Not implemented.
+**What it cannot be.** A matched absent class cannot be silence plus cloud. If a "no" trial
+sounded like nothing at all, the difference between the classes would be level, and a machine
+would read it — which is exactly what `absent_class: "incoherent"` does (learnt d' +1.34 at
+0 ms, +0.62 at 4 ms, +0.52 at 16 ms; only 8 and 12 ms clean) and what `plain` does much worse
+(+2.51 pooled, 89.5% correct). Both are one flag away — `--async-set absent_class=incoherent` —
+and `verification/asynchrony_rising_seed_sweep.txt` carries the numbers.
 
 ```
 python -m seqsfg asynchrony-verify --preset asynchrony_rising_config.json
-python -m seqsfg asynchrony-run     --preset asynchrony_rising_config.json --data data
+python -m seqsfg asynchrony-demo   --preset asynchrony_rising_config.json --seed 12
+python -m seqsfg asynchrony-run    --preset asynchrony_rising_config.json --data data
 ```

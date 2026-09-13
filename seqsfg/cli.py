@@ -300,7 +300,8 @@ def cmd_async_demo(args):
     steps = [float(s) for s in (args.steps.split(",") if args.steps else cfg.steps_ms)]
     for step in steps:
         for present in (True, False):
-            iv = build_interval(cfg, d, args.seed, step, args.order, present, acfg.absent_class)
+            iv = build_interval(cfg, d, args.seed, step, args.order, present,
+                                acfg.absent_class, acfg.absent_order)
             name = out / f"step{step:g}_{'figure' if present else 'no-figure'}.wav"
             sf.write(name, render(cfg, d, iv), cfg.sample_rate)
             if present:

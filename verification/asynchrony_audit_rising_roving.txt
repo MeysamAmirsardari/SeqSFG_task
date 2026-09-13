@@ -1,0 +1,98 @@
+====================================================================================================
+ONSET-ASYNCHRONY AUDIT   absent class 'roving'   60 present + 60 absent per cell
+====================================================================================================
+A yes/no listener answers from ONE sound, so any property whose distribution differs
+between the classes -- in mean OR in spread -- is a usable criterion, whether or not
+anyone hears a figure. Everything below is measured on single intervals.
+
+[0] construction, checked on the schedule over 40 matched pairs
+    same_n_tones                        ok
+    same_channel_counts                 ok
+    same_active_channels                ok
+    budget_exact                        ok
+    no_same_channel_overlap             ok
+    same_element_schedule               ok
+    elements_never_collide              ok
+    tones sounding at once, present  mean  7.81   sd  2.80   max  17.6
+    tones sounding at once, absent   mean  7.81   sd  2.81   max  17.7
+    time-aligned groups per interval   present 8   absent 8
+
+[0b] does anything in a 'no' trial come back?  60 trials, 8 groups each, step > 0
+                                                 present      absent   wanted in the absent          
+    channel sets that occur twice                   7.00        0.00   0 - no set ever returns       
+    channels shared, group to group                 7.00        0.00   0 - no pitch carries over     
+    channels shared by the worst pair               7.00        4.17   well under 7                  
+    channels used in two groups running            49.00        0.00   0                             
+    distinct within-group orders                    1.00        7.98   8 - every shape new           
+    the present column is the reference: that is what deliberate repetition looks
+    like. A 'no' trial still carries one aligned group per element -- that is what
+    matches the envelope -- but nothing about it may recur.
+
+[1] how scattered an element's channels are (a band gives an element a register,
+    and a run of elements with registers streams -- which is a figure)
+                        mean gap (ch)   span (oct)   most in 4 ch  adjacent pair
+    figure                       3.85         4.33           2.50            84%
+    other elements               3.88         4.34           2.48            82%
+    the figure and the other elements must match here, or which set is the aligned
+    one is legible from the spectrum before anything is heard.
+
+[2] the cues a listener would try first, pooled over the ladder
+    feature                                              present            absent  yes/no d
+    long-term RMS (dB)                           -26.523+-0.007    -26.523+-0.007      +0.02
+    peak amplitude                                 0.248+-0.023      0.247+-0.023      +0.06
+    envelope level (dB)                          -26.523+-0.007    -26.523+-0.007      +0.02
+    crest factor                                   1.708+-0.126      1.709+-0.127      +0.03
+    envelope peaks above 3 SD                      4.683+-4.917      4.583+-4.599      +0.02
+    envelope peaks above 5 SD                      0.047+-0.237      0.033+-0.180      +0.02
+    tallest burst (SD)                             3.704+-0.639      3.700+-0.609      +0.02
+    envelope kurtosis                              4.213+-0.541      4.227+-0.548      +0.07
+    envelope modulation depth                      0.219+-0.017      0.219+-0.017      +0.08
+    modulation power, element-rate band (dB)      20.056+-1.495     20.149+-1.470      +0.06
+    envelope autocorrelation at element lags       0.124+-0.051      0.123+-0.053      +0.03
+    spectral peakedness (dB)                       0.184+-0.027      0.183+-0.029      +0.04
+    most irregular channel (IOI CV)                0.955+-0.097      0.951+-0.097      +0.04
+    channel IOI spread, mean (ms)                100.321+-3.318     99.866+-3.086      +0.16
+    tones sounding, mean                           6.868+-0.009      6.867+-0.010      +0.19
+
+[3] every one of the 64 features, largest yes/no d' first
+    feature                                          d     AUC  what differs
+    ch_audio:count:sd                             0.23   0.512        spread
+    count_audio_mean                              0.19   0.533        spread
+    occ_mean                                      0.19   0.533        spread
+    ch:ioi_mean:mean                              0.16   0.544         shift
+    ch:ioi_sd:mean                                0.16   0.544         shift
+    ch:ioi_mean:max                               0.16   0.544         shift
+    env:mod_30_150Hz                              0.14   0.523        spread
+    ch:ioi_max:mean                               0.13   0.537         shift
+    ch:ioi_cv:mean                                0.13   0.537         shift
+    ch_audio:pairs_iei_norm:max                   0.13   0.489        spread
+    count_audio_max                               0.12   0.504        spread
+    ch_audio:ioi_cv:min                           0.12   0.501        spread
+
+[4] can ANY of them separate the classes?  max-statistic permutation over labels
+    largest d' observed           0.232  (ch_audio:count:sd)
+    largest under relabelling     95th percentile 0.264
+    p (any feature separates)     0.196
+    -> no measured property separates the classes
+
+[5] an ideal observer that has LEARNT the best linear criterion over every
+    feature (leave-one-out, fitted within each cell, held-out decisions pooled)
+    hit 0.500   false alarm 0.506   d' = -0.014   49.7% correct
+    This is the ceiling for someone who never hears a group and has only learnt
+    what these sounds are usually like. It must sit at chance.
+
+[6] per cell
+    a cell's learnt d' has a null SD of 0.23 at 60+60 trials, so the largest of 6 cells
+    sits near +0.32 with nothing wrong. Read a cell only if it is well past that AND the same
+    cell moves the same way at another seed.
+    step (ms)  order       permutation p   largest d   learnt d   learnt hit/fa
+    0          rising              0.918        0.42      +0.21    0.57/0.48   
+    4          rising              0.640        0.48      -0.21    0.50/0.58   
+    8          rising              0.955        0.40      -0.42    0.38/0.55   
+    12         rising              0.515        0.50      +0.12    0.52/0.47   
+    16         rising              0.003        0.81      -0.08    0.45/0.48   
+    20         rising              0.388        0.53      +0.29    0.58/0.47   
+
+    note: every element is a frequency sweep, so the limit this measures is the limit for a figure that has a trajectory as well as a shared onset pattern. It is the most generous case, and it is the right one to report as long as it is described that way. A 'fixed' ladder bounds it from below.
+built in 50s; config 07156d5fdadab6f8; asynchrony 9acbe390e2939498
+====================================================================================================

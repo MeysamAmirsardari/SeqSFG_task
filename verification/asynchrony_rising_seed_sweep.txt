@@ -1,42 +1,51 @@
-RISING vs NOTHING (absent_class = 'incoherent')   asynchrony_rising_config.json
-seed stability of the machine ceiling: leave-one-out ridge-logistic observer over all 65
-features, fitted within each cell, 60 present + 60 absent per cell, five independent seeds.
-A null cell d' has SD 0.23 at that n, so the mean of five has SE 0.10.
+RISING FIGURE vs NOTHING THAT RECURS      asynchrony_rising_config.json
+  orders ['rising']   absent_class 'roving'   absent_order 'redrawn'
+
+Machine ceiling: leave-one-out ridge-logistic observer over all 65 features, fitted within each
+cell, 60 present + 60 absent per cell, five independent seeds. A null cell d' has SD 0.23 at
+that n, so the mean of five has SE 0.10 and anything inside +-0.2 is noise.
 
   step      4242        77       313  20260913      8891     mean  p<0.05
-     0     +1.44     +1.60     +1.28     +1.24     +1.18    +1.34     5/5
-     4     +0.21     +0.94     +0.59     +0.46     +0.89    +0.62     4/5
-     8     -0.33     -0.29     +0.33     +0.29     +0.33    +0.07     1/5
-    12     -0.50     -0.25     +0.21     +0.21     -0.21    -0.11     0/5
-    16     +0.58     +0.59     +0.21     +0.46     +0.76    +0.52     2/5
-    20     +0.71     +0.04     -0.08     +0.00     +0.50    +0.23     2/5
+     0     +0.21     -0.33     +0.33     +0.25     -0.37    +0.02     0/5
+     4     -0.21     -0.08     -0.21     -0.17     -0.08    -0.15     1/5
+     8     -0.42     -0.04     -0.04     +0.21     -0.12    -0.08     0/5
+    12     +0.12     +0.12     -0.58     +0.25     -0.25    -0.07     0/5
+    16     -0.08     -0.08     -0.16     -0.25     -0.54    -0.22     1/5
+    20     +0.29     +0.00     +0.08     -0.04     -0.21    +0.02     0/5
 
-Read it as a U, not a single leak, and both arms have the same cause: the present element's
-onsets sit on an EVEN grid and the absent's are placed at random inside the same window.
+  pooled permutation p   0.196  0.371  0.652  0.485  0.748
+  pooled learnt d'      -0.014 -0.069 -0.097 +0.042 -0.265
 
-  at 0 and 4 ms the grid is a chord, so the present interval has a level event the absent one
-  does not. env:n_bursts_3sd is 15.2 in present against 10.0 in absent at 0 ms -- it is not
-  subtle, and no arrangement of the same tones avoids it. Synchrony IS an envelope event.
+Every rung sits at chance at every seed. There is no rung of this ladder where a listener could
+score above chance without hearing something group.
 
-  at 16 and 20 ms the grid is a regular 62 Hz / 50 Hz pulse train inside the element while the
-  absent scatter is irregular, so the regularity itself is readable (env:mod_10_30Hz,
-  env:kurtosis). Smaller than the chord cue, and marginal at 20 ms, but the sign is positive
-  at all five seeds at 16 ms.
+DOES THE 'NO' REPEAT ANYTHING?  60 trials, 8 groups each, steps above zero. The present column
+is the reference: it is what deliberate repetition looks like.
 
-  8 and 12 ms are clean: the window is wide enough that a chord is gone and narrow enough that
-  seven random placements look much like seven evenly spaced ones.
+                                            present   absent   wanted
+  channel sets that occur twice                7.00     0.00   0, no set ever returns
+  channels shared, group to group              7.00     0.00   0, no pitch carries over
+  channels shared by the worst pair            7.00     4.17   well under 7
+  channels used in two groups running         49.00     0.00   0
+  distinct within-group orders                 1.00     7.98   8, every shape new
 
-WHAT TO DO WITH IT. Report the whole ladder, and report this table beside it. d' at 0 and 4 ms
-is an upper bound, not a measurement -- treat 0 ms as a manipulation check. 8 and 12 ms are the
-clean measurement. 16 ms carries about half a d' of machine-readable cue; 20 ms about a quarter.
+The worst pair at 4.17 of 7 is chance for this universe: eight 7-channel groups drawn from 23
+channels share 7*7/23 = 2.1 on average, and the largest of the 28 pairs lands near 4. Those two
+groups are never adjacent -- consecutive sharing is exactly 0 -- so no pitch is ever heard twice
+at the element rate.
 
-The alternative is asynchrony_config.json, whose 'roving' absent is clean at every rung
-(pooled p = 0.55, learnt observer d' = -0.03) -- but it asks whether a figure RECURRED rather
-than whether anything was bound, which is a different question.
+WHY absent_order 'redrawn'. A 'roving' absent interval must carry one time-aligned group per
+element: that is what makes a group start just as often in both classes, and it is the whole
+reason this contrast is envelope-matched where a plain cloud is not. But with the order held
+fixed, all eight of those groups are the SAME shape -- under 'rising', eight identical chirps on
+new pitches. Nothing returns, and yet there is plainly something to hear. Redrawing the order
+costs nothing: a permutation does not change the multiset of onset times inside an element, so
+the envelope, the per-channel counts and the count trace are matched to the last sample, while
+the 'no' loses its repeating shape as well as its repeating pitches.
 
-The wide end could be cleaned without changing the question: draw the seven within-element
-offsets once per trial from a uniform distribution over the span and hold them fixed across
-elements, instead of putting them on an even grid. Sorted and assigned to ascending channels
-that is still a rising sweep, and both classes then draw their offsets from the same
-distribution, so only recurrence differs. It does not help at 0 ms, where the span is zero and
-the two classes collapse onto each other. That construction is not implemented.
+WHAT THIS CANNOT BE. A matched absent class cannot be silence-plus-cloud. One group starts per
+element in both classes; the listener's job is to notice that in a 'yes' trial the same seven
+pitches keep coming back. If a 'no' trial sounded like nothing at all, the difference would be
+level, and a machine would read it -- which is exactly what happens with absent_class
+'incoherent' (learnt d' +1.34 at 0 ms, +0.62 at 4 ms, +0.52 at 16 ms; see git history of this
+file) and with 'plain' (+2.51 pooled, 89.5% correct).
