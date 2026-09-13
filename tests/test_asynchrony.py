@@ -388,3 +388,36 @@ def test_audit_runs_and_reports(preset):
     assert "ONSET-ASYNCHRONY AUDIT" in text
     assert "construction, checked on the schedule" in text
     assert len(res["cells"]) == 3
+
+
+# ---- the command line -------------------------------------------------------
+def test_set_overrides_reach_a_preset():
+    """--set used to be dropped on the floor whenever --preset was given, silently."""
+    from argparse import Namespace
+    from seqsfg.cli import _async_cfgs
+    args = Namespace(preset=PRESET, set=["tones_per_channel=44", "tone_amplitude=0.024"],
+                     async_set=None)
+    cfg, _ = _async_cfgs(args)
+    assert cfg.tones_per_channel == 44
+    assert cfg.tone_amplitude == 0.024
+    plain, _ = _async_cfgs(Namespace(preset=PRESET, set=None, async_set=None))
+    assert plain.tones_per_channel != 44
+
+
+def test_async_set_overrides_the_task_section():
+    from argparse import Namespace
+    from seqsfg.cli import _async_cfgs
+    _, acfg = _async_cfgs(Namespace(preset=PRESET, set=None,
+                                    async_set=["trials_per_cell=6", "absent_class=incoherent"]))
+    assert acfg.trials_per_cell == 6 and acfg.absent_class == "incoherent"
+
+
+def test_the_plain_preset_is_valid_and_is_what_it_says():
+    cfg, acfg = A.load_preset("asynchrony_plain_config.json")
+    A.check(cfg, acfg)
+    assert acfg.absent_class == "plain"
+    assert acfg.orders == ("rising",)
+    assert cfg.tones_per_channel == 52          # the density the leak table is computed at
+    d = validate(cfg)
+    assert d.peak_bound < 0.99                  # no clipping headroom problem
+    assert d.occupancy_per_channel < 0.6

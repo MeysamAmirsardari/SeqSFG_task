@@ -1071,3 +1071,42 @@ python -m seqsfg asynchrony-verify --preset asynchrony_rising_config.json
 python -m seqsfg asynchrony-demo   --preset asynchrony_rising_config.json --seed 12
 python -m seqsfg asynchrony-run    --preset asynchrony_rising_config.json --data data
 ```
+
+### Running it as a rising figure against a plain cloud
+
+`asynchrony_plain_config.json` — `orders: ["rising"]`, `absent_class: "plain"`,
+`tones_per_channel: 52`. A "no" trial has **no element structure at all**: the same 30 channels,
+the same per-channel budget, the same 1560 tones, every one placed at a free time at random.
+Nothing starts together anywhere. It is the only absent class where *"was a figure there?"*
+means what it says.
+
+**The cost, and the one lever that works.** Synchrony is an envelope event and no arrangement of
+the same tones avoids it, so this contrast cannot be envelope-matched — only buried. At the
+pilot's density it is 90% machine-solvable. Density fixes most of that:
+
+| tones/channel | occupancy | sounding at once | learnt d' | % correct |
+|---|---|---|---|---|
+| 28 | 0.26 | 7.8 | +2.60 | 90.4 |
+| 40 | 0.37 | 11.2 | +1.13 | 71.5 |
+| **52** | **0.48** | **14.5** | **+0.59** | **61.7** |
+| 64 | 0.60 | 17.9 | +0.43 | 58.5 |
+
+64 is the ceiling — above it occupancy passes 0.6 and the validator refuses, because the tones
+can no longer be packed without overlap. The density masks the figure as well as the cue, so
+listen before committing: `asynchrony-demo --preset ... --set tones_per_channel=28` and so on.
+
+**Where the ladder can be trusted at 52**, five seeds, 60+60 per cell (null cell SD 0.23):
+
+| step | 0 | 4 | 8 | 12 | 16 | 20 |
+|---|---|---|---|---|---|---|
+| mean learnt d' | **+2.99** | **+1.00** | +0.08 | +0.19 | +0.12 | −0.05 |
+| seeds with p<0.05 | 5/5 | 5/5 | 0/5 | 2/5 | 1/5 | 0/5 |
+
+0 ms is confounded and **cannot be fixed at any density** — 0 ms means simultaneous, and a
+simultaneous group is a level event. Report it as a manipulation check. 4 ms is confounded at
+d' ≈ 1. From 8 ms up it is clean at every seed, and that is the measurement. The pooled d' from
+a session will be inflated by the two bottom rungs, so quote the ladder and not the pool.
+
+```
+python -m seqsfg asynchrony-run --preset asynchrony_plain_config.json --data data
+```

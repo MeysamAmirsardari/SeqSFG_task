@@ -1,0 +1,53 @@
+RISING FIGURE vs PLAIN CLOUD          asynchrony_plain_config.json
+  orders ['rising']   absent_class 'plain'   tones_per_channel 52   tone_amplitude 0.022
+
+A 'no' trial here has no element structure at all: the same 30 channels, the same per-channel
+budget, the same 1560 tones, every one placed at a free time at random. Nothing starts together
+anywhere. It is the only absent class where "was a figure there?" means what it says.
+
+WHY THE DENSITY IS 52. Synchrony is an envelope event, and no arrangement of the same tones
+avoids it, so this contrast cannot be envelope-matched -- only buried. Learnt observer over all
+65 features, fitted within each cell, 40+40 a cell:
+
+   tones/channel  occupancy  sounding at once   pooled learnt d'   % correct
+        28           0.26          7.8               +2.60           90.4
+        40           0.37         11.2               +1.13           71.5
+        52           0.48         14.5               +0.59           61.7   <- shipped
+        64           0.60         17.9               +0.43           58.5
+
+64 is the ceiling: above it per-channel occupancy passes 0.6 and the validator refuses, because
+the tones can no longer be packed without overlap. 52 takes most of the reduction while leaving
+the figure among ~15 simultaneous tones rather than ~18. The density is a trade, not a free win:
+it masks the figure as well as the cue. Listen at several before committing.
+
+SEED STABILITY AT 52. 60 present + 60 absent per cell, five independent seeds. A null cell d'
+has SD 0.23, so the mean of five has SE 0.10.
+
+  step      4242        77       313  20260913      8891     mean  p<0.05
+     0     +2.79     +2.24     +3.08     +3.32     +3.54    +2.99     5/5
+     4     +0.94     +1.27     +0.63     +1.08     +1.08    +1.00     5/5
+     8     -0.21     -0.08     +0.37     -0.21     +0.50    +0.08     0/5
+    12     +0.04     +0.33     +0.41     +0.25     -0.08    +0.19     2/5
+    16     +0.12     +0.72     -0.76     +0.04     +0.50    +0.12     1/5
+    20     +0.21     -0.29     -0.08     +0.33     -0.41    -0.05     0/5
+
+  pooled learnt d'   +0.54  +0.64  +0.47  +0.64  +0.66   (59-63% correct)
+
+HOW TO READ THE LADDER.
+
+  0 ms   confounded, d' = +3.0, and it cannot be fixed at any density. 0 ms means the components
+         are simultaneous, and a simultaneous group is a level event. Report it as a
+         manipulation check: it says the listener understood the task, not how far onsets can be
+         separated.
+  4 ms   confounded, d' = +1.0. Report it, and report that number beside it.
+  8 ms and above   clean at every seed. This is the measurement.
+
+The pooled d' from a session will be inflated by the two bottom rungs. Quote the ladder, not the
+pool, and put this table next to it.
+
+THE ALTERNATIVE. asynchrony_rising_config.json uses 'roving': an aligned group in both classes,
+differing only in whether the same pitches return. That one is clean at every rung, including
+0 ms (learnt d' between -0.22 and +0.02 across all six). What it costs is the question: it asks
+whether a figure RECURRED, not whether one was there, and its 'no' trials audibly contain
+groups. The first listener on it produced hits 0.80 against false alarms 0.75 -- answering "was
+a figure there?" truthfully, before the wording was fixed to ask about recurrence.

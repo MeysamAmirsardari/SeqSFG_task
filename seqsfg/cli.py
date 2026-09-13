@@ -9,11 +9,13 @@ from pathlib import Path
 from .config import VARIANTS, Config, ConfigError, DEFAULT, describe, validate
 
 
-def load_config(args) -> Config:
-    cfg = DEFAULT
-    if getattr(args, "config", None):
-        with open(args.config) as f:
-            cfg = Config.from_dict(json.load(f))
+def apply_sets(cfg: Config, args) -> Config:
+    """Apply every --set KEY=VALUE to a Config.
+
+    Split out of load_config because the preset-based commands build their Config from the
+    preset file instead, and used to drop --set on the floor without saying so -- so
+    `--preset x.json --set tones_per_channel=64` quietly ran at the preset's density.
+    """
     for kv in getattr(args, "set", None) or []:
         k, _, v = kv.partition("=")
         if not hasattr(cfg, k):
@@ -26,6 +28,14 @@ def load_config(args) -> Config:
             val = tuple(tuple(x) if isinstance(x, list) else x for x in val)
         cfg = cfg.replace(**{k: val})
     return cfg
+
+
+def load_config(args) -> Config:
+    cfg = DEFAULT
+    if getattr(args, "config", None):
+        with open(args.config) as f:
+            cfg = Config.from_dict(json.load(f))
+    return apply_sets(cfg, args)
 
 
 def add_common(p):
@@ -205,6 +215,7 @@ def _async_cfgs(args):
     from .asynchrony import AsyncConfig, check, load_preset
     if getattr(args, "preset", None):
         cfg, acfg = load_preset(args.preset)
+        cfg = apply_sets(cfg, args)
     else:
         cfg, acfg = load_config(args), AsyncConfig()
     for kv in getattr(args, "async_set", None) or []:
@@ -317,6 +328,7 @@ def _exposure_cfgs(args):
     from .exposure import ExposureConfig, load_preset
     if getattr(args, "preset", None):
         cfg, ecfg = load_preset(args.preset)
+        cfg = apply_sets(cfg, args)
     else:
         cfg, ecfg = load_config(args), ExposureConfig()
     for kv in getattr(args, "exposure_set", None) or []:

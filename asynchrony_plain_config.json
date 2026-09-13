@@ -1,0 +1,140 @@
+{
+ "_README": [
+  "Preset for the onset-asynchrony task run as RISING FIGURE vs PLAIN CLOUD.",
+  "",
+  "  orders        ['rising']    one present condition: the element ascends in frequency.",
+  "  absent_class  'plain'       a 'no' trial has NO element structure at all. Same 30 channels,",
+  "                              same per-channel budget, same total tone count -- every tone",
+  "                              placed at a free time at random. Nothing starts together",
+  "                              anywhere. This is the classic figure-vs-cloud contrast, and it",
+  "                              is the only absent class where the question 'was a figure",
+  "                              there?' means what it says.",
+  "",
+  "WHAT IT COSTS, AND WHAT THE DENSITY IS FOR. Synchrony is an envelope event: seven tones",
+  "starting together are a level event a flat cloud does not have, and no arrangement of the",
+  "same tones avoids it. At the pilot's density (28 tones per channel) a learnt observer reads",
+  "this contrast at d' = +2.60, 90% correct, WITHOUT hearing anything group -- it leaks at every",
+  "rung. The one lever that works is burying the event in a denser cloud, and it works well:",
+  "",
+  "    tones/channel   occupancy   mean tones sounding   learnt d'   % correct",
+  "         28            0.26            7.8              +2.60        90.4",
+  "         40            0.37           11.2              +1.13        71.5",
+  "         52            0.48           14.5              +0.59        61.7    <- this file",
+  "         64            0.60           17.9              +0.43        58.5",
+  "",
+  "  per step at 52:   0 ms +2.48   4 ms +0.69   8 ms -0.12   12 ms +0.06   16 ms +0.56   20 ms +0.31",
+  "",
+  "So from 8 ms up this is clean, 4 ms is marginal, and 0 ms cannot be cleaned at any density --",
+  "a simultaneous group IS a level event, and 0 ms is the rung that means 'simultaneous'. Treat",
+  "0 ms as a manipulation check, not a data point, and report the table beside the ladder.",
+  "",
+  "The density is a trade, not a free win: it also masks the figure. 52 leaves the figure among",
+  "~14 simultaneous tones instead of ~8. Listen at several before committing --",
+  "  python -m seqsfg asynchrony-demo --preset asynchrony_plain_config.json --set tones_per_channel=28",
+  "  ... and 40, 52, 64 -- and pick by ear. tone_amplitude is lowered with it to stay clear of",
+  "clipping; recalibrate when you change either.",
+  "",
+  "asynchrony_config.json (roving, two orders) and asynchrony_rising_config.json (roving, rising)",
+  "are untouched, and so is pilot_config.json."
+ ],
+ "config": {
+  "sample_rate": 48000,
+  "grid_ms": 1.0,
+  "pool_low_hz": 200.0,
+  "pool_high_hz": 10000.0,
+  "pool_spacing_erb": 1.0,
+  "min_beat_rate_hz": 40.0,
+  "tone_dur_ms": 40.0,
+  "ramp_ms": 5.0,
+  "tone_amplitude": 0.022,
+  "tones_per_channel": 52,
+  "interval_dur_ms": 4300.0,
+  "n_components": 7,
+  "figure_repeats": 1,
+  "figure_min_spacing_channels": 1,
+  "figure_anchor_seed": null,
+  "steps_ms": [
+   0.0,
+   4.0,
+   8.0,
+   12.0,
+   16.0,
+   20.0
+  ],
+  "main_variants": [
+   "rising"
+  ],
+  "n_elements": 8,
+  "iei_min_ms": 340.0,
+  "iei_max_ms": 420.0,
+  "lead_min_ms": 350.0,
+  "lead_max_ms": 600.0,
+  "tail_min_ms": 350.0,
+  "figure_band_channels": null,
+  "matched_incidence": true,
+  "foil_universe_size": 23,
+  "anchored_fraction": 1.0,
+  "foil_subpool_size": null,
+  "max_shared_consecutive": 5,
+  "max_shared_any": 5,
+  "isi_ms": 400.0,
+  "lead_silence_ms": 50.0,
+  "trials_per_condition": 10,
+  "max_condition_run": 2,
+  "max_variant_run": 4,
+  "practice_cells": [
+   [
+    "ungrouped",
+    0.0
+   ],
+   [
+    "rising",
+    0.0
+   ]
+  ],
+  "practice_n": 12,
+  "practice_criterion": 10,
+  "practice_max_rounds": 2,
+  "break_every": 40,
+  "feedback_main": true,
+  "feedback_control": true,
+  "control_cells": [
+   [
+    "ungrouped",
+    0.0
+   ],
+   [
+    "onechannel",
+    0.0
+   ]
+  ],
+  "control_trials_per_cell": 8,
+  "max_session_minutes": 40.0,
+  "response_allowance_s": 1.2,
+  "feedback_s": 0.4,
+  "iti_s": 0.5,
+  "break_s": 45.0,
+  "setup_minutes": 5.0,
+  "tone_level_db_spl": 60.0,
+  "calibration_freq_hz": 1000.0,
+  "calibration_dur_s": 5.0,
+  "bootstrap_n": 1000,
+  "threshold_pc": 0.75,
+  "alpha": 0.05
+ },
+ "asynchrony": {
+  "orders": [
+   "rising"
+  ],
+  "absent_class": "plain",
+  "trials_per_cell": 20,
+  "practice_trials": 12,
+  "practice_step_ms": 0.0,
+  "feedback_main": false,
+  "feedback_practice": true,
+  "max_class_run": 4,
+  "max_cell_run": 2,
+  "threshold_dprime": 1.0,
+  "n_boot": 4000
+ }
+}
