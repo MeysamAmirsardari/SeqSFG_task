@@ -1,0 +1,88 @@
+====================================================================================================
+ONSET-ASYNCHRONY AUDIT   absent class 'incoherent'   60 present + 60 absent per cell
+====================================================================================================
+A yes/no listener answers from ONE sound, so any property whose distribution differs
+between the classes -- in mean OR in spread -- is a usable criterion, whether or not
+anyone hears a figure. Everything below is measured on single intervals.
+
+[0] construction, checked on the schedule over 40 matched pairs
+    same_n_tones                        ok
+    same_channel_counts                 ok
+    same_active_channels                ok
+    budget_exact                        ok
+    no_same_channel_overlap             ok
+    same_element_schedule               ok
+    elements_never_collide              ok
+    tones sounding at once, present  mean  7.81   sd  2.80   max  17.6
+    tones sounding at once, absent   mean  7.81   sd  2.80   max  17.9
+    time-aligned groups per interval   present 8   absent 0
+
+[1] how scattered an element's channels are (a band gives an element a register,
+    and a run of elements with registers streams -- which is a figure)
+                        mean gap (ch)   span (oct)   most in 4 ch  adjacent pair
+    figure                       3.85         4.33           2.50            84%
+    other elements               3.88         4.34           2.48            82%
+    the figure and the other elements must match here, or which set is the aligned
+    one is legible from the spectrum before anything is heard.
+
+[2] the cues a listener would try first, pooled over the ladder
+    feature                                              present            absent  yes/no d
+    long-term RMS (dB)                           -26.523+-0.007    -26.523+-0.007      +0.01
+    peak amplitude                                 0.246+-0.021      0.246+-0.021      +0.04
+    envelope level (dB)                          -26.523+-0.007    -26.523+-0.007      +0.01
+    crest factor                                   1.708+-0.133      1.708+-0.113      +0.12
+    envelope peaks above 3 SD                      4.731+-5.012      3.686+-3.657      +0.14
+    envelope peaks above 5 SD                      0.067+-0.291      0.017+-0.128      +0.07
+    tallest burst (SD)                             3.701+-0.658      3.638+-0.577      +0.13
+    envelope kurtosis                              4.223+-0.615      4.082+-0.519      +0.21
+    envelope modulation depth                      0.219+-0.016      0.221+-0.014      +0.22
+    modulation power, element-rate band (dB)      20.110+-1.539     20.275+-1.396      +0.13
+    envelope autocorrelation at element lags       0.124+-0.049      0.137+-0.049      +0.28
+    spectral peakedness (dB)                       0.185+-0.029      0.184+-0.028      +0.05
+    most irregular channel (IOI CV)                0.949+-0.092      0.956+-0.099      +0.11
+    channel IOI spread, mean (ms)                100.158+-3.333    100.134+-3.352      +0.06
+    tones sounding, mean                           6.867+-0.010      6.867+-0.009      +0.11
+
+[3] every one of the 65 features, largest yes/no d' first
+    feature                                          d     AUC  what differs
+    env:ac_peak_iei                               0.28   0.421         shift
+    env_ac_peak_iei                               0.28   0.421         shift
+    env:mod_10_30Hz                               0.28   0.453        spread
+    ch:ioi_min:max                                0.23   0.512        spread
+    env:mod_depth                                 0.22   0.455        spread
+    env_mod_depth                                 0.22   0.455        spread
+    env:kurtosis                                  0.21   0.560         shift
+    env:ac_peak_100_1000                          0.21   0.440         shift
+    count_audio_max                               0.21   0.495        spread
+    env:mod_30_150Hz                              0.20   0.556         shift
+    ch:ioi_max:min                                0.20   0.515        spread
+    env:mod_0.5_3Hz                               0.19   0.448         shift
+
+[4] can ANY of them separate the classes?  max-statistic permutation over labels
+    largest d' observed           0.282  (env:ac_peak_iei)
+    largest under relabelling     95th percentile 0.265
+    p (any feature separates)     0.022
+    -> THE CLASSES ARE SEPARABLE WITHOUT HEARING A FIGURE
+
+[5] an ideal observer that has LEARNT the best linear criterion over every
+    feature (leave-one-out, fitted within each cell, held-out decisions pooled)
+    hit 0.567   false alarm 0.433   d' = +0.335   56.7% correct
+    This is the ceiling for someone who never hears a group and has only learnt
+    what these sounds are usually like. It must sit at chance.
+
+[6] per cell
+    a cell's learnt d' has a null SD of 0.23 at 60+60 trials, so the largest of 6 cells
+    sits near +0.32 with nothing wrong. Read a cell only if it is well past that AND the same
+    cell moves the same way at another seed.
+    step (ms)  order       permutation p   largest d   learnt d   learnt hit/fa
+    0          rising              0.000        1.29      +1.44    0.80/0.27   
+    4          rising              0.085        0.63      +0.21    0.53/0.45   
+    8          rising              0.174        0.59      -0.33    0.43/0.57   
+    12         rising              0.620        0.48      -0.50    0.38/0.58   
+    16         rising              0.021        0.71      +0.58    0.62/0.38   
+    20         rising              0.003        0.79      +0.71    0.63/0.35   
+
+    note: every element is a frequency sweep, so the limit this measures is the limit for a figure that has a trajectory as well as a shared onset pattern. It is the most generous case, and it is the right one to report as long as it is described that way. A 'fixed' ladder bounds it from below.
+    note: absent_class='incoherent' is not the matched one; read section [3] of the audit before running a listener on it.
+built in 52s; config 07156d5fdadab6f8; asynchrony f944192ceb245c41
+====================================================================================================

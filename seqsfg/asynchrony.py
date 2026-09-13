@@ -186,9 +186,16 @@ def notes(cfg: Config, acfg: AsyncConfig) -> List[str]:
         out.append(f"figure_anchor_seed={cfg.figure_anchor_seed}: {cfg.anchored_fraction:.0%} of "
                    f"trials reuse ONE figure, so a listener can learn it across the session and "
                    f"the ladder measures learning as well as binding. For a limit, set it to null.")
-    if "rising" in acfg.orders:
+    if "rising" in acfg.orders and len(acfg.orders) > 1:
         out.append("the 'rising' order makes each element a frequency sweep, which is a grouping "
-                   "cue of its own; its rung of the ladder is not comparable with the others.")
+                   "cue of its own, so its ladder is not comparable rung for rung with an order "
+                   "that has no trajectory; the rising-minus-fixed difference is what that "
+                   "trajectory is worth.")
+    elif acfg.orders == ("rising",):
+        out.append("every element is a frequency sweep, so the limit this measures is the limit "
+                   "for a figure that has a trajectory as well as a shared onset pattern. It is "
+                   "the most generous case, and it is the right one to report as long as it is "
+                   "described that way. A 'fixed' ladder bounds it from below.")
     if acfg.absent_class != "roving":
         out.append(f"absent_class={acfg.absent_class!r} is not the matched one; read section [3] "
                    f"of the audit before running a listener on it.")

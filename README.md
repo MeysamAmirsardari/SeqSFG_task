@@ -1017,3 +1017,44 @@ python -m seqsfg asynchrony-demo --out demo/asynchrony  # one figure and one clo
 python -m seqsfg asynchrony-run --data data             # run a listener
 python -m seqsfg asynchrony-analyze data/P01/session_01
 ```
+
+### Running it as rising vs nothing
+
+`asynchrony_rising_config.json` is the same Config with two different task choices:
+`orders: ["rising"]` and `absent_class: "incoherent"`. One present condition, so there is no
+order contrast and the whole session pays for one ladder: 6 cells × 20 present + 20 absent =
+240 trials, ~35 min, and a cell's d' has SE 0.41 instead of 0.59.
+
+This is the version that matches the title. `roving` asks whether a figure *recurred*;
+`incoherent` asks whether anything was bound at all, which is what "how far can onsets be
+separated and still group" means. It costs a confound, and the confound is a **U**, not a
+single leak. Leave-one-out observer over all 65 features, 60+60 per cell, five seeds:
+
+| step | 0 | 4 | 8 | 12 | 16 | 20 |
+|---|---|---|---|---|---|---|
+| mean learnt d' | **+1.34** | **+0.62** | +0.07 | −0.11 | **+0.52** | +0.23 |
+| seeds with p<0.05 | 5/5 | 4/5 | 1/5 | 0/5 | 2/5 | 2/5 |
+
+Both arms have one cause: the present element's onsets sit on an **even grid** and the absent's
+are placed at random inside the same window.
+
+* At 0 and 4 ms the grid is a chord. `env:n_bursts_3sd` is 15.2 present against 10.0 absent at
+  0 ms — synchrony *is* an envelope event and no arrangement of the same tones avoids it.
+* At 16 and 20 ms the grid is a regular 62 Hz / 50 Hz pulse train inside the element while the
+  absent scatter is irregular, so the regularity is readable. Smaller, and marginal at 20 ms,
+  but positive at all five seeds at 16.
+* 8 and 12 ms are clean: wide enough that the chord is gone, narrow enough that seven random
+  placements look like seven evenly spaced ones.
+
+So report the whole ladder with that table beside it. 0 and 4 ms are upper bounds rather than
+measurements — treat 0 ms as a manipulation check. 8 and 12 ms are the clean measurement. The
+wide end could be cleaned without changing the question, by drawing the seven within-element
+offsets once per trial from a uniform distribution over the span and holding them fixed across
+elements rather than putting them on a grid; sorted onto ascending channels that is still a
+rising sweep, and both classes would then draw offsets from the same distribution. It does not
+help at 0 ms, where the span is zero and the two classes collapse together. Not implemented.
+
+```
+python -m seqsfg asynchrony-verify --preset asynchrony_rising_config.json
+python -m seqsfg asynchrony-run     --preset asynchrony_rising_config.json --data data
+```

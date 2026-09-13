@@ -1,0 +1,42 @@
+RISING vs NOTHING (absent_class = 'incoherent')   asynchrony_rising_config.json
+seed stability of the machine ceiling: leave-one-out ridge-logistic observer over all 65
+features, fitted within each cell, 60 present + 60 absent per cell, five independent seeds.
+A null cell d' has SD 0.23 at that n, so the mean of five has SE 0.10.
+
+  step      4242        77       313  20260913      8891     mean  p<0.05
+     0     +1.44     +1.60     +1.28     +1.24     +1.18    +1.34     5/5
+     4     +0.21     +0.94     +0.59     +0.46     +0.89    +0.62     4/5
+     8     -0.33     -0.29     +0.33     +0.29     +0.33    +0.07     1/5
+    12     -0.50     -0.25     +0.21     +0.21     -0.21    -0.11     0/5
+    16     +0.58     +0.59     +0.21     +0.46     +0.76    +0.52     2/5
+    20     +0.71     +0.04     -0.08     +0.00     +0.50    +0.23     2/5
+
+Read it as a U, not a single leak, and both arms have the same cause: the present element's
+onsets sit on an EVEN grid and the absent's are placed at random inside the same window.
+
+  at 0 and 4 ms the grid is a chord, so the present interval has a level event the absent one
+  does not. env:n_bursts_3sd is 15.2 in present against 10.0 in absent at 0 ms -- it is not
+  subtle, and no arrangement of the same tones avoids it. Synchrony IS an envelope event.
+
+  at 16 and 20 ms the grid is a regular 62 Hz / 50 Hz pulse train inside the element while the
+  absent scatter is irregular, so the regularity itself is readable (env:mod_10_30Hz,
+  env:kurtosis). Smaller than the chord cue, and marginal at 20 ms, but the sign is positive
+  at all five seeds at 16 ms.
+
+  8 and 12 ms are clean: the window is wide enough that a chord is gone and narrow enough that
+  seven random placements look much like seven evenly spaced ones.
+
+WHAT TO DO WITH IT. Report the whole ladder, and report this table beside it. d' at 0 and 4 ms
+is an upper bound, not a measurement -- treat 0 ms as a manipulation check. 8 and 12 ms are the
+clean measurement. 16 ms carries about half a d' of machine-readable cue; 20 ms about a quarter.
+
+The alternative is asynchrony_config.json, whose 'roving' absent is clean at every rung
+(pooled p = 0.55, learnt observer d' = -0.03) -- but it asks whether a figure RECURRED rather
+than whether anything was bound, which is a different question.
+
+The wide end could be cleaned without changing the question: draw the seven within-element
+offsets once per trial from a uniform distribution over the span and hold them fixed across
+elements, instead of putting them on an even grid. Sorted and assigned to ascending channels
+that is still a rising sweep, and both classes then draw their offsets from the same
+distribution, so only recurrence differs. It does not help at 0 ms, where the span is zero and
+the two classes collapse onto each other. That construction is not implemented.

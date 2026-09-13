@@ -1,0 +1,128 @@
+{
+ "_README": [
+  "Preset for the onset-asynchrony task run as RISING vs NOTHING (seqsfg/asynchrony.py).",
+  "",
+  "Same stimulus machinery and the same Config as asynchrony_config.json -- only the two",
+  "task-level choices differ, and only the 'asynchrony' section changes:",
+  "",
+  "  orders        ['rising']       one present condition: the element ascends in frequency,",
+  "                                 component i starting i*step after the lowest. There is no",
+  "                                 order contrast, so the whole session pays for one ladder",
+  "                                 and every cell gets twice the trials.",
+  "  absent_class  'incoherent'     no time-aligned group ANYWHERE. The figure's channels and",
+  "                                 the other elements' channels all carry their tones at a",
+  "                                 random time inside their own element window. A pure cloud.",
+  "",
+  "Why this absent class, and what it costs. 'roving' (asynchrony_config.json) puts an aligned",
+  "group in both classes and varies only whether it recurs, so it is matched at every rung --",
+  "but it asks 'did a figure come back', not 'was anything bound'. 'incoherent' asks the",
+  "question this project is named after. Synchrony is an envelope event, so it cannot be",
+  "envelope-matched, and the size of that cue is largest at 0 ms and gone by the middle of the",
+  "ladder. Run `seqsfg asynchrony-verify --preset asynchrony_rising_config.json` and read",
+  "section [6]: the rungs where the learnt observer sits at chance are the ones that measure",
+  "hearing. Treat 0 ms as a manipulation check, not a data point.",
+  "",
+  "Everything in the 'config' section is identical to asynchrony_config.json, so the two can be",
+  "compared rung for rung, and pilot_config.json is untouched by either."
+ ],
+ "config": {
+  "sample_rate": 48000,
+  "grid_ms": 1.0,
+  "pool_low_hz": 200.0,
+  "pool_high_hz": 10000.0,
+  "pool_spacing_erb": 1.0,
+  "min_beat_rate_hz": 40.0,
+  "tone_dur_ms": 40.0,
+  "ramp_ms": 5.0,
+  "tone_amplitude": 0.026,
+  "tones_per_channel": 28,
+  "interval_dur_ms": 4300.0,
+  "n_components": 7,
+  "figure_repeats": 1,
+  "figure_min_spacing_channels": 1,
+  "figure_anchor_seed": null,
+  "steps_ms": [
+   0.0,
+   4.0,
+   8.0,
+   12.0,
+   16.0,
+   20.0
+  ],
+  "main_variants": [
+   "rising"
+  ],
+  "n_elements": 8,
+  "iei_min_ms": 340.0,
+  "iei_max_ms": 420.0,
+  "lead_min_ms": 350.0,
+  "lead_max_ms": 600.0,
+  "tail_min_ms": 350.0,
+  "figure_band_channels": null,
+  "matched_incidence": true,
+  "foil_universe_size": 23,
+  "anchored_fraction": 1.0,
+  "foil_subpool_size": null,
+  "max_shared_consecutive": 5,
+  "max_shared_any": 5,
+  "isi_ms": 400.0,
+  "lead_silence_ms": 50.0,
+  "trials_per_condition": 10,
+  "max_condition_run": 2,
+  "max_variant_run": 4,
+  "practice_cells": [
+   [
+    "ungrouped",
+    0.0
+   ],
+   [
+    "rising",
+    0.0
+   ]
+  ],
+  "practice_n": 12,
+  "practice_criterion": 10,
+  "practice_max_rounds": 2,
+  "break_every": 40,
+  "feedback_main": true,
+  "feedback_control": true,
+  "control_cells": [
+   [
+    "ungrouped",
+    0.0
+   ],
+   [
+    "onechannel",
+    0.0
+   ]
+  ],
+  "control_trials_per_cell": 8,
+  "max_session_minutes": 40.0,
+  "response_allowance_s": 1.2,
+  "feedback_s": 0.4,
+  "iti_s": 0.5,
+  "break_s": 45.0,
+  "setup_minutes": 5.0,
+  "tone_level_db_spl": 60.0,
+  "calibration_freq_hz": 1000.0,
+  "calibration_dur_s": 5.0,
+  "bootstrap_n": 1000,
+  "threshold_pc": 0.75,
+  "alpha": 0.05
+ },
+ "asynchrony": {
+  "orders": [
+   "rising"
+  ],
+  "absent_class": "incoherent",
+  "trials_per_cell": 20,
+  "practice_trials": 12,
+  "practice_step_ms": 0.0,
+  "feedback_main": false,
+  "feedback_practice": true,
+  "max_class_run": 4,
+  "max_cell_run": 2,
+  "threshold_dprime": 1.0,
+  "n_boot": 4000
+ }
+}
