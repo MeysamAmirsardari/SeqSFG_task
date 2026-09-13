@@ -1154,9 +1154,11 @@ equal-*fraction* pair does not (0.363 vs 0.444).
 
 Only the figure's components change length: they carry their own duration (`Interval.dur`, opt-in
 and unused by every earlier task) while the background keeps `cfg.tone_dur_ms`. Fixed in all
-seven cells: background duration 40 ms, budget 70 tones per channel, pool of 24 channels
-200–4865 Hz, one amplitude (0.026) for background and figure alike, 8 recurrences at
-420–500 ms with 120 ms of shared jitter, and a 4.9 s scene. The timing is sized for the widest
+seven cells: background duration **30 ms**, budget 54 tones per channel (**about 8 tones sounding
+at once**), pool of 24 channels 200–4865 Hz, one amplitude (0.026) for background and figure
+alike, 8 recurrences at 420–500 ms with 120 ms of shared jitter, and a 4.9 s scene. 30 ms sits
+*between* the two component durations, so neither 20 nor 40 is privileged by blending into the
+cloud. The timing is sized for the widest
 cell — `T40_d40` spans 280 ms, so one recurrence needs 400 ms — and the rate is never relaxed for
 a longer or harder condition.
 
@@ -1171,13 +1173,19 @@ leave-one-out learnt observer. Four seeds, 40+40 per cell (null cell SD 0.28):
 
 | cell | `T20_d0` | `T20_d10` | `T20_d20` | `T40_d0` | `T40_d20` | `T40_d30` | `T40_d40` |
 |---|---|---|---|---|---|---|---|
-| mean learnt d' | **+1.17** | −0.08 | +0.06 | **+1.46** | −0.36 | +0.03 | −0.09 |
-| seeds p<0.05 | 3/4 | 0/4 | 0/4 | 4/4 | 0/4 | 0/4 | 0/4 |
+| mean learnt d' | **+1.91** | +0.26 | −0.12 | **+2.87** | +0.26 | +0.31 | +0.20 |
+| seeds p<0.05 | 4/4 | 2/4 | 0/4 | 4/4 | 1/4 | 0/4 | 0/4 |
 
-The leak is confined to the two **synchronous** cells, where it cannot be removed: seven tones
-starting together are a level event a scattered cloud does not have. Every asynchronous cell —
-which is to say every cell the three planned contrasts use — sits at chance at every seed. Read
-the synchronous cells as a manipulation check.
+The two **synchronous** cells carry a large cue that cannot be removed: seven tones starting
+together are a level event a scattered cloud does not have. They are manipulation checks, not
+data. The five asynchronous cells carry about d' = 0.25 — a machine at 55% correct. It is small,
+it is roughly *the same* in each of them, and all three planned contrasts compare one
+asynchronous cell with another, so most of it cancels in the contrast. Report the table beside
+the results rather than calling the cells clean.
+
+**This is a deliberate trade against audibility.** At 14 tones sounding every asynchronous cell
+sat at chance at every seed — and the figure was inaccessible to a listener, which is not a trade
+worth making. `--set tone_dur_ms=40 --set tones_per_channel=70` restores the dense version.
 
 `overlap_roving_control.json` keeps roving as a **separately named, separately analysed** control.
 It answers a different question (recurring frequency identity among other organised groups), its

@@ -1,0 +1,12 @@
+{
+  "preset": "overlap_pilot.json",
+  "config_hash": "299f0b4c489e61ff",
+  "overlap_hash": "9ef55de25ba3afdc",
+  "seed": 12,
+  "n_channels": 24,
+  "figures": [
+    "01_yes_no_scenes",
+    "02_seven_conditions",
+    "03_trial_and_session"
+  ]
+}

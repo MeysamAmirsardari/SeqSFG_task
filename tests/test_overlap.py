@@ -68,7 +68,10 @@ def test_preset_loads_validates_and_is_the_pilot(preset):
     O.check(cfg, ocfg)
     assert ocfg.absent_class == "plain"
     assert cfg.n_components == 7 and cfg.n_elements == 8
-    assert cfg.tone_dur_ms == 40.0            # the BACKGROUND duration, fixed across cells
+    assert cfg.tone_dur_ms == 30.0            # the BACKGROUND duration, fixed across cells
+    assert cfg.tone_dur_ms not in ocfg.durations, (
+        "the background must not share a duration with either component, or one of the two "
+        "durations would be privileged by blending into the cloud")
     assert ocfg.trials_per_cell == 10 and 2 * 10 * len(ocfg.cells) == 140
 
 

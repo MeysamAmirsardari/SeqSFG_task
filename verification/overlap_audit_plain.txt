@@ -33,51 +33,51 @@ recommend replacing the task.
 
 [3] the cues a listener could use instead, pooled over the seven cells
     feature                                            present            absent  yes/no d
-    long-term RMS (dB)                         -24.117+-0.044    -24.117+-0.043      +0.06
-    peak amplitude                               0.286+-0.018      0.286+-0.018      +0.01
-    total tone-time in the scene (ms)        66720.000+-554.256 66720.000+-554.256     +0.00
-    tones sounding, mean                        13.616+-0.113     13.616+-0.113      +0.00
-    tones sounding, max                         21.361+-0.743     21.246+-0.756      +0.14
-    envelope modulation depth                    0.197+-0.004      0.196+-0.004      +0.22
-    modulation power 0.5-3 Hz (dB)              17.306+-1.789     17.293+-1.670      +0.03
-    modulation power 3-10 Hz (dB)               18.650+-0.995     18.526+-1.052      +0.12
-    envelope peaks above 3 SD                   13.521+-4.043     13.464+-3.675      +0.05
-    tallest burst (SD)                           4.340+-0.486      4.368+-0.488      +0.08
-    envelope autocorrelation at recurrence lags     0.046+-0.014      0.045+-0.013      +0.10
-    spectral peakedness (dB)                     0.163+-0.034      0.164+-0.033      +0.08
-    most irregular channel (IOI CV)              0.472+-0.040      0.468+-0.033      +0.06
-    strongest single-channel periodicity         1.133+-0.029      1.130+-0.027      +0.11
+    long-term RMS (dB)                         -26.723+-0.079    -26.724+-0.080      +0.05
+    peak amplitude                               0.226+-0.016      0.222+-0.015      +0.27
+    total tone-time in the scene (ms)        38960.000+-554.256 38960.000+-554.256     +0.00
+    tones sounding, mean                         7.951+-0.113      7.951+-0.113      +0.00
+    tones sounding, max                         16.282+-1.196     15.911+-0.896      +0.29
+    envelope modulation depth                    0.240+-0.009      0.238+-0.006      +0.33
+    modulation power 0.5-3 Hz (dB)              23.389+-1.860     22.936+-1.772      +0.27
+    modulation power 3-10 Hz (dB)               23.535+-1.230     23.430+-1.049      +0.17
+    envelope peaks above 3 SD                   13.289+-4.399     12.261+-3.631      +0.24
+    tallest burst (SD)                           4.417+-0.574      4.336+-0.496      +0.16
+    envelope autocorrelation at recurrence lags     0.054+-0.020      0.052+-0.020      +0.11
+    spectral peakedness (dB)                     0.306+-0.098      0.310+-0.097      +0.03
+    most irregular channel (IOI CV)              0.815+-0.074      0.814+-0.065      +0.17
+    strongest single-channel periodicity         1.218+-0.049      1.208+-0.046      +0.19
 
-[4] every one of the 47 features, largest first, and whether ANY
+[4] every one of the 50 features, largest first, and whether ANY
     separates the classes (max-statistic permutation over class labels)
-    env:mod_30_150Hz                            0.27   0.575         shift
-    count_sd                                    0.24   0.561        spread
-    env:mod_depth                               0.22   0.561         shift
-    env:ac_peak_100_1000                        0.20   0.556         shift
-    env:mod_10_30Hz                             0.17   0.547         shift
-    ch:ioi_cv:sd                                0.16   0.546         shift
-    ch:ioi_sd:sd                                0.16   0.544         shift
-    count_max                                   0.14   0.540         shift
-    ch:ioi_sd:min                               0.12   0.472        spread
-    env:mod_3_10Hz                              0.12   0.534         shift
-    largest observed 0.269   95th percentile under relabelling 0.293   p = 0.116
+    ch:pairs_iei_norm:mean                      0.43   0.620         shift
+    env:mod_30_150Hz                            0.37   0.604         shift
+    count_sd                                    0.34   0.586        spread
+    env:mod_10_30Hz                             0.33   0.501        spread
+    env:mod_depth                               0.33   0.556        spread
+    count_audio_max                             0.33   0.592         shift
+    count_max                                   0.29   0.581         shift
+    peak                                        0.27   0.576         shift
+    env:mod_0.5_3Hz                             0.27   0.575         shift
+    env:n_bursts_3sd                            0.24   0.567         shift
+    largest observed 0.433   95th percentile under relabelling 0.292   p = 0.000
 
 [5] an observer that has LEARNT the best linear criterion over every feature
     (leave-one-out, fitted within each cell, held-out decisions pooled)
-    hit 0.582   false alarm 0.446   d' = +0.341   56.8% correct
+    hit 0.639   false alarm 0.357   d' = +0.720   64.1% correct
 
 [6] per cell
     a null cell d' has SD 0.28 at 40+40 trials; the largest of 7 cells sits near +0.41 with nothing wrong.
             cell   permutation p   largest d   learnt d        hit/fa
-          T20 d0       0.000        1.59      +1.02   0.70/0.30  
-         T20 d10       0.096        0.76      +0.25   0.57/0.47  
-         T20 d20       0.334        0.65      -0.06   0.45/0.47  
-          T40 d0       0.000        1.72      +1.47   0.80/0.25  
-         T40 d20       0.748        0.53      -0.25   0.47/0.57  
-         T40 d30       0.832        0.52      -0.18   0.50/0.57  
-         T40 d40       0.417        0.62      +0.25   0.57/0.47  
+          T20 d0       0.000        1.97      +1.72   0.82/0.20  
+         T20 d10       0.010        0.91      +0.00   0.50/0.50  
+         T20 d20       0.109        0.75      -0.12   0.45/0.50  
+          T40 d0       0.000        3.26      +3.58   0.97/0.03  
+         T40 d20       0.179        0.71      +0.37   0.60/0.45  
+         T40 d30       0.121        0.74      +0.43   0.55/0.38  
+         T40 d40       0.592        0.58      +0.31   0.57/0.45  
 
     note: the same component amplitude is used at both durations, so a 40 ms component carries about 3.0 dB more energy than a 20 ms one. The synchronous cell at each duration is what a duration effect would show up in; it does not remove the confound.
     note: adjacent overlap is not common overlap: all seven components share 0 ms in the (40, 20) cell, not 20 ms. Only the synchronous cells have positive common overlap.
-built in 53s; config 299f0b4c489e61ff; overlap 9ef55de25ba3afdc
+built in 46s; config 217bdc8d859fdea0; overlap 9ef55de25ba3afdc
 ====================================================================================================
