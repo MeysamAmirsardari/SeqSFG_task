@@ -49,7 +49,7 @@ import json
 import math
 import time
 import zlib
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -440,6 +440,34 @@ def make_design(cfg: Config, acfg: AsyncConfig, code: str, session_index: int) -
     return dz
 
 
+
+# ----------------------------------------------------------------------------
+# what the listener is actually asked
+# ----------------------------------------------------------------------------
+# The question depends on the absent class, and getting it wrong is not a wording detail.
+# Under 'roving' BOTH classes contain tones that start together at every element -- that is
+# what matches the envelope -- and only whether the same pitches return differs. A listener
+# told "the rest are just cloud" and asked "was a figure there?" will hear grouping in a 'no'
+# trial, answer yes truthfully, and produce a false-alarm rate near the hit rate.
+WORDING = {
+    "roving": dict(
+        prompt="  did the SAME pitches come back? [y/n]  ",
+        brief=("EVERY sound here has tones that start together -- little groups, over and over.\n"
+               "That is true on both kinds of trial, so hearing a group is NOT the answer.\n\n"
+               "  yes  ->  one set of pitches keeps coming back. The same notes, again and again.\n"
+               "  no   ->  there are groups, but every one is on new pitches. Nothing returns.\n\n"
+               "The judgement is whether something RECURS, not whether something is there."),
+        yes_is="the same pitches came back", no_is="every group was new pitches"),
+    "incoherent": dict(
+        prompt="  was a figure there? [y/n]  ",
+        brief=("Some of these sounds contain a figure: a handful of tones that keep coming back\n"
+               "together, on the same pitches, over and over. The rest are cloud, with nothing\n"
+               "starting together at all.\n\n"
+               "  yes  ->  a figure was there.      no  ->  it was only cloud."),
+        yes_is="there was one", no_is="there was none"),
+}
+WORDING["plain"] = WORDING["incoherent"]
+
 # ----------------------------------------------------------------------------
 # the session
 # ----------------------------------------------------------------------------
@@ -470,7 +498,7 @@ class AsyncRunner:
             dp = 2.4 * float(np.exp(-spec.step_ms / self.auto)) - (0.4 if spec.order == "redrawn" else 0.0)
             x = self.rng_auto.normal(max(dp, 0.0) if spec.present else 0.0, 1.0)
             return "y" if x > 0.55 else "n"
-        return getkey({"y", "n", "q"}, "  was a figure there? [y/n]  ")
+        return getkey({"y", "n", "q"}, WORDING[self.acfg.absent_class]["prompt"])
 
     def _trial(self, spec: AsyncSpec, feedback: bool, i: int, n: int) -> bool:
         import time as _t
@@ -490,8 +518,9 @@ class AsyncRunner:
         rt = (_t.time() - t0) * 1000.0
         correct = int((k == "y") == spec.present)
         if feedback:
+            w = WORDING[self.acfg.absent_class]
             print("   correct" if correct else
-                  f"   wrong ({'there was one' if spec.present else 'there was none'})")
+                  f"   wrong ({w['yes_is'] if spec.present else w['no_is']})")
         else:
             print("   ok")
         self.log.write(dict(trial_index=spec.index, block=spec.block, practice_round=0,
@@ -537,8 +566,55 @@ class AsyncRunner:
             self.audio.play(render(cfg, d, bare))
             print("    now buried in the cloud -- the same thing, and this is a 'yes' trial")
             self.audio.play(render(cfg, d, iv))
-        print("\nA 'no' trial has tones starting together too. What it never has is the SAME")
-        print("pitches coming back. That is the whole judgement.")
+        if self.acfg.absent_class == "roving":
+            print("\nNow a 'no' trial. It has tones starting together too -- listen to how the")
+            print("pitches move somewhere new every time instead of coming back.")
+            if getkey({" ", "s"}, "  [space = play, s = skip]  ") == " ":
+                sd = int(np.random.default_rng([2028]).integers(2 ** 31 - 1))
+                self.audio.play(render(cfg, d, build_interval(
+                    cfg, d, sd, 0.0, self.acfg.orders[0], False, "roving", self.acfg.absent_order)))
+            print("\nSo: hearing a group is not the answer. Both kinds have groups. The question")
+            print("is whether ONE SET of pitches keeps coming back.")
+        else:
+            print("\nA 'no' trial has none of that -- no tones starting together anywhere.")
+
+    def practice_gate(self, specs: Sequence[AsyncSpec], ok: Sequence[bool]) -> bool:
+        """Say how practice went, and do not walk into 240 trials at chance without noticing.
+
+        Practice runs at the easiest rung with feedback. A listener who is at chance THERE is not
+        going to produce a usable ladder, and the commonest reason is that they are answering a
+        different question from the one being asked -- which is invisible from the outside unless
+        the hit and false-alarm rates are put on the screen.
+        """
+        h = sum(1 for s, c in zip(specs, ok) if s.present and c)
+        ns = sum(1 for s in specs if s.present)
+        fa = sum(1 for s, c in zip(specs, ok) if not s.present and not c)
+        nn = len(specs) - ns
+        if not ns or not nn:
+            return True
+        dp = dprime_yesno(h / ns, fa / nn, ns, nn)
+        print(f"\n  practice: hits {h}/{ns}, false alarms {fa}/{nn}   d' = {dp:+.2f}")
+        if dp >= 1.0:
+            print("  that is the easiest rung and you are well above chance. Good to go.")
+            return True
+        w = WORDING[self.acfg.absent_class]
+        print("  that is at or near chance on the EASIEST trials, with feedback.")
+        if fa / nn > 0.4 and h / ns > 0.6:
+            print(f"  you said yes to most of both kinds. Re-read this:\n")
+            print("    " + w["brief"].replace("\n", "\n    "))
+        if self.auto is not None:
+            return True
+        from .runner import getkey
+        k = getkey({"r", "g", "q"},
+                   "  [r] run practice again   [g] go on anyway   [q] stop here  ")
+        if k == "q":
+            print("  stopped. Nothing is lost -- the practice trials are recorded.")
+            return False
+        if k == "r":
+            pr2 = [replace(s, index=s.index + len(specs)) for s in specs]
+            ok2 = [self._trial(s, True, i, len(pr2)) for i, s in enumerate(pr2, 1)]
+            return self.practice_gate(pr2, ok2)
+        return True
 
     def run(self, code: Optional[str] = None, session_index: Optional[int] = None):
         from .runner import QuitRequested, Runner
@@ -574,13 +650,15 @@ class AsyncRunner:
         self.log = TrialLog(sdir / "trials.csv")
         try:
             self.familiarise()
-            self.pause("Practice, with feedback. You will hear ONE sound each time.\n"
-                       "Some of them contain a figure: a handful of tones that keep coming back\n"
-                       "together, on the same pitches, over and over. The rest are just cloud.\n"
-                       "Answer 'y' if a figure was there, 'n' if it was not.")
+            self.pause("Practice, with feedback. You will hear ONE sound each time.\n\n"
+                       + WORDING[acfg.absent_class]["brief"])
             pr = [AsyncSpec(**t) for t in design["practice"]]
-            for i, s in enumerate(pr, 1):
-                self._trial(s, acfg.feedback_practice, i, len(pr))
+            ok = [self._trial(s, acfg.feedback_practice, i, len(pr)) for i, s in enumerate(pr, 1)]
+            if not self.practice_gate(pr, ok):
+                meta["status"] = "stopped_after_practice"
+                write_json(sdir / "session.json", meta)
+                self.log.close()
+                return sdir
             mn = [AsyncSpec(**t) for t in design["main"]]
             self.pause(f"Main block: {len(mn)} trials, no feedback.\n\n"
                        "The trials are shuffled, so an easy one can follow a hard one and the\n"
