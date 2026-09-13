@@ -1,0 +1,83 @@
+====================================================================================================
+TEMPORAL OVERLAP PILOT -- acoustic cue audit   absent class 'plain'   40 present + 40 absent per cell
+====================================================================================================
+A yes/no listener answers from ONE scene, so any property whose distribution differs
+between the classes -- in mean OR in spread -- is a usable criterion whether or not
+anyone hears a pattern. This section describes alternative explanations; it does not
+recommend replacing the task.
+
+[1] the seven cells, and what 'overlap' means in each
+       T  step  adjacent  fraction  common(7)  extent   gap  envelope  env frac
+      20     0       20m      1.00        20m      20     0    13.73m     1.000
+      20    10       10m      0.50         0m      80     0     4.98m     0.363
+      20    20        0m      0.00         0m     140     0     0.00m     0.000
+      40     0       40m      1.00        40m      40     0    33.73m     1.000
+      40    20       20m      0.50         0m     160     0    14.98m     0.444
+      40    30       10m      0.25         0m     220     0     4.98m     0.148
+      40    40        0m      0.00         0m     280     0     0.00m     0.000
+    'adjacent' is what two CONSECUTIVE components share; 'common(7)' is what all
+    seven share, and it is zero everywhere except the synchronous cells. 'envelope'
+    weights the overlap by the raised-cosine gates (5 ms ramps at both durations),
+    so the same geometric overlap is worth less when it falls on a ramp.
+
+[2] construction: do a present and an absent trial of one seed hold the same tones?
+            cell   inventory match   placement rejects
+          T20 d0         20/20                   0
+         T20 d10         20/20                   0
+         T20 d20         20/20                   0
+          T40 d0         20/20                   0
+         T40 d20         20/20                   0
+         T40 d30         20/20                   0
+         T40 d40         20/20                   0
+    matched per (frequency, duration), not on the total count.
+
+[3] the cues a listener could use instead, pooled over the seven cells
+    feature                                            present            absent  yes/no d
+    long-term RMS (dB)                         -24.117+-0.044    -24.117+-0.043      +0.06
+    peak amplitude                               0.286+-0.018      0.286+-0.018      +0.01
+    total tone-time in the scene (ms)        66720.000+-554.256 66720.000+-554.256     +0.00
+    tones sounding, mean                        13.616+-0.113     13.616+-0.113      +0.00
+    tones sounding, max                         21.361+-0.743     21.246+-0.756      +0.14
+    envelope modulation depth                    0.197+-0.004      0.196+-0.004      +0.22
+    modulation power 0.5-3 Hz (dB)              17.306+-1.789     17.293+-1.670      +0.03
+    modulation power 3-10 Hz (dB)               18.650+-0.995     18.526+-1.052      +0.12
+    envelope peaks above 3 SD                   13.521+-4.043     13.464+-3.675      +0.05
+    tallest burst (SD)                           4.340+-0.486      4.368+-0.488      +0.08
+    envelope autocorrelation at recurrence lags     0.046+-0.014      0.045+-0.013      +0.10
+    spectral peakedness (dB)                     0.163+-0.034      0.164+-0.033      +0.08
+    most irregular channel (IOI CV)              0.472+-0.040      0.468+-0.033      +0.06
+    strongest single-channel periodicity         1.133+-0.029      1.130+-0.027      +0.11
+
+[4] every one of the 47 features, largest first, and whether ANY
+    separates the classes (max-statistic permutation over class labels)
+    env:mod_30_150Hz                            0.27   0.575         shift
+    count_sd                                    0.24   0.561        spread
+    env:mod_depth                               0.22   0.561         shift
+    env:ac_peak_100_1000                        0.20   0.556         shift
+    env:mod_10_30Hz                             0.17   0.547         shift
+    ch:ioi_cv:sd                                0.16   0.546         shift
+    ch:ioi_sd:sd                                0.16   0.544         shift
+    count_max                                   0.14   0.540         shift
+    ch:ioi_sd:min                               0.12   0.472        spread
+    env:mod_3_10Hz                              0.12   0.534         shift
+    largest observed 0.269   95th percentile under relabelling 0.293   p = 0.116
+
+[5] an observer that has LEARNT the best linear criterion over every feature
+    (leave-one-out, fitted within each cell, held-out decisions pooled)
+    hit 0.582   false alarm 0.446   d' = +0.341   56.8% correct
+
+[6] per cell
+    a null cell d' has SD 0.28 at 40+40 trials; the largest of 7 cells sits near +0.41 with nothing wrong.
+            cell   permutation p   largest d   learnt d        hit/fa
+          T20 d0       0.000        1.59      +1.02   0.70/0.30  
+         T20 d10       0.096        0.76      +0.25   0.57/0.47  
+         T20 d20       0.334        0.65      -0.06   0.45/0.47  
+          T40 d0       0.000        1.72      +1.47   0.80/0.25  
+         T40 d20       0.748        0.53      -0.25   0.47/0.57  
+         T40 d30       0.832        0.52      -0.18   0.50/0.57  
+         T40 d40       0.417        0.62      +0.25   0.57/0.47  
+
+    note: the same component amplitude is used at both durations, so a 40 ms component carries about 3.0 dB more energy than a 20 ms one. The synchronous cell at each duration is what a duration effect would show up in; it does not remove the confound.
+    note: adjacent overlap is not common overlap: all seven components share 0 ms in the (40, 20) cell, not 20 ms. Only the synchronous cells have positive common overlap.
+built in 53s; config 299f0b4c489e61ff; overlap 9ef55de25ba3afdc
+====================================================================================================

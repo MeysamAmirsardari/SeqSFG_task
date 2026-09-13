@@ -27,7 +27,7 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .config import Config, Derived, derive, VARIANTS
+from .config import Config, ConfigError, Derived, derive, VARIANTS
 
 BACKGROUND, FIGURE = 0, 1
 
@@ -51,16 +51,29 @@ class Interval:
     element_sets: List[np.ndarray]  # channel set of each element (empty list for 'ungrouped')
     patterns: List[np.ndarray]      # delay order per element: component i starts at pattern[i]*step
     figure_set: np.ndarray          # A's recurring set S (kept on B and C for oracle measurements)
+    dur: Optional[np.ndarray] = None
+    # None -> every tone lasts cfg.tone_dur_ms, which is what every task built before the
+    #         temporal-overlap pilot assumes, and what the legacy rendering path does.
+    # array-> per-tone duration in GRID units, same length as `onset`. Only the overlap pilot
+    #         sets it: there the figure's components have a duration of their own while the
+    #         background keeps cfg.tone_dur_ms, and the two have to coexist in one channel.
 
     @property
     def n_tones(self) -> int:
         return int(self.onset.size)
 
+    def durations(self, d: "Derived") -> np.ndarray:
+        """Per-tone duration in grid units, whether or not this interval carries its own."""
+        if self.dur is None:
+            return np.full(self.onset.size, d.tone_dur_grid, dtype=int)
+        return np.asarray(self.dur, dtype=int)
+
     def copy(self) -> "Interval":
         return Interval(self.role, self.variant, self.step_ms, self.onset.copy(), self.channel.copy(),
                         self.phase.copy(), self.kind.copy(), self.element.copy(), self.component.copy(),
                         self.element_onsets.copy(), [s.copy() for s in self.element_sets],
-                        [p.copy() for p in self.patterns], self.figure_set.copy())
+                        [p.copy() for p in self.patterns], self.figure_set.copy(),
+                        None if self.dur is None else self.dur.copy())
 
 
 @dataclass
@@ -631,9 +644,18 @@ def make_trial(cfg: Config, seed: int, step_ms: float, variant: str, max_rebuild
 # ----------------------------------------------------------------------------
 # rendering
 # ----------------------------------------------------------------------------
-def tone_envelope(cfg: Config) -> np.ndarray:
-    n = cfg.ms_to_samples(cfg.tone_dur_ms)
+def tone_envelope(cfg: Config, dur_ms: Optional[float] = None) -> np.ndarray:
+    """Raised-cosine gated tone envelope. `dur_ms` defaults to cfg.tone_dur_ms.
+
+    The ramp is cfg.ramp_ms whatever the duration: the onset transient is the thing grouping
+    is built on, so it is held constant rather than scaled, and a 20 ms tone is therefore half
+    ramp where a 40 ms one is a quarter. That choice is what makes the envelope-weighted
+    overlap differ from the geometric overlap; overlap.py reports both.
+    """
+    n = cfg.ms_to_samples(cfg.tone_dur_ms if dur_ms is None else dur_ms)
     r = cfg.ms_to_samples(cfg.ramp_ms)
+    if n < 2 * r:
+        raise ConfigError(f"a {dur_ms} ms tone cannot carry two {cfg.ramp_ms} ms ramps")
     env = np.ones(n)
     ramp = 0.5 * (1.0 - np.cos(np.pi * np.arange(r) / r))
     env[:r] = ramp
@@ -641,7 +663,10 @@ def tone_envelope(cfg: Config) -> np.ndarray:
     return env
 
 
-def render_interval(cfg: Config, iv: Interval, d: Optional[Derived] = None) -> np.ndarray:
+def render_interval(cfg: Config, iv: Interval, d: Optional[Derived] = None,
+                    amplitude=None) -> np.ndarray:
+    """`amplitude` overrides cfg.tone_amplitude, per tone when it is an array. Only reachable
+    on the per-tone-duration path, so nothing built before the overlap pilot can see it."""
     d = d or derive(cfg)
     sr = cfg.sample_rate
     n_total = cfg.ms_to_samples(cfg.interval_dur_ms)
@@ -651,10 +676,22 @@ def render_interval(cfg: Config, iv: Interval, d: Optional[Derived] = None) -> n
     x = np.zeros(n_total, dtype=np.float64)
     freqs = d.channel_freqs_hz
     samples_per_grid = cfg.grid_ms * sr / 1000.0
+    if iv.dur is None:
+        for j in range(iv.n_tones):
+            start = int(round(iv.onset[j] * samples_per_grid))
+            f = freqs[iv.channel[j]]
+            x[start:start + n_tone] += cfg.tone_amplitude * env * np.sin(2.0 * np.pi * f * t + iv.phase[j])
+        return x.astype(np.float32)
+    # per-tone durations: one cached envelope per distinct duration, otherwise identical
+    amp = cfg.tone_amplitude if amplitude is None else np.asarray(amplitude, dtype=float)
+    amps = np.full(iv.n_tones, amp) if np.ndim(amp) == 0 else amp
+    envs = {int(u): tone_envelope(cfg, float(u) * cfg.grid_ms) for u in np.unique(iv.dur)}
+    ts = {u: np.arange(e.size) / sr for u, e in envs.items()}
     for j in range(iv.n_tones):
         start = int(round(iv.onset[j] * samples_per_grid))
+        e = envs[int(iv.dur[j])]
         f = freqs[iv.channel[j]]
-        x[start:start + n_tone] += cfg.tone_amplitude * env * np.sin(2.0 * np.pi * f * t + iv.phase[j])
+        x[start:start + e.size] += amps[j] * e * np.sin(2.0 * np.pi * f * ts[int(iv.dur[j])] + iv.phase[j])
     return x.astype(np.float32)
 
 

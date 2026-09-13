@@ -1,0 +1,134 @@
+{
+ "_README": [
+  "Temporal Overlap Pilot -- roving CONTROL preset. Separate question, separate analysis.",
+  "",
+  "Identical to overlap_pilot.json except absent_class = 'roving'. Here an absent trial is not a",
+  "cloud: it carries an organised group at every recurrence, on a fresh set of channels and a",
+  "fresh internal order each time. The question becomes whether a frequency set RECURS among",
+  "other organised groups, which is not the question the pilot asks.",
+  "",
+  "Two limitations to state whenever it is reported:",
+  "  * its per-frequency tone inventory does NOT match the present trial's, because the groups",
+  "    land on different channels. The audit prints the match rate and it is not 1. The fully",
+  "    matched roving contrast is the asynchrony task (asynchrony_rising_config.json), which uses",
+  "    matched incidence to put both channel sets in both intervals.",
+  "  * it must never be pooled with, or substituted for, the plain cells. Analyse it on its own."
+ ],
+ "config": {
+  "sample_rate": 48000,
+  "grid_ms": 1.0,
+  "pool_low_hz": 200.0,
+  "pool_high_hz": 5000.0,
+  "pool_spacing_erb": 1.0,
+  "min_beat_rate_hz": 40.0,
+  "tone_dur_ms": 40.0,
+  "ramp_ms": 5.0,
+  "tone_amplitude": 0.026,
+  "tones_per_channel": 70,
+  "interval_dur_ms": 4900.0,
+  "n_components": 7,
+  "figure_repeats": 1,
+  "figure_min_spacing_channels": 1,
+  "figure_anchor_seed": null,
+  "steps_ms": [
+   0.0,
+   10.0,
+   20.0,
+   30.0,
+   40.0
+  ],
+  "main_variants": [
+   "rising"
+  ],
+  "n_elements": 8,
+  "iei_min_ms": 420.0,
+  "iei_max_ms": 500.0,
+  "lead_min_ms": 350.0,
+  "lead_max_ms": 600.0,
+  "tail_min_ms": 350.0,
+  "figure_band_channels": null,
+  "matched_incidence": false,
+  "foil_universe_size": 23,
+  "anchored_fraction": 1.0,
+  "foil_subpool_size": null,
+  "max_shared_consecutive": 5,
+  "max_shared_any": 5,
+  "isi_ms": 400.0,
+  "lead_silence_ms": 50.0,
+  "trials_per_condition": 4,
+  "max_condition_run": 2,
+  "max_variant_run": 4,
+  "practice_cells": [
+   [
+    "rising",
+    0.0
+   ]
+  ],
+  "practice_n": 12,
+  "practice_criterion": 10,
+  "practice_max_rounds": 2,
+  "break_every": 40,
+  "feedback_main": true,
+  "feedback_control": true,
+  "control_cells": [
+   [
+    "ungrouped",
+    0.0
+   ]
+  ],
+  "control_trials_per_cell": 2,
+  "max_session_minutes": 90.0,
+  "response_allowance_s": 1.2,
+  "feedback_s": 0.4,
+  "iti_s": 0.5,
+  "break_s": 45.0,
+  "setup_minutes": 5.0,
+  "tone_level_db_spl": 60.0,
+  "calibration_freq_hz": 1000.0,
+  "calibration_dur_s": 5.0,
+  "bootstrap_n": 1000,
+  "threshold_pc": 0.75,
+  "alpha": 0.05
+ },
+ "overlap": {
+  "cells": [
+   [
+    20.0,
+    0.0
+   ],
+   [
+    20.0,
+    10.0
+   ],
+   [
+    20.0,
+    20.0
+   ],
+   [
+    40.0,
+    0.0
+   ],
+   [
+    40.0,
+    20.0
+   ],
+   [
+    40.0,
+    30.0
+   ],
+   [
+    40.0,
+    40.0
+   ]
+  ],
+  "absent_class": "roving",
+  "trials_per_cell": 10,
+  "figure_amplitude": null,
+  "jitter_ms": 120.0,
+  "practice_trials": 16,
+  "response_timeout_s": 4.0,
+  "max_class_run": 4,
+  "max_cell_run": 2,
+  "n_boot": 4000
+ }
+}

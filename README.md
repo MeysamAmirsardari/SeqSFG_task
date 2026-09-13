@@ -1110,3 +1110,99 @@ a session will be inflated by the two bottom rungs, so quote the ladder and not 
 ```
 python -m seqsfg asynchrony-run --preset asynchrony_plain_config.json --data data
 ```
+
+---
+
+## 12. The Temporal Overlap Pilot
+
+`seqsfg/overlap.py`, driven by `overlap_pilot.json`. A fourth task, sharing the stimulus layer
+and changing nothing about the three already there — `pilot_config.json` still hashes
+`7f8f210f0f5000b3`, and a test asserts it.
+
+**The question.** Does detection of an asynchronous recurring figure depend on the *absolute
+duration* of overlap between its components, on the *proportion* of them that overlaps, or only
+on how far apart their *onsets* are? Two tones can overlap by 50% while sharing very different
+amounts of time. Nothing in the analysis is built to prefer an answer.
+
+### The seven cells
+
+| cell | T (ms) | step (ms) | adjacent overlap | fraction | common to all 7 | extent | envelope overlap |
+|---|---|---|---|---|---|---|---|
+| `T20_d0` | 20 | 0 | 20 ms | 100% | 20 ms | 20 ms | 13.73 ms |
+| `T20_d10` | 20 | 10 | 10 ms | 50% | 0 ms | 80 ms | 4.98 ms |
+| `T20_d20` | 20 | 20 | 0 ms | 0% | 0 ms | 140 ms | 0 ms |
+| `T40_d0` | 40 | 0 | 40 ms | 100% | 40 ms | 40 ms | 33.73 ms |
+| `T40_d20` | 40 | 20 | 20 ms | 50% | 0 ms | 160 ms | 14.98 ms |
+| `T40_d30` | 40 | 30 | 10 ms | 25% | 0 ms | 220 ms | 4.98 ms |
+| `T40_d40` | 40 | 40 | 0 ms | 0% | 0 ms | 280 ms | 0 ms |
+
+Planned before any data: **equal fraction** `T20_d10` vs `T40_d20`; **equal absolute overlap**
+`T20_d10` vs `T40_d30`; **equal onset separation** `T20_d20` vs `T40_d20`. Synchronous and
+zero-overlap references at both durations.
+
+**Adjacent overlap is not common overlap.** `max(0, T − step)` is what two *consecutive*
+components share; what all seven share is `max(0, T − 6·step)`, which is zero in every
+asynchronous cell. Both are logged and plotted separately. At step = T the tones meet — there is
+no positive silent gap.
+
+**The envelope-weighted overlap** is `∫e(t)e(t−step)dt`, normalised by `∫e(t)²dt`, with the ramp
+held at 5 ms at both durations. It is reported beside the geometric overlap, not instead of it,
+and it shows that the equal-*absolute* pair stays equal after weighting (4.98 ms both) while the
+equal-*fraction* pair does not (0.363 vs 0.444).
+
+### What is held fixed, and what is not
+
+Only the figure's components change length: they carry their own duration (`Interval.dur`, opt-in
+and unused by every earlier task) while the background keeps `cfg.tone_dur_ms`. Fixed in all
+seven cells: background duration 40 ms, budget 70 tones per channel, pool of 24 channels
+200–4865 Hz, one amplitude (0.026) for background and figure alike, 8 recurrences at
+420–500 ms with 120 ms of shared jitter, and a 4.9 s scene. The timing is sized for the widest
+cell — `T40_d40` spans 280 ms, so one recurrence needs 400 ms — and the rate is never relaxed for
+a longer or harder condition.
+
+**An absent trial holds the same tones**: same channels, same durations, same amplitude, same
+counts, only the arrangement randomised. Checked per **(frequency, duration)** bin, 20/20 pairs
+in every cell, 0 placement rejections.
+
+### Audit
+
+Independent seeds for the two classes; all 50 features; max-statistic permutation plus a
+leave-one-out learnt observer. Four seeds, 40+40 per cell (null cell SD 0.28):
+
+| cell | `T20_d0` | `T20_d10` | `T20_d20` | `T40_d0` | `T40_d20` | `T40_d30` | `T40_d40` |
+|---|---|---|---|---|---|---|---|
+| mean learnt d' | **+1.17** | −0.08 | +0.06 | **+1.46** | −0.36 | +0.03 | −0.09 |
+| seeds p<0.05 | 3/4 | 0/4 | 0/4 | 4/4 | 0/4 | 0/4 | 0/4 |
+
+The leak is confined to the two **synchronous** cells, where it cannot be removed: seven tones
+starting together are a level event a scattered cloud does not have. Every asynchronous cell —
+which is to say every cell the three planned contrasts use — sits at chance at every seed. Read
+the synchronous cells as a manipulation check.
+
+`overlap_roving_control.json` keeps roving as a **separately named, separately analysed** control.
+It answers a different question (recurring frequency identity among other organised groups), its
+per-frequency inventory does not match at T=20 (0/20; at T=40 it matches only because component
+and background durations coincide), and its learnt observer reads +0.91. It is never substituted
+for the plain contrast.
+
+### Known confound, not fixed
+
+At equal amplitude a 40 ms component carries about 3 dB more energy than a 20 ms one. The
+synchronous cell at each duration is where a general duration benefit would appear; it does not
+remove the confound, and normalising the mixture RMS would not either — that equalises the scene,
+not the component.
+
+### Commands
+
+```
+python -m seqsfg overlap-design                 # the seven cells, geometry, duration, caveats
+python -m seqsfg overlap-verify --out v.txt     # matching, placement and the cue audit
+python -m seqsfg overlap-demo --out demo/overlap
+python -m seqsfg overlap-run --data data
+python -m seqsfg overlap-analyze data/P01/session_01
+```
+
+[`SeqSFG_overlap_pilot.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/SeqSFG_overlap_pilot.ipynb)
+has the condition table, onset/offset diagrams, envelope diagrams, full-mixture audio for every
+cell, the matching check, and the analysis exercised on a clearly-labelled simulated responder.
+140 main trials, about 25 minutes.

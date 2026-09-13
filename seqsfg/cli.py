@@ -324,6 +324,103 @@ def cmd_async_demo(args):
           f"absent '{acfg.absent_class}', same seed throughout so the figure is the same set)")
 
 
+# ---- temporal overlap pilot -------------------------------------------------
+def _overlap_cfgs(args):
+    from .overlap import OverlapConfig, check, load_preset
+    if getattr(args, "preset", None):
+        cfg, ocfg = load_preset(args.preset)
+        cfg = apply_sets(cfg, args)
+    else:
+        cfg, ocfg = load_config(args), OverlapConfig()
+    for kv in getattr(args, "overlap_set", None) or []:
+        k, _, v = kv.partition("=")
+        if not hasattr(ocfg, k):
+            raise SystemExit(f"unknown overlap parameter {k}")
+        try:
+            val = json.loads(v)
+        except json.JSONDecodeError:
+            val = v
+        if isinstance(val, list):
+            val = tuple(tuple(x) if isinstance(x, list) else x for x in val)
+        ocfg = OverlapConfig(**{**ocfg.to_dict(), k: val})
+    validate(cfg)
+    check(cfg, ocfg)
+    return cfg, ocfg
+
+
+def cmd_overlap_design(args):
+    from .overlap import condition_table, duration_estimate, make_design, notes, widest_footprint_ms
+    cfg, ocfg = _overlap_cfgs(args)
+    dz = make_design(cfg, ocfg, args.code or "P01", args.session or 1)
+    est = duration_estimate(cfg, ocfg)
+    print(f"participant {dz['participant_code']}  session {dz['session_index']}  "
+          f"design {dz['design_hash']}")
+    print(f"absent class         {ocfg.absent_class}")
+    print(f"components           {cfg.n_components}, {cfg.n_elements} recurrences, "
+          f"one arbitrary order per trial reused by every recurrence")
+    print(f"background           {cfg.tone_dur_ms:g} ms tones, {cfg.tones_per_channel} per "
+          f"channel, amplitude {cfg.tone_amplitude} -- fixed in every cell")
+    print(f"timing               recurrence every {cfg.iei_min_ms:.0f}-{cfg.iei_max_ms:.0f} ms, "
+          f"{ocfg.jitter_ms:.0f} ms shared jitter, scene {cfg.interval_dur_ms:.0f} ms")
+    print(f"                     widest cell needs {widest_footprint_ms(cfg, ocfg):.0f} ms per "
+          f"recurrence; the same schedule is used for all {est['n_cells']}")
+    print(f"trials               {est['n_cells']} cells x {ocfg.trials_per_cell} present "
+          f"+ {ocfg.trials_per_cell} absent = {est['n_main']}, plus {est['n_practice']} practice")
+    print(f"estimated session    {est['minutes']:.0f} min")
+    print()
+    print(condition_table(cfg, ocfg))
+    for n in notes(cfg, ocfg):
+        print(f"\nnote: {n}")
+    if args.json:
+        from .session import write_json
+        write_json(Path(args.json), dz)
+        print(f"\ndesign written to {args.json}")
+
+
+def cmd_overlap_verify(args):
+    from . import overlap as O
+    cfg, ocfg = _overlap_cfgs(args)
+    res = O.run_audit(cfg, ocfg, n_trials=args.trials, seed=args.seed, n_perm=args.perm,
+                      verbose=not args.quiet)
+    text = O.report(res)
+    print(text)
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(text + "\n")
+        print(f"written to {args.out}")
+
+
+def cmd_overlap_run(args):
+    from .overlap import OverlapRunner
+    cfg, ocfg = _overlap_cfgs(args)
+    OverlapRunner(cfg, ocfg, args.data, args.device, audio=not args.no_audio,
+                  auto=args.auto).run(code=args.code, session_index=args.session)
+
+
+def cmd_overlap_analyze(args):
+    from .overlap import analyse
+    print(analyse(args.sessions))
+
+
+def cmd_overlap_demo(args):
+    import soundfile as sf
+    from .overlap import build_interval, cell_name, geometry, render
+    cfg, ocfg = _overlap_cfgs(args)
+    d = validate(cfg)
+    out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
+    for (T, s) in ocfg.cells:
+        for present in (True, False):
+            iv = build_interval(cfg, ocfg, d, args.seed, T, s, present)
+            name = out / f"{cell_name(T, s)}_{'pattern' if present else 'no-pattern'}.wav"
+            sf.write(name, render(cfg, ocfg, d, iv), cfg.sample_rate)
+        g = geometry(cfg, T, s, cfg.n_components)
+        print(f"  {cell_name(T, s):>10}  adjacent overlap {g['adjacent_overlap_ms']:.0f} ms "
+              f"({g['adjacent_overlap_fraction']:.0%}), extent {g['total_extent_ms']:.0f} ms, "
+              f"envelope overlap {g['envelope_overlap_ms']:.2f} ms")
+    print(f"wrote {2 * len(ocfg.cells)} full-mixture files to {out} "
+          f"(absent '{ocfg.absent_class}', one seed throughout)")
+
+
 def _exposure_cfgs(args):
     from .exposure import ExposureConfig, load_preset
     if getattr(args, "preset", None):
@@ -548,6 +645,40 @@ def main(argv=None):
     q.add_argument("--order", default="fixed"); q.add_argument("--steps",
                    help="comma-separated, default the whole ladder")
     q.set_defaults(fn=cmd_async_demo)
+
+    def add_overlap(q):
+        add_common(q)
+        q.add_argument("--preset", default="overlap_pilot.json",
+                       help="two-section preset file (config + overlap)")
+        q.add_argument("--overlap-set", action="append", metavar="KEY=VALUE",
+                       help="override one overlap parameter")
+
+    q = sub.add_parser("overlap-design", help="the seven cells, their geometry and the duration")
+    add_overlap(q); q.add_argument("--code"); q.add_argument("--session", type=int)
+    q.add_argument("--json"); q.set_defaults(fn=cmd_overlap_design)
+
+    q = sub.add_parser("overlap-verify", help="matching, placement and the acoustic cue audit")
+    add_overlap(q)
+    q.add_argument("--trials", type=int, default=40); q.add_argument("--seed", type=int, default=606)
+    q.add_argument("--perm", type=int, default=20000); q.add_argument("--quiet", action="store_true")
+    q.add_argument("--out"); q.set_defaults(fn=cmd_overlap_verify)
+
+    q = sub.add_parser("overlap-run", help="run a temporal overlap pilot session")
+    add_overlap(q)
+    q.add_argument("--data", default="data"); q.add_argument("--code")
+    q.add_argument("--session", type=int); q.add_argument("--device")
+    q.add_argument("--no-audio", action="store_true")
+    q.add_argument("--auto", type=float, default=None, metavar="TAU_MS",
+                   help="simulated listener; pipeline test only")
+    q.set_defaults(fn=cmd_overlap_run)
+
+    q = sub.add_parser("overlap-analyze", help="per-cell d', the three planned contrasts, caveats")
+    q.add_argument("sessions", nargs="+"); q.set_defaults(fn=cmd_overlap_analyze)
+
+    q = sub.add_parser("overlap-demo", help="full-mixture present and absent audio for every cell")
+    add_overlap(q)
+    q.add_argument("--out", default="demo/overlap"); q.add_argument("--seed", type=int, default=12)
+    q.set_defaults(fn=cmd_overlap_demo)
 
     args = p.parse_args(argv)
     try:
