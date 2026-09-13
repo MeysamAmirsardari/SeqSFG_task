@@ -501,6 +501,45 @@ class AsyncRunner:
                             t_start=t_play, t_response=now_iso()))
         return bool(correct)
 
+    def familiarise(self, n: int = 3) -> None:
+        """Hear a figure with the cloud stripped out, then the same trial whole.
+
+        The figure is drawn fresh on every trial here, so there is no one pattern to memorise --
+        what this teaches is what "a group that keeps coming back" sounds like, which is not
+        obvious from the instructions alone. It records nothing.
+        """
+        if self.auto is not None:
+            return
+        from .runner import getkey
+        from .stimulus import FIGURE, render_interval
+        cfg, d = self.cfg, self.d
+        print("\n" + "=" * 68)
+        print("First, what you are listening for. Nothing here is recorded.")
+        print("=" * 68)
+        print(f"\n{n} examples. Each one twice: the figure alone, then the same sound with the")
+        print("cloud back in. The pitches change from example to example -- what does not change")
+        print("is that they keep coming back together.")
+        for j in range(n):
+            k = getkey({" ", "s", "q"}, f"\n  example {j + 1} of {n}  [space = play, s = skip, q = go on]  ")
+            if k in ("s", "q"):
+                print("  skipped." if k == "s" else "  moving on.")
+                if k == "q":
+                    return
+                continue
+            seed = int(np.random.default_rng([2027, j]).integers(2 ** 31 - 1))
+            iv = build_interval(cfg, d, seed, 0.0, self.acfg.orders[0], True)
+            S = np.round(d.channel_freqs_hz[np.sort(iv.figure_set)]).astype(int).tolist()
+            print(f"    the figure alone -- {cfg.n_components} pitches, {S} Hz")
+            m = iv.kind == FIGURE
+            bare = iv.copy()
+            for a in ("onset", "channel", "phase", "kind", "element", "component"):
+                setattr(bare, a, getattr(iv, a)[m])
+            self.audio.play(render(cfg, d, bare))
+            print("    now buried in the cloud -- the same thing, and this is a 'yes' trial")
+            self.audio.play(render(cfg, d, iv))
+        print("\nA 'no' trial has tones starting together too. What it never has is the SAME")
+        print("pitches coming back. That is the whole judgement.")
+
     def run(self, code: Optional[str] = None, session_index: Optional[int] = None):
         from .runner import QuitRequested, Runner
         from .session import (TrialLog, next_session_index, provenance, session_dir,
@@ -529,8 +568,12 @@ class AsyncRunner:
         write_json(sdir / "session.json", meta)
         print(f"new asynchrony session {sdir} (absent='{acfg.absent_class}', "
               f"design {design['design_hash']})")
+        self.sdir, self.meta = sdir, meta
+        from .runner import Runner as _R
+        _R.calibrate(self)
         self.log = TrialLog(sdir / "trials.csv")
         try:
+            self.familiarise()
             self.pause("Practice, with feedback. You will hear ONE sound each time.\n"
                        "Some of them contain a figure: a handful of tones that keep coming back\n"
                        "together, on the same pitches, over and over. The rest are just cloud.\n"
@@ -539,9 +582,15 @@ class AsyncRunner:
             for i, s in enumerate(pr, 1):
                 self._trial(s, acfg.feedback_practice, i, len(pr))
             mn = [AsyncSpec(**t) for t in design["main"]]
-            self.pause(f"Main block: {len(mn)} trials, no feedback. The figure gets harder to\n"
-                       "hear as the block goes on -- its tones stop starting together. Answer\n"
-                       "what you hear; guessing 'no' when you are unsure is normal and fine.")
+            self.pause(f"Main block: {len(mn)} trials, no feedback.\n\n"
+                       "The trials are shuffled, so an easy one can follow a hard one and the\n"
+                       "difficulty does NOT build through the block. On some the figure's tones\n"
+                       "start together; on others they are spread over up to a sixth of a second,\n"
+                       "and those are much harder. Expect to be unsure often -- that is the point\n"
+                       "of the ladder, not a sign you are doing it wrong.\n\n"
+                       "Answer what you hear. Try to keep the same standard for saying 'yes' from\n"
+                       "the first trial to the last; drifting towards 'no' as you tire is the one\n"
+                       "thing that spoils this measurement.")
             for i, s in enumerate(mn, 1):
                 if i > 1 and (i - 1) % cfg.break_every == 0:
                     self.pause("Take a break.")
