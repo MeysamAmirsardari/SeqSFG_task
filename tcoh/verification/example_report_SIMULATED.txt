@@ -1,0 +1,90 @@
+==============================================================================
+*** SIMULATED DATA (observer mode: coherence) ***
+*** Nothing below describes a listener. It describes a generative model. ***
+==============================================================================
+two-tone coherence  |  1 session(s), participant(s) SIMCOH
+config fd54e2c7f3fcb05e   A 1000 Hz / B 2378 Hz (15 st)   75 ms tones, 150 ms SOA, 5 precursors
+threshold = 79.4% correct point, geometric mean of the last 6 reversals
+
+-- session validity ---------------------------------------------------------
+  main trials 1304   catch 82   practice 0
+  catch trials at 45 ms: 97.6% correct (miss rate 2.4%, limit 15%)  -> OK
+  tracks converged 33/33 (100%)
+  trials pinned at the delta ceiling 42, at the floor 0  (a floor-pinned track gives an upper bound, not a threshold)
+  target interval balance p=0.98; response bias p=0.33
+  level rove favoured the target interval on 49.2% of trials (50% means it carried no information)
+  early vs late shift: 77.5% vs 78.2% correct (chi2 p=0.79; median delta 10.0 vs 11.2 ms)
+  first half 77.8% correct at 11.2 ms, second half 77.9% at 10.0 ms
+
+-- thresholds ---------------------------------------------------------------
+  condition      dT%   A-kind     tracks   staircase    fit (all trials)   slope   %corr
+  b_only          0.0  absent     3/3      16.83 ms      17.08 ms    0.34   79.3%
+  coh_0           0.0  coherent   3/3       3.60 ms       3.80 ms    0.32   81.1%
+  coh_25         25.0  coherent   3/3       4.29 ms       4.25 ms    0.33   77.2%
+  coh_50         50.0  coherent   3/3       6.18 ms       6.68 ms    0.80   81.2%
+  coh_75         75.0  coherent   3/3       8.09 ms       8.22 ms    0.57   77.5%
+  coh_100       100.0  coherent   3/3       8.10 ms      11.20 ms    0.78   77.1%
+  scr_0           0.0  scrambled  3/3      16.51 ms      16.92 ms    0.47   79.6%
+  scr_25         25.0  scrambled  3/3      12.38 ms      15.39 ms    0.59   80.2%
+  scr_50         50.0  scrambled  3/3      13.11 ms      13.94 ms    0.88   79.9%
+  scr_75         75.0  scrambled  3/3      11.02 ms      12.07 ms    0.62   75.7%
+  scr_100       100.0  scrambled  3/3      15.58 ms      15.00 ms    0.62   79.9%
+  the two routes agree to within a factor of 1.38 (r=0.981 on log thresholds)
+  fitted slopes span 0.32 to 0.88 log units  -- NOT similar; the staircase bias differs by condition and the ratios below inherit that. Prefer the fitted thresholds.
+
+-- against Elhilali et al. (2009), Figure 2 ---------------------------------
+  dT=0%: 3.60 ms   published 2-4 ms   consistent
+  b_only: 16.83 ms   published 10-20 ms   consistent
+
+-- kappa: how far from 'one object' towards 'no low tone at all' ------------
+  scale: dT=0% 3.60 ms  ->  B-only 16.83 ms   (log span 1.54, 95% CI 1.25 to 1.83)
+    dT%    kappa observed (95% CI)     model l2/l1
+     0.0    -0.01  (-0.22,  0.19)        0.000
+    25.0     0.11  (-0.09,  0.27)        0.210
+    50.0     0.35  ( 0.10,  0.64)        0.526
+    75.0     0.52  ( 0.36,  0.68)        0.791
+   100.0     0.53  ( 0.27,  0.77)        0.883
+  scrambled control, on the SAME scale (coherent dT=0% to b_only):
+     0.0     0.99  ( 0.84,  1.15)
+    25.0     0.80  ( 0.52,  1.11)
+    50.0     0.85  ( 0.46,  1.26)
+    75.0     0.73  ( 0.58,  0.88)
+   100.0     0.96  ( 0.79,  1.13)
+
+-- tests --------------------------------------------------------------------
+  H1  does threshold rise with dT?   [establishes the effect; separates nothing]
+      Spearman rho = +0.831 over 15 tracks at 5 levels, permutation p = 0.0000 (one sided)
+
+  H2  coherent vs scrambled at matched dT   [THE test: separates coherence from
+      interval discrimination and from local acoustic overlap, both of which
+      predict no difference at any dT because the final pair is identical]
+      The coherence account predicts a NEGATIVE slope: a coherent low-tone sequence
+      helps a great deal at synchrony and not at all at alternation.
+
+      [scrambled control, 5 matched dT levels]
+        dT=  0.0%   control - coherent = +1.52 log units (x4.58), 95% CI +1.25 to +1.77
+        dT= 25.0%   control - coherent = +1.05 log units (x2.85), 95% CI +0.62 to +1.48
+        dT= 50.0%   control - coherent = +0.76 log units (x2.14), 95% CI +0.08 to +1.43
+        dT= 75.0%   control - coherent = +0.31 log units (x1.36), 95% CI +0.06 to +0.56
+        dT=100.0%   control - coherent = +0.66 log units (x1.93), 95% CI +0.25 to +1.08
+        slope -0.994 log units per 100% dT, 95% CI -1.435 to -0.533; permutation p = 0.0677
+        -> NOT resolved by this control
+
+  H3  five precursors vs thirteen   [separates coherence from anything local]
+      not run: no build-up conditions in this design
+
+  H4  observed shape vs the model curve   [reported, but see the caveat]
+      coherence_model    r2 = 0.991   AICc = -8.8
+      linear_in_dT       r2 = 0.938   AICc = +0.8
+      best: coherence_model by dAICc = 9.5
+      CAVEAT: over these dT levels the model curve and a straight line correlate at r = 0.9878
+      and differ by at most 0.15 once both are rescaled to [0,1]. They are
+      NOT separable by this design. Do not report the winner as evidence for either.
+
+-- what this session does not establish -------------------------------------
+  * a monotone rise is predicted by every account on the table; only H2 and H3 choose
+    between them.
+  * kappa is normalised by two conditions measured in the same session, so a bad floor
+    or a bad ceiling moves the whole curve. Both are printed above in milliseconds.
+  * one listener. Nothing here generalises; it is a threshold sweep for this person.
+==============================================================================

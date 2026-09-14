@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "seqsfg"
 version = "0.1.0"
-description = "Temporally sheared stochastic figure-ground: stimulus, verification battery, runner, analysis"
+description = "Psychoacoustics of auditory grouping: stochastic figure-ground (seqsfg) and two-tone temporal coherence (tcoh)"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 seqsfg = "seqsfg.cli:main"
+tcoh = "tcoh.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["seqsfg*"]
+include = ["seqsfg*", "tcoh*"]

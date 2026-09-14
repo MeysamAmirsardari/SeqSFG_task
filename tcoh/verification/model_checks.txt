@@ -1,0 +1,37 @@
+check against the published Figure 8 (300 / 952 Hz, 75 ms tones):
+   reading        dT=100%    dT=0%  monotone
+   halfwave         0.893   0.0000  True
+   none             0.156   0.0000  False
+   magnitude        0.041   0.0000  False
+   published        0.930   0.0100
+   -> this package uses 'halfwave'; see the note in tcoh/model.py
+
+is dT a monotone axis at each duty cycle?
+   tone/soa = 0.250   NOT monotone, peaking at dT=62%
+   tone/soa = 0.375   NOT monotone, peaking at dT=75%
+   tone/soa = 0.500   monotone
+   tone/soa = 0.625   monotone
+   tone/soa = 0.750   NOT monotone, peaking at dT=100%
+   -> this config uses 0.500
+
+the prediction for THIS stimulus:
+   dT%   index   range across 8 readings
+     0.0  0.000   0.000 - 0.000
+    25.0  0.199   0.145 - 0.218
+    50.0  0.518   0.440 - 0.549
+    75.0  0.786   0.696 - 0.829
+   100.0  0.887   0.803 - 0.922
+   all monotone: True   all agreeing on the order: True
+
+the model index for every condition as built:
+   coh_0         coherent    0.000
+   coh_25        coherent    0.204
+   coh_50        coherent    0.511
+   coh_75        coherent    0.773
+   coh_100       coherent    0.870
+   scr_0         scrambled   0.319
+   scr_25        scrambled   0.408
+   scr_50        scrambled   0.514
+   scr_75        scrambled   0.587
+   scr_100       scrambled   0.597
+   b_only        absent        -

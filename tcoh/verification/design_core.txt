@@ -1,0 +1,33 @@
+two-tone coherence  |  config fd54e2c7f3fcb05e
+  tones      A 1000 Hz, B 2378 Hz (15 st, 1.25 oct, 7.0 ERB)
+             75 ms tones, 10 ms ramps, 150 ms SOA (duty 0.50), 6 per channel
+             cross-channel leak <-60 dB; nearest low-order ratio 5:2 (4.9% away)
+  trial      1445 ms + 500 ms + 1445 ms = 3.39 s of sound
+  track      3-down 1-up, steps x4/x2/x1.41421, threshold = geometric mean of the last 6 reversals
+             delta starts at 20 ms, capped at 45 ms (75 ms before a collision)
+  conditions 11 x 3 tracks = 33 tracks, about 1469 trials, 122 min
+
+  condition      dT%   A            reference   model l2/l1   role
+  coh_0           0.0  coherent     yoked          0.000      main
+  coh_25         25.0  coherent     yoked          0.204      main
+  coh_50         50.0  coherent     yoked          0.511      main
+  coh_75         75.0  coherent     yoked          0.773      main
+  coh_100       100.0  coherent     yoked          0.870      main
+  scr_0           0.0  scrambled    yoked          0.319      control
+  scr_25         25.0  scrambled    yoked          0.408      control
+  scr_50         50.0  scrambled    yoked          0.514      control
+  scr_75         75.0  scrambled    yoked          0.587      control
+  scr_100       100.0  scrambled    yoked          0.597      control
+  b_only          0.0  absent       yoked            -        control
+
+  predicted scrambled minus coherent (what H2 tests; it should fall with dT):
+    dT=0%: +0.32   dT=25%: +0.20   dT=50%: +0.00   dT=75%: -0.19   dT=100%: -0.27
+
+  note: an error on the first trial would call for 80 ms, above the 45 ms ceiling, so the track will sit at the ceiling until it gets three right. That is before the first reversal and outside the threshold average, but the audit reports how often it happened.
+  note: levels are roved by +-3 dB per interval. Shifting the B tone cannot change the energy in either channel, so the rove is insurance rather than a fix, and the audit confirms the roved difference carries no information about which interval was the target.
+
+  duration   1382 trials, 40 per track, 121 min total (115 main + 1 practice + 4 breaks)
+             at 50 minutes a sitting that is 3 session(s)
+
+  order      33 tracks; every condition once per round, so one track in each 33% of the session
+             within-round serial-position spread 0.065; longest run of one condition 2 (limit 2)

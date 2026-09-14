@@ -1,0 +1,62 @@
+==============================================================================
+tcoh verification battery   |   config fd54e2c7f3fcb05e
+A 1000 Hz / B 2378 Hz, 75 ms tones, 150 ms SOA, 5 precursors, 11 conditions
+==============================================================================
+
+-- stimulus invariants -----------------------------------------------------
+  [PASS] only the final B tone differs between the two intervals
+         checked 11 conditions: A onsets equal, B precursors equal, the final B tone displaced by exactly delta (largest error 0.00e+00 ms)
+  [PASS] the A channel is bit-identical between standard and target
+         max |difference| over 10 conditions = 0.000e+00 (so no observer listening only to the low tone can do the task at all)
+  [PASS] the B channel is bit-identical across conditions of the same length
+         max |difference| over 10 comparisons = 0.000e+00 (so the cue available from the high tone alone cannot vary with dT).
+  [PASS] standard and target always last exactly as long as each other
+         1 distinct interval length(s) across 11 conditions, for 1 distinct precursor count(s): [69360] samples. Duration is constant WITHIN a trial, which is what stops it being a cue; it differs between conditions of different length, which it must, and which the listener cannot use to answer a within-trial question.
+  [PASS] shifting the tone does not change the energy
+         standard vs target total energy differs by 3.84e-06%, i.e. by 1.7e-07 dB. The residual is the starting phase of the displaced tone landing on a different sample, not a level difference any listener or meter could resolve. The level rove, which is a deliberate randomisation, is excluded here.
+  [PASS] two tones in one channel never overlap
+         smallest silent gap within a channel across every condition and the extremes of delta: 16.57 ms
+  [PASS] the realised shift matches the requested one
+         largest deviation 9.9 us over 40 values from 0.25 to 45 ms; the sample grid is 20.8 us. The analysis uses the realised value.
+  [PASS] the level rove carries no information about the answer
+         the target interval was the louder one on 48.2% of 4000 trials (mean gap -0.081 dB); 50% is uninformative
+
+-- peripheral audit --------------------------------------------------------
+  [PASS] displacing B leaves A's auditory filters alone
+         largest envelope change within one ERB of 1000 Hz: 0.018% of that filter's peak; at the midpoint between the tones (1608 Hz) it is 28.876%
+  [PASS] the disturbance stays inside B's own auditory region
+         filters more than 6.0 ERB from B are unmoved (change under 1%); A is 7.0 ERB away, so the disturbance falls short of it by 1.0 ERB. Bank of 28 gammatones from 500 to 4757 Hz. This is what makes the one-channel-per-tone reduction the model prediction rests on safe here.
+
+-- model -------------------------------------------------------------------
+  [PASS] the model implementation reproduces the published Figure 8
+         alternating 0.893 (paper 0.93), synchronous 0.000 (paper 0.01), monotone True. The literal signed-product reading gives 0.156 and is not monotone; see the note in tcoh/model.py.
+  [PASS] dT is a monotone axis at this duty cycle
+         duty 0.500: predicted index is monotone in dT. 0.250:non-mono  0.375:non-mono  0.500:mono  0.625:mono  0.750:non-mono
+  [PASS] the prediction survives every defensible reading of the filter bank
+         8 variants: all monotone True, all agreeing on the ordering of dT levels True, largest disagreement in height 0.13. The ORDER is predicted robustly; the heights are not, which is why the shape test is reported with a caveat.
+  [PASS] the scrambled control predicts a falling difference (this is what H2 tests)
+         model index, control minus coherent: dT=0%: +0.32, dT=25%: +0.20, dT=50%: +0.00, dT=75%: -0.19, dT=100%: -0.27; slope -0.63 per 100% dT. Positive at synchrony and falling is the signature. A pedestal or local-overlap account predicts zero at every dT -- a different shape, which is what makes them separable.
+  [PASS] the two tones do not share auditory filters
+         7.0 ERBs apart (15 semitones); cross-channel leak <-60 dB
+  [PASS] the two tones are not in a simple frequency ratio
+         f_b/f_a = 2.3784, nearest ratio with terms up to 6 is 5:2, 4.9% away. Closer than about 3% and harmonicity would fuse the pair for reasons this design does not control.
+
+-- procedure ---------------------------------------------------------------
+  [PASS] the staircase recovers a threshold it was given
+         worst bias +12.9% across thresholds from 2 to 24 ms and slopes from 0.35 to 0.9; single-track spread sd(log) = 0.31; median 39 trials; non-convergence 0.0%. The bias is a slight UNDERestimate at every threshold, so it largely cancels in the log ratios kappa is built from.
+  [PASS] no condition is confounded with time in the session
+         every condition contributes exactly one track per round (mean round index varies by 0.0e+00), so each gets one track in each 33% of the session by construction. Within that, mean serial position still varies by 0.065 of the session across 11 conditions -- a residue of blocks that do not divide evenly. A slow drift across the session therefore cannot line up with dT; `analysis.diagnostics` measures the drift itself as well.
+  [PASS] no condition repeats more than the configured run length
+         longest planned run 2, limit 2; catch trials planned at 6.3% against 6.0%
+
+-- level and safety --------------------------------------------------------
+  [PASS] the waveform cannot clip
+         peak 0.129 FS with the rove at its maximum (17.8 dB of headroom)
+  [PASS] the level at the ear is comfortable and safe
+         one tone at 65 dB SPL as calibrated; both together at most 68.0 dB SPL. A whole session is around 122 minutes, which at this level is far below any exposure limit.
+  [PASS] both tones sit in a comfortable frequency range
+         A 1000 Hz, B 2378 Hz -- both well inside the range where hearing is most sensitive and neither is shrill
+
+==============================================================================
+22/22 checks passed
+==============================================================================
