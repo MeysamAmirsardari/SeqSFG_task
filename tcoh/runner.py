@@ -142,7 +142,13 @@ class Runner:
         self.fast = fast
         self.sim = SimulatedListener(cfg, mode=auto, seed=seed or 20260913) if auto else None
         self.cond = {c.name: c for c in self.d.conditions}
-        self.rng = np.random.default_rng(seed or 20260913)
+        self.seed = int(seed)
+        # replaced in start() by a stream keyed on the session. Seeding the per-trial draws --
+        # which interval holds the target, which way the tone moves, the starting phases -- from
+        # a constant gave every participant the identical sequence of target positions. Balanced,
+        # and no use to a listener, but any accidental structure would then be shared by everyone
+        # rather than averaging out across the sample.
+        self.rng = np.random.default_rng([self.seed, 0x7C00])
 
     # -- setup -------------------------------------------------------------------
     def start(self, code: Optional[str] = None, resume: bool = False,
@@ -183,11 +189,47 @@ class Runner:
             print(f"new session {sdir} (seed {design['session_seed']}, design {design['design_hash']})")
 
         self.sdir, self.meta, self.design = sdir, meta, design
+        self.rng = np.random.default_rng([design["session_seed"], self.seed, 0x7C00])
         self.log = TrialLog(sdir / "trials.csv")
         self.done = read_trials(sdir / "trials.csv")
         self.tracks: Dict[int, Track] = {}
         self.trial_index = len(self.done)
+        self.done_slots = self._restore()
+        if self.done_slots:
+            live = sum(1 for t in self.tracks.values() if not t.finished)
+            print(f"  restored {len(self.done_slots)} completed trials: "
+                  f"{len(self.tracks) - live}/{len(self.tracks)} started tracks already finished, "
+                  f"{live} mid-flight")
         return sdir
+
+    def _restore(self) -> set:
+        """Rebuild every staircase from the trial log, and return the slots already done.
+
+        Without this, resuming re-created each Track at its starting delta and replayed the
+        whole session from the top, appending a second copy of every trial. A session of this
+        length has to be splittable across sittings, so resume has to actually resume: the
+        logged responses are fed back through the same rule, in the order they were collected,
+        which leaves each track at exactly the delta and reversal count it had when the listener
+        stopped. Catch trials occupy a slot but never touched a staircase, so they are skipped
+        here for the same reason they were skipped then.
+        """
+        rows = [r for r in self.done if r.get("phase") in ("main", "catch")]
+        if not rows:
+            return set()
+        by_id = {t["track_id"]: t for t in self.design["tracks"]}
+        done_slots = set()
+        for r in sorted(rows, key=lambda r: int(float(r["slot_index"] or 0))):
+            done_slots.add(int(float(r["slot_index"] or 0)))
+            if r.get("phase") == "catch":
+                continue
+            tid = int(float(r["track_id"]))
+            spec = by_id.get(tid)
+            if spec is None:
+                continue
+            t = self.tracks.setdefault(tid, Track(self.cfg, spec["condition"], spec["seed"]))
+            if not t.finished:
+                t.update(bool(int(float(r["correct"]))))
+        return done_slots
 
     def panel(self, code: Optional[str]) -> dict:
         known = load_participants(self.data_dir)
@@ -359,7 +401,11 @@ class Runner:
             getkey({" "}, "press space to begin ")
 
         seen_blocks = set()
+        done_slots = getattr(self, "done_slots", set())
         for slot in slots:
+            if slot["index"] in done_slots:
+                seen_blocks.add(slot["block_index"])
+                continue
             tid = slot["track_id"]
             tr_spec = by_id[tid]
             if tid not in self.tracks:

@@ -488,3 +488,78 @@ def test_the_battery_catches_a_broken_stimulus():
     from tcoh.config import ConfigError
     with pytest.raises(ConfigError):
         V.run_battery(CFG.replace(df_semitones=1.0), quick=True)
+
+
+# ============================================================ resume
+def _run_partial(cfg, data_dir, n_trials, code="P", seed=3):
+    """Run a simulated session and stop after n_trials, as a listener quitting mid-sitting."""
+    from tcoh.runner import QuitRequested
+    r = Runner(cfg, data_dir, audio=False, auto="coherence", seed=seed)
+    sdir = r.start(code=code)
+    r.calibrate()
+    n = {"i": 0}
+    orig = r._present
+
+    def stopping(*a, **k):
+        if n["i"] >= n_trials:
+            raise QuitRequested()
+        n["i"] += 1
+        return orig(*a, **k)
+
+    r._present = stopping
+    r.main_block()
+    return r, sdir
+
+
+def _state(t):
+    return (round(t.delta, 9), t.step_index, t.n_correct_run, t.direction,
+            len(t.trials), len(t.reversals), t.finished, t.threshold_ms())
+
+
+def test_resume_puts_every_staircase_back_exactly_where_it_was(tmp_path):
+    """A 121-minute session has to be splittable, so resume has to actually resume.
+
+    Before this was fixed the runner read the trial log and then built every Track from its
+    starting delta, replaying the whole session and appending a second copy of every trial.
+    """
+    r1, sdir = _run_partial(CFG, tmp_path, 400)
+    before = {tid: _state(t) for tid, t in r1.tracks.items()}
+    assert before, "the partial run produced no tracks"
+
+    r2 = Runner(CFG, tmp_path, audio=False, auto="coherence", seed=3)
+    r2.start(code="P", resume=True)
+    after = {tid: _state(t) for tid, t in r2.tracks.items()}
+    assert after == before
+
+
+def test_resume_does_not_repeat_a_trial_and_still_finishes(tmp_path):
+    _run_partial(CFG, tmp_path, 400)
+    r2 = Runner(CFG, tmp_path, audio=False, auto="coherence", seed=3)
+    sdir = r2.run(code="P", resume=True)
+    rows = list(csv.DictReader(open(sdir / "trials.csv")))
+    slots = [int(float(x["slot_index"])) for x in rows if x["slot_index"]]
+    assert len(slots) == len(set(slots)), "a resumed session re-ran trials it had already done"
+    assert all(t.stop_reason == "converged" for t in r2.tracks.values())
+    # and the thresholds are still recomputable from the log alone
+    rep = replay_tracks(load([sdir])[0], CFG)
+    assert all(a["threshold_ms"] is not None for a in rep.values())
+
+
+def test_the_per_trial_stream_differs_between_participants_and_sessions(tmp_path):
+    """Which interval holds the target must not be the same sequence for everyone.
+
+    It was: the stimulus generator was seeded from a constant, so every participant got an
+    identical run of target positions. Balanced, and no use to a listener, but any accidental
+    structure would have been shared by the whole sample instead of averaging out.
+    """
+    seqs = {}
+    for code, idx in (("AA", 1), ("BB", 1), ("AA", 2)):
+        r = Runner(CFG, tmp_path, audio=False, auto="coherence", seed=0)
+        r.start(code=code, session_index=idx)
+        seqs[(code, idx)] = [int(r.rng.integers(1, 3)) for _ in range(30)]
+    assert seqs[("AA", 1)] != seqs[("BB", 1)]
+    assert seqs[("AA", 1)] != seqs[("AA", 2)]
+    # but a given participant and session is reproducible
+    r = Runner(CFG, tmp_path, audio=False, auto="coherence", seed=0)
+    r.start(code="AA", session_index=1, resume=True)
+    assert [int(r.rng.integers(1, 3)) for _ in range(30)] == seqs[("AA", 1)]
