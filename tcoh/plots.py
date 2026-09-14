@@ -2,7 +2,8 @@
 
 The set is deliberately small, because each answers a question someone will ask:
 
-    schematic       what does the stimulus actually look like at each dT?
+    trial           what is the listener actually asked, on one trial?
+    schematic       what does the stimulus look like at each dT?
     envelopes       what does the coherence model see, and why does the index move?
     prediction      what is being predicted, with the spread across defensible readings
     tracks          did the staircases converge, or did they wander?
@@ -79,6 +80,116 @@ def schematic(cfg: Config, pcts: Optional[Sequence[float]] = None, path: Optiona
                  "Only the last B tone (outlined) moves; A never moves; B's grid is the same in "
                  "every row.", fontsize=9)
     fig.subplots_adjust(left=0.14, right=0.98, top=0.86, bottom=0.09, hspace=0.45)
+    if path:
+        fig.savefig(path, dpi=150)
+        plt.close(fig)
+    return fig
+
+
+def trial(cfg: Config, lag_pct: float = 50.0, delta_ms: float = 40.0,
+          target_position: int = 2, direction: int = -1, path: Optional[Path] = None):
+    """One whole trial, plus a zoom on the ending where the one difference lives.
+
+    The `schematic` figure shows what changes across conditions; this shows what the listener
+    is actually asked on a single trial, which is the question people ask first.
+
+    The zoom is not decoration. At threshold delta is a few milliseconds against a trial nearly
+    three seconds long -- about one part in a thousand -- so a whole-trial view cannot show the
+    manipulation at all, and a first version of this figure duly showed a red arrow two pixels
+    wide. The top row is for the structure; the bottom row is for the thing being detected.
+
+    `direction` defaults to -1, an EARLY shift, for drawing rather than for science: a late
+    shift at an intermediate dT slides the last B tone onto the last A tone, so the interval
+    that is supposed to look wrong comes out looking more aligned than the other one. In the
+    experiment the direction is randomised per trial and both are logged.
+    """
+    delta_ms = abs(delta_ms)
+    signed = delta_ms * (1 if direction >= 0 else -1)
+    plt = _mpl()
+    d = validate(cfg)
+    b = b_onsets(cfg)
+    a = b + cfg.lag_ms(lag_pct)
+    iv_ms = float(b[-1] + cfg.tone_ms + cfg.tail_ms)
+    gap = cfg.isi_ms
+
+    fig = plt.figure(figsize=(11, 5.4))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.15, 1.0], hspace=0.62, wspace=0.10)
+    top = fig.add_subplot(gs[0, :])
+
+    def draw(ax, off, shift, tone_w=None):
+        for on in a:
+            ax.add_patch(plt.Rectangle((off + on, 0.08), cfg.tone_ms, 0.34, fc="#4477aa", ec="none"))
+        for i, on in enumerate(b):
+            last = i == b.size - 1
+            x = off + on + (shift if last else 0.0)
+            ax.add_patch(plt.Rectangle((x, 0.56), cfg.tone_ms, 0.34,
+                                       fc="#cc6677" if last else "#88aacc", ec="none"))
+            if last and shift:
+                ax.add_patch(plt.Rectangle((off + on, 0.56), cfg.tone_ms, 0.34, fc="none",
+                                           ec="#cc3311", ls=(0, (3, 2)), lw=1.4))
+
+    # ---- whole trial ----------------------------------------------------------
+    for which in (1, 2):
+        off = 0.0 if which == 1 else iv_ms + gap
+        shift = signed if which == target_position else 0.0
+        draw(top, off, shift)
+        top.text(off + iv_ms / 2, 1.30,
+                 f"interval {which}" + ("   \u2190 the odd one out" if shift else ""),
+                 ha="center", va="center", fontsize=10.5,
+                 color="#cc3311" if shift else "#333333",
+                 fontweight="bold" if shift else "normal")
+        top.add_patch(plt.Rectangle((off, 0.02), iv_ms, 0.94, fc="none", ec="#bbbbbb", lw=0.8))
+    top.annotate("", (iv_ms + gap, 0.49), (iv_ms, 0.49),
+                 arrowprops=dict(arrowstyle="<->", color="#888888", lw=1))
+    top.text(iv_ms + gap / 2, 0.43, f"{gap:g} ms", ha="center", va="top", fontsize=8.5,
+             color="#666666")
+    top.set_xlim(-60, 2 * iv_ms + gap + 60)
+    top.set_ylim(0, 1.5)
+    top.set_yticks([0.25, 0.73])
+    top.set_yticklabels([f"A  {cfg.f_a_hz:.0f} Hz", f"B  {d.f_b_hz:.0f} Hz"], fontsize=9)
+    top.set_xlabel("time (ms)", fontsize=9)
+    top.tick_params(axis="y", length=0)
+    for sp in ("top", "right", "left"):
+        top.spines[sp].set_visible(False)
+
+    # ---- the ending of each interval, magnified ---------------------------------
+    win_lo = float(b[-2]) - 30.0 - delta_ms
+    win_hi = float(b[-1]) + cfg.tone_ms + delta_ms + 40.0
+    for col, which in enumerate((1, 2)):
+        ax = fig.add_subplot(gs[1, col])
+        shift = signed if which == target_position else 0.0
+        draw(ax, 0.0, shift)
+        ax.set_xlim(win_lo, win_hi)
+        ax.set_ylim(0, 1.45)
+        ax.set_yticks([0.25, 0.73])
+        ax.set_yticklabels([f"A", f"B"] if col == 0 else ["", ""], fontsize=9)
+        ax.tick_params(axis="y", length=0, labelsize=8)
+        ax.tick_params(axis="x", labelsize=8)
+        for sp in ("top", "right", "left"):
+            ax.spines[sp].set_visible(False)
+        if shift:
+            y = 1.10
+            ax.annotate("", (float(b[-1]) + shift, y), (float(b[-1]), y),
+                        arrowprops=dict(arrowstyle="->", color="#cc3311", lw=2))
+            ax.text(float(b[-1]) + shift / 2, y + 0.05,
+                    f"$\\delta$ = {delta_ms:g} ms {'early' if shift < 0 else 'late'}",
+                    ha="center", va="bottom", fontsize=9.5, color="#cc3311")
+            ax.text(float(b[-1]) + cfg.tone_ms / 2, 0.50, "where it should have been",
+                    ha="center", va="center", fontsize=7.5, color="#cc3311")
+            ax.set_title("interval 2, magnified  \u2014  the last B tone has moved",
+                         fontsize=9.5, color="#cc3311")
+        else:
+            ax.text(float(b[-1]) + cfg.tone_ms / 2, 1.10, "in step", ha="center", va="bottom",
+                    fontsize=9, color="#666666")
+            ax.set_title("interval 1, magnified  \u2014  nothing has moved", fontsize=9.5,
+                         color="#333333")
+        ax.set_xlabel("time (ms)", fontsize=8)
+
+    fig.suptitle("One trial.  The two sounds are identical except that in ONE of them the last "
+                 "high tone is out of place.\n"
+                 f"Which one?   Drawn at $\\Delta$T = {lag_pct:g}% and with $\\delta$ "
+                 "exaggerated; at threshold it is a few milliseconds.", fontsize=10.5)
+    fig.subplots_adjust(left=0.09, right=0.985, top=0.84, bottom=0.09)
     if path:
         fig.savefig(path, dpi=150)
         plt.close(fig)
@@ -285,7 +396,8 @@ def write_all(cfg: Config, outdir: Path, rows: Optional[Sequence[dict]] = None,
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     made = []
-    for name, fn in (("schematic", lambda p: schematic(cfg, path=p)),
+    for name, fn in (("trial", lambda p: trial(cfg, path=p)),
+                     ("schematic", lambda p: schematic(cfg, path=p)),
                      ("envelopes", lambda p: envelopes(cfg, path=p)),
                      ("prediction", lambda p: prediction(cfg, path=p))):
         p = outdir / f"tcoh_{name}.png"

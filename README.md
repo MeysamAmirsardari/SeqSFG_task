@@ -1255,6 +1255,8 @@ are normalised between two conditions measured in the same session — ΔT = 0% 
 B-only (low tone switched off) — giving a behavioural quantity on the same 0-to-1 scale as
 λ₂/λ₁, with no free parameter.
 
+![one trial of the two-tone coherence task](tcoh/verification/tcoh_trial.png)
+
 ```bash
 python -m tcoh design      # conditions, geometry, duration
 python -m tcoh model       # the prediction, checked against the published figure

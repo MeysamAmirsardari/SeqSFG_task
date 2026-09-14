@@ -27,6 +27,11 @@ and thresholds are an order of magnitude worse. Sweeping ΔT and normalising the
 between those two endpoints gives a behavioural quantity on the same 0-to-1 scale as the
 model's λ₂/λ₁.
 
+![one trial](verification/tcoh_trial.png)
+
+And the same stimulus across the whole ΔT sweep — note that only the outlined tone ever moves,
+and the high tone's grid is identical in every row:
+
 ![the stimulus at each asynchrony](verification/tcoh_schematic.png)
 
 ## Quick start
