@@ -111,7 +111,7 @@ class CondResult:
     lag_pct: float
     a_kind: str
     n_precursor: int
-    track_thresholds: List[float]
+    track_thresholds: List[float]          # usable only; censored ones are held separately
     n_tracks_attempted: int
     geomean_ms: Optional[float]
     fit: Optional[Fit]
@@ -119,6 +119,19 @@ class CondResult:
     prop_correct: float
     ceiling_trials: int
     floor_trials: int
+    censored_thresholds: List[float] = None    # tracks whose averaged reversals hit a clamp
+    censor_side: str = ""                      # "ceiling" | "floor" | ""
+
+    @property
+    def censored(self) -> bool:
+        return bool(self.censored_thresholds)
+
+    @property
+    def bound_ms(self) -> Optional[float]:
+        """The lower (or upper) bound a censored condition supports, if any."""
+        if not self.censored_thresholds:
+            return None
+        return float(np.exp(np.mean(np.log(self.censored_thresholds))))
 
     @property
     def log_thr(self) -> Optional[float]:
@@ -162,11 +175,26 @@ def thresholds(rows: Sequence[dict], cfg: Config, use: str = "replay") -> Dict[s
     conds = {c.name: c for c in d.conditions}
     replay = replay_tracks(rows, cfg)
 
+    # A "reversal" recorded at the delta clamp is not a reversal: the rule called for a step the
+    # track could not take, so the value is the clamp rather than a measurement. Averaging those
+    # in produces a number that looks like a threshold and is really a statement about
+    # delta_max_ms. The pre-registration says such tracks are reported separately and kept out of
+    # kappa; this is where that happens.
     by_cond_tracks: Dict[str, List[float]] = defaultdict(list)
+    censored: Dict[str, List[float]] = defaultdict(list)
+    sides: Dict[str, str] = {}
     attempted: Dict[str, int] = defaultdict(int)
     for tid, a in replay.items():
         attempted[a["condition"]] += 1
-        if a["threshold_ms"] is not None:
+        if a["threshold_ms"] is None:
+            continue
+        used = a.get("reversals_used_ms") or []
+        hi = sum(1 for v in used if v >= cfg.delta_max_ms - 1e-9)
+        lo = sum(1 for v in used if v <= cfg.delta_min_ms + 1e-9)
+        if hi or lo:
+            censored[a["condition"]].append(a["threshold_ms"])
+            sides[a["condition"]] = "ceiling" if hi >= lo else "floor"
+        else:
             by_cond_tracks[a["condition"]].append(a["threshold_ms"])
 
     by_cond_trials: Dict[str, List[dict]] = defaultdict(list)
@@ -190,7 +218,8 @@ def thresholds(rows: Sequence[dict], cfg: Config, use: str = "replay") -> Dict[s
             sorted(thr), attempted.get(name, 0), gm, f, len(tr),
             float(np.mean(correct)) if correct else float("nan"),
             sum(_i(r, "at_ceiling", 0) == 1 for r in tr),
-            sum(_i(r, "at_floor", 0) == 1 for r in tr))
+            sum(_i(r, "at_floor", 0) == 1 for r in tr),
+            sorted(censored.get(name, [])), sides.get(name, ""))
     return out
 
 
@@ -542,7 +571,11 @@ def diagnostics(rows: Sequence[dict], metas: Sequence[dict], cfg: Config,
 
     slopes = {n: r.fit.sigma for n, r in res.items() if r.fit is not None and r.fit.reliable}
     unreliable = [n for n, r in res.items() if r.fit is not None and not r.fit.reliable]
-    n_conv = sum(len(r.track_thresholds) for r in res.values())
+    # a censored track DID converge -- its reversals just sat on a clamp -- so it counts as
+    # converged here and is reported separately as censored. Conflating the two made the
+    # convergence rate look like a problem with the staircase when the problem is delta_max_ms.
+    n_cens = sum(len(r.censored_thresholds or []) for r in res.values())
+    n_conv = sum(len(r.track_thresholds) for r in res.values()) + n_cens
     n_att = sum(r.n_tracks_attempted for r in res.values())
     return {
         "n_main": len(main), "n_catch": len(catch), "n_practice": len(prac),
@@ -553,7 +586,7 @@ def diagnostics(rows: Sequence[dict], metas: Sequence[dict], cfg: Config,
         "target_position_balance_p": pos_p, "response_bias_p": bias_p,
         "rove_favours_target": rove_auc,
         "drift": drift,
-        "tracks_converged": n_conv, "tracks_attempted": n_att,
+        "tracks_converged": n_conv, "tracks_attempted": n_att, "tracks_censored": n_cens,
         "convergence_rate": n_conv / n_att if n_att else float("nan"),
         "ceiling_trials": sum(r.ceiling_trials for r in res.values()),
         "floor_trials": sum(r.floor_trials for r in res.values()),
@@ -614,7 +647,9 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None, n_boot: Optional
     else:
         A("  no catch trials: nothing here can tell you whether the listener stayed awake.")
     A(f"  tracks converged {diag['tracks_converged']}/{diag['tracks_attempted']} "
-      f"({diag['convergence_rate']:.0%})")
+      f"({diag['convergence_rate']:.0%})"
+      + (f", of which {diag['tracks_censored']} are censored by the delta ceiling"
+         if diag["tracks_censored"] else ""))
     if diag["ceiling_trials"] or diag["floor_trials"]:
         A(f"  trials pinned at the delta ceiling {diag['ceiling_trials']}, at the floor "
           f"{diag['floor_trials']}  (a floor-pinned track gives an upper bound, not a threshold)")
@@ -643,13 +678,17 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None, n_boot: Optional
     # ---- thresholds -------------------------------------------------------------
     A("-- thresholds " + "-" * 63)
     A("  condition      dT%   A-kind     tracks   staircase    fit (all trials)   slope   %corr")
+    censored_names = []
     for name, r in sorted(res.items(), key=lambda kv: (kv[1].a_kind, kv[1].lag_pct)):
-        st = f"{r.geomean_ms:7.2f} ms" if r.geomean_ms else "     --   "
+        st = f"{r.geomean_ms:7.2f} ms" if r.geomean_ms else (
+            f">={r.bound_ms:6.1f} ms" if r.censored else "     --   ")
+        if r.censored:
+            censored_names.append(name)
         ft = f"{r.fit.threshold_ms:7.2f} ms" if r.fit else "     --   "
         sl = (f"{r.fit.sigma:5.2f}" if r.fit and r.fit.reliable else ("  ~  " if r.fit else "   --"))
         A(f"  {name:<13} {r.lag_pct:5.1f}  {r.a_kind:<10} "
           f"{len(r.track_thresholds)}/{r.n_tracks_attempted}    {st}    {ft}   {sl}   "
-          f"{r.prop_correct:5.1%}")
+          f"{r.prop_correct:5.1%}" + ("   CENSORED" if r.censored else ""))
     if res:
         both = [(r.geomean_ms, r.fit.threshold_ms) for r in res.values()
                 if r.geomean_ms and r.fit and np.isfinite(r.fit.threshold_ms)]
@@ -657,6 +696,14 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None, n_boot: Optional
             lr = np.log([a for a, _ in both]); lf = np.log([b for _, b in both])
             A(f"  the two routes agree to within a factor of {math.exp(np.max(np.abs(lr - lf))):.2f} "
               f"(r={np.corrcoef(lr, lf)[0, 1]:.3f} on log thresholds)")
+    if censored_names:
+        A("")
+        A(f"  CENSORED: {', '.join(censored_names)}. Some of the reversals averaged into those")
+        A(f"  thresholds sit exactly on the delta {res[censored_names[0]].censor_side} "
+          f"({cfg.delta_max_ms:g} ms). The staircase")
+        A("  called for a step it could not take, so the value recorded is the clamp, not a")
+        A("  measurement. Those conditions are reported as bounds, are kept out of kappa and out")
+        A("  of the tests, and the fix is a wider delta range rather than a longer session.")
     if diag["unreliable_fits"]:
         A(f"  slope not estimable for {len(diag['unreliable_fits'])} condition(s) "
           f"(marked ~): an adaptive track piles its trials at threshold, which pins the")

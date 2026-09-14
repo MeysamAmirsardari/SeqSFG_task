@@ -425,9 +425,12 @@ def test_h2_separates_coherence_from_the_pedestal_rival(simulated):
     rc = interaction_test(thresholds(load([sc])[0], CFG), CFG, n_boot=600, n_perm=4000)
     rp = interaction_test(thresholds(load([sp])[0], CFG), CFG, n_boot=600, n_perm=4000)
     assert rc["ok"] and rp["ok"]
-    assert rc["slope_per_pct"] < 0 < rp["slope_per_pct"]
+    # the decision, not the sign of a null slope: under the pedestal truth the slope is zero, so
+    # which side of zero it lands on is a coin flip and asserting it was over-specified.
     assert rc["p_slope_negative"] < 0.05
     assert rp["p_slope_negative"] > 0.05
+    assert rc["slope_per_pct"] < 0
+    assert rc["slope_per_pct"] < rp["slope_per_pct"]
     assert rc["p_method"].startswith("permutation")
 
 
@@ -445,6 +448,10 @@ def test_the_diagnostics_notice_the_things_they_are_for(simulated):
     dg = diagnostics(rows, metas, CFG, thresholds(rows, CFG))
     assert dg["catch_ok"]
     assert dg["convergence_rate"] == 1.0
+    # Some censoring is normal: a staircase whose threshold is 15 ms still wanders, and with
+    # delta_max at 45 ms the odd reversal lands on the clamp. What would not be normal is most
+    # of them, which is what a real session showed and what prompted this check existing.
+    assert dg["tracks_censored"] <= 0.15 * dg["tracks_attempted"]
     assert 0.4 < dg["rove_favours_target"] < 0.6
     assert dg["auto"] == ["coherence"]
 
