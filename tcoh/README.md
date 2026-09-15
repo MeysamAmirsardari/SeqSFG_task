@@ -224,6 +224,15 @@ tcoh/
   PREREGISTRATION.md
 ```
 
+Two notebooks:
+
+- [`notebooks/tcoh_two_tone_coherence.ipynb`](notebooks/tcoh_two_tone_coherence.ipynb) — the
+  short version: what the task is, what it sounds like, what is predicted, what was checked.
+- [`notebooks/tcoh_reference.ipynb`](notebooks/tcoh_reference.ipynb) — the full one, with the
+  arithmetic: every parameter, the exact onsets, the δ geometry, the filter bank, the staircase
+  simulation, the design audit, the whole verification battery, power, and worked runs under
+  both the hypothesis and the rival.
+
 Tests are in `tests/test_tcoh.py` and `tests/test_tcoh_model.py` (73 of them; `pytest` from the
 repository root runs them alongside everything else).
 
