@@ -379,17 +379,26 @@ def procedure_checks(cfg: Config, quick: bool = True) -> List[Check]:
 
     des = make_design(cfg, "VERIFY", 1)
     a = audit_design(cfg, des)
+    one_track = cfg.tracks_per_condition < 2
+    if one_track:
+        detail = ("With one track per condition there is a single round, so each condition is "
+                  "heard once at a fixed point in the session and its position IS its identity. "
+                  "No ordering can fix that; only a second track can. Expected for a feasibility "
+                  "preset, disqualifying for a measurement one. Serial-position spread "
+                  f"{a['serial_position_spread']:.2f} of the session.")
+    else:
+        detail = (f"every condition contributes exactly one track per round (mean round index "
+                  f"varies by {a['round_balance_spread']:.1e}), so each gets one track in each "
+                  f"{1 / cfg.tracks_per_condition:.0%} of the session by construction. Within "
+                  f"that, mean serial position still varies by "
+                  f"{a['serial_position_spread']:.3f} of the session across "
+                  f"{len(a['tracks_per_condition'])} conditions. A slow drift across the session "
+                  f"therefore cannot line up with dT; `analysis.diagnostics` measures the drift "
+                  f"itself as well.")
     out.append(Check("no condition is confounded with time in the session",
-                     a["round_balance_spread"] < 1e-9 and a["serial_position_spread"] < 0.10
-                     and a["balanced_track_count"],
-                     f"every condition contributes exactly one track per round (mean round index "
-                     f"varies by {a['round_balance_spread']:.1e}), so each gets one track in each "
-                     f"{1 / cfg.tracks_per_condition:.0%} of the session by construction. Within "
-                     f"that, mean serial position still varies by "
-                     f"{a['serial_position_spread']:.3f} of the session across "
-                     f"{len(a['tracks_per_condition'])} conditions -- a residue of blocks that do "
-                     f"not divide evenly. A slow drift across the session therefore cannot line up "
-                     f"with dT; `analysis.diagnostics` measures the drift itself as well."))
+                     (not one_track) and a["round_balance_spread"] < 1e-9
+                     and a["serial_position_spread"] < 0.10 and a["balanced_track_count"],
+                     detail))
     out.append(Check("no condition repeats more than the configured run length",
                      a["run_constraint_respected"],
                      f"longest planned run {a['longest_condition_run']}, limit "

@@ -181,6 +181,14 @@ class Config:
     # ---- catch trials --------------------------------------------------------
     catch_rate: float = 0.06             # fraction of main trials replaced by a supra-threshold one
     catch_delta_ms: float = 45.0         # the shift used on those; must be detectable by anyone
+    catch_at_pct: Optional[float] = None
+    # Which condition a catch trial is built from. None means "whichever track hosts the slot",
+    # which is what the first design did and what the first real session showed to be wrong: a
+    # fixed 50 ms probe is eight times threshold at dT = 0% and barely above it at dT = 100%, so
+    # its difficulty tracks the condition and a miss says nothing about attention. Set it to a
+    # lag_pct -- 0.0 is the obvious choice -- and every catch trial is the same easy stimulus
+    # wherever it lands, which is the only way a lapse probe measures lapses. The listener
+    # cannot pick them out, because trials at that lag occur normally anyway.
     max_catch_miss_rate: float = 0.15    # above this the session is flagged as inattentive
 
     # ---- procedure -----------------------------------------------------------
@@ -192,6 +200,11 @@ class Config:
     response_timeout_s: float = 6.0
     break_every: int = 8                 # tracks between offered breaks
     max_same_condition_run: int = 2      # consecutive trials from one track when interleaving
+    tracks_per_block: Optional[int] = None
+    # How many tracks are interleaved at once. None picks it: the block size has to divide the
+    # number of conditions, or some condition sits in the short block every round and ends up
+    # systematically late. With five conditions in blocks of three the serial-position spread
+    # was 0.185 of the session; interleaving all five gives 0.
 
     # ---- streams block (secondary, subjective) -------------------------------
     streams_block: bool = False          # "one sound or two?" at each dT, no timing manipulation
@@ -338,6 +351,62 @@ def conditions(cfg: Config) -> Tuple[Condition, ...]:
     return tuple(out)
 
 
+FUSION_MARGIN_MS = 25.0
+# How close two tones may come before they stop being two events. Onset-asynchrony DETECTION
+# runs to a few milliseconds, but two tones still fuse into one perceived event well beyond
+# that; 25 ms is a deliberately conservative reading of that literature and is used only to
+# bound delta, never to model anything.
+
+
+def displaced_tone_clearance(cfg: Config, lag_pct: float, delta_ms: float,
+                             direction: int) -> dict:
+    """How close the displaced final B tone comes to anything else, and whether that is new.
+
+    Two separate hazards, and only the second is subtle.
+
+    The obvious one: shifted early, the tone walks back towards the PRECEDING B tone in its own
+    channel. `b_gap_ms` is what is left; at zero they abut and fuse into one tone of twice the
+    duration.
+
+    The subtle one: shifted LATE, it walks towards its own A partner, which lags it by exactly
+    `lag`. At delta = lag the two coincide and the listener hears a chord that the standard
+    interval did not contain. That is not a larger version of the same cue, it is a different
+    cue, and it is available at every dT above zero -- worst at small lags, where it sits right
+    where the staircase starts. Shifted EARLY the same tone moves AWAY from its partner and
+    towards the previous A instead, which is `soa - lag` away, so the clean range is much wider.
+
+    dT = 0% is the exception that proves it: there the standard IS the chord and any shift
+    breaks it, so `makes_more_synchronous` is False and the shrinking separation is the signal.
+    """
+    lag = cfg.lag_ms(lag_pct)
+    sign = 1 if direction >= 0 else -1
+    own = abs(lag - sign * delta_ms)          # to its own A partner after the shift
+    prev = abs((cfg.soa_ms - lag) + sign * delta_ms)   # to the A tone before that
+    return {"a_sep_ms": min(own, prev),
+            "b_gap_ms": cfg.soa_ms - cfg.tone_ms - (delta_ms if sign < 0 else 0.0),
+            "makes_more_synchronous": bool(own < lag - 1e-9),
+            "own_a_sep_ms": own, "prev_a_sep_ms": prev}
+
+
+def max_safe_delta_ms(cfg: Config, pcts: Sequence[float], direction: int,
+                      margin_ms: float = FUSION_MARGIN_MS) -> float:
+    """The largest delta that keeps every condition clear of both hazards, or 0 if none does."""
+    best = 0.0
+    for dl in np.arange(1.0, cfg.soa_ms - cfg.tone_ms, 0.5):
+        ok = True
+        for p in pcts:
+            g = displaced_tone_clearance(cfg, p, float(dl), direction)
+            if g["b_gap_ms"] < margin_ms:
+                ok = False
+            if p > 0 and (g["makes_more_synchronous"] or g["a_sep_ms"] < margin_ms):
+                ok = False
+            if not ok:
+                break
+        if ok:
+            best = float(dl)
+    return best
+
+
 def interval_ms(cfg: Config, n_precursor: Optional[int] = None) -> float:
     """How long one interval lasts, for a sequence with this many precursors.
 
@@ -439,8 +508,33 @@ def validate(cfg: Config) -> Derived:
         if c.reference == "tempo" and c.tempo_gap_ms is None:
             raise ConfigError(f"{c.name}: reference='tempo' needs tempo_gap_ms")
 
-    # a shift must not carry the final B tone into the tone before it
+    # a shift must not carry the final B tone into the tone before it, nor onto an A tone
     headroom = cfg.soa_ms - cfg.tone_ms
+    sweep = sorted({c.lag_pct for c in conds if c.a_kind == "coherent"})
+    if sweep:
+        dirs = ((-1,), (1,), (-1, 1))[{"backward": 0, "forward": 1, "random": 2}[cfg.delta_direction]]
+        safe = min(max_safe_delta_ms(cfg, sweep, s) for s in dirs)
+        if cfg.delta_max_ms > safe:
+            worst = None
+            for p in sweep:
+                for s in dirs:
+                    g = displaced_tone_clearance(cfg, p, cfg.delta_max_ms, s)
+                    if p > 0 and (g["makes_more_synchronous"] or g["a_sep_ms"] < FUSION_MARGIN_MS):
+                        worst = (p, "late" if s > 0 else "early", g)
+                        break
+                if worst:
+                    break
+            where = ("" if worst is None else
+                     f" At dT={worst[0]:g}% a {worst[1]} shift of {cfg.delta_max_ms:g} ms brings it "
+                     f"within {worst[2]['a_sep_ms']:.1f} ms of an A tone"
+                     + (", MORE synchronous with its partner than the standard is."
+                        if worst[2]["makes_more_synchronous"] else "."))
+            notes.append(
+                f"delta_max_ms={cfg.delta_max_ms:g} exceeds the {safe:.0f} ms this geometry supports "
+                f"with a {FUSION_MARGIN_MS:.0f} ms fusion margin.{where} Near that delta the "
+                "listener is detecting a chord that appeared rather than a tone that moved. "
+                "Lower delta_max_ms, or set delta_direction='backward', which moves the tone away "
+                "from its partner instead of towards it.")
     if cfg.delta_max_ms >= headroom:
         raise ConfigError(
             f"delta_max_ms={cfg.delta_max_ms} is not less than soa_ms - tone_ms = {headroom:.1f} ms, "
@@ -448,6 +542,17 @@ def validate(cfg: Config) -> Derived:
             "trial would contain a collision rather than a displacement.")
     if cfg.catch_delta_ms > cfg.delta_max_ms:
         raise ConfigError("catch_delta_ms exceeds delta_max_ms")
+    if cfg.catch_at_pct is not None:
+        if not any(abs(c.lag_pct - cfg.catch_at_pct) < 1e-9 and c.a_kind == "coherent"
+                   for c in conds):
+            raise ConfigError(
+                f"catch_at_pct={cfg.catch_at_pct:g} names a coherent condition this design does "
+                "not contain, so the probe would be a stimulus the listener never otherwise hears.")
+    elif cfg.catch_rate > 0:
+        notes.append(
+            "catch trials are built from whichever condition hosts them, so a probe in a hard "
+            "condition is not easy and a miss there does not mean inattention. Set catch_at_pct "
+            "(0.0 is the obvious choice) to make every probe the same easy stimulus.")
     if cfg.delta_start_ms > cfg.delta_max_ms:
         raise ConfigError("delta_start_ms exceeds delta_max_ms")
     if cfg.delta_start_ms * cfg.step_factors[0] > cfg.delta_max_ms:

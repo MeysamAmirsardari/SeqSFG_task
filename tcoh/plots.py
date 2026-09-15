@@ -3,6 +3,7 @@
 The set is deliberately small, because each answers a question someone will ask:
 
     trial           what is the listener actually asked, on one trial?
+    pilot_curve     the descriptive pilot's one output: threshold against onset lag
     schematic       what does the stimulus look like at each dT?
     envelopes       what does the coherence model see, and why does the index move?
     prediction      what is being predicted, with the spread across defensible readings
@@ -337,6 +338,95 @@ def curve(cfg: Config, idx: dict, control_idx: Optional[dict] = None,
     ax.set_title(title, fontsize=9, color="#cc3311" if simulated else "black")
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    if path:
+        fig.savefig(path, dpi=150)
+        plt.close(fig)
+    return fig
+
+
+def pilot_curve(cfg: Config, res, path: Optional[Path] = None, title: Optional[str] = None,
+                simulated: bool = False):
+    """The descriptive pilot's one figure: threshold against onset lag.
+
+    Axis runs 100% on the LEFT to 0% on the RIGHT, matching Figure 8B of Elhilali et al. (2009),
+    so the two can be laid side by side. That is the only relationship claimed between them.
+    What is plotted here is a detection threshold in milliseconds, measured behaviourally; it is
+    not lambda2/lambda1, it is not a rescaling of it, and no normalisation against a B-only
+    ceiling is computed, because this preset does not measure one.
+
+    Individual tracks are drawn as well as their geometric mean, because with two tracks per
+    condition the mean of two numbers is not a summary anyone should read without seeing both.
+    Tracks that did not converge, or whose averaged reversals sat on the delta clamp, are shown
+    in their own marker and take no part in the mean.
+    """
+    plt = _mpl()
+    d = validate(cfg)
+    pcts = sorted({c.lag_pct for c in d.conditions if c.a_kind == "coherent"})
+    fig, ax = plt.subplots(figsize=(7.0, 4.8))
+
+    gm_x, gm_y, any_cens, n_missing = [], [], False, 0
+    for p in pcts:
+        r = next((v for v in res.values()
+                  if v.a_kind == "coherent" and abs(v.lag_pct - p) < 1e-9
+                  and v.n_precursor == cfg.n_precursor), None)
+        if r is None:
+            continue
+        good = list(r.track_thresholds)
+        cens = list(r.censored_thresholds or [])
+        n_missing += max(0, r.n_tracks_attempted - len(good) - len(cens))
+        if good:
+            # nudged apart in x so two tracks with similar thresholds stay two visible points,
+            # and so neither hides under the mean marker drawn on top of them
+            off = np.linspace(-2.2, 2.2, len(good)) if len(good) > 1 else np.zeros(1)
+            ax.plot(p + off, good, "o", ms=6, mfc="white", mec="#4477aa", mew=1.6, zorder=6)
+            g = float(np.exp(np.mean(np.log(good))))
+            gm_x.append(p)
+            gm_y.append(g)
+        for v in cens:
+            any_cens = True
+            ax.plot([p], [v], "v", ms=9, color="#cc3311", zorder=4)
+            ax.annotate("", (p, v * 1.45), (p, v * 1.05),
+                        arrowprops=dict(arrowstyle="->", color="#cc3311", lw=1.5))
+    if gm_x:
+        ax.plot(gm_x, gm_y, "-", color="#333333", lw=2, zorder=4)
+        ax.plot(gm_x, gm_y, "o", ms=11, color="#333333", zorder=5,
+                label="geometric mean of usable tracks")
+    ax.plot([], [], "o", ms=6, mfc="white", mec="#4477aa", mew=1.6, label="individual track")
+    if any_cens:
+        ax.plot([], [], "v", ms=9, color="#cc3311",
+                label=f"hit the {cfg.delta_max_ms:g} ms ceiling — a bound, not a threshold")
+    if cfg.delta_max_ms:
+        ax.axhline(cfg.delta_max_ms, color="#cc3311", ls="--", lw=1.2)
+        ax.text(-10, cfg.delta_max_ms * 1.05, f"ceiling {cfg.delta_max_ms:g} ms", fontsize=8,
+                color="#cc3311", va="bottom", ha="right")
+
+    ax.set_xlim(112, -12)                # 100% alternation on the LEFT, 0% synchrony on the RIGHT
+    ax.set_xticks(pcts)
+    ax.set_yscale("log")
+    ax.minorticks_off()
+    lo = min([v for v in gm_y] or [2.0]) * 0.6
+    ticks = [t for t in (1, 2, 3, 5, 8, 12, 20, 30, 50, 80) if lo <= t <= cfg.delta_max_ms * 1.9]
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([str(t) for t in ticks])
+    ax.set_ylim(lo, cfg.delta_max_ms * 1.55)
+    ax.set_xlabel("onset lag ΔT  (% of half the repetition period)\n"
+                  "100% = alternating                                        0% = synchronous",
+                  fontsize=9)
+    ax.set_ylabel("final-B displacement threshold (ms)")
+    sec = ax.secondary_xaxis("top")
+    sec.set_xticks(pcts)
+    sec.set_xticklabels([f"{cfg.lag_ms(p):.0f}" for p in pcts], fontsize=8)
+    sec.set_xlabel("the same axis in milliseconds of lag", fontsize=8.5)
+
+    t = title or "Displacement threshold against onset asynchrony"
+    if simulated:
+        t = "SIMULATED DATA — " + t
+    if n_missing:
+        t += f"\n{n_missing} track(s) did not converge and are not shown"
+    ax.set_title(t, fontsize=10, color="#cc3311" if simulated else "black")
+    ax.legend(fontsize=8, frameon=False, loc="lower left")
+    ax.spines["right"].set_visible(False)
     fig.tight_layout()
     if path:
         fig.savefig(path, dpi=150)

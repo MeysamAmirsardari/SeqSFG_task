@@ -570,3 +570,175 @@ def test_the_per_trial_stream_differs_between_participants_and_sessions(tmp_path
     r = Runner(CFG, tmp_path, audio=False, auto="coherence", seed=0)
     r.start(code="AA", session_index=1, resume=True)
     assert [int(r.rng.integers(1, 3)) for _ in range(30)] == seqs[("AA", 1)]
+
+
+# ============================================================ the descriptive pilot
+import json as _json
+
+PILOT = Config.from_dict(_json.load(open("tcoh/configs/tcoh_pilot.json")))
+
+
+def test_the_pilot_preset_is_five_coherent_conditions_and_nothing_else():
+    d = validate(PILOT)
+    assert [c.lag_pct for c in d.conditions] == [0.0, 25.0, 50.0, 75.0, 100.0]
+    assert {c.a_kind for c in d.conditions} == {"coherent"}
+    assert PILOT.tracks_per_condition == 2
+    assert d.n_tracks == 10
+    assert not PILOT.include_b_only
+    assert PILOT.scrambled_pcts == () and PILOT.pair_only_pcts == () and PILOT.buildup_pcts == ()
+
+
+def test_the_pilot_keeps_the_convergence_requirements_of_the_full_design():
+    """Fewer conditions and fewer repeats -- not a cheaper threshold."""
+    for f in ("n_down", "step_factors", "reversals_per_step", "n_final_reversals",
+              "max_trials_per_track", "practice_criterion", "soa_ms", "tone_ms", "n_precursor"):
+        assert getattr(PILOT, f) == getattr(CFG, f), f
+
+
+def test_each_condition_is_measured_once_before_any_is_measured_twice():
+    des = make_design(PILOT, "P01", 1)
+    first, second = {}, {}
+    for t in des["tracks"]:
+        (first if t["round_index"] == 0 else second).setdefault(t["condition"], 0)
+        (first if t["round_index"] == 0 else second)[t["condition"]] += 1
+    assert set(first) == set(second) == set(des["conditions"])
+    assert set(first.values()) == set(second.values()) == {1}
+    # and every round-0 track is scheduled before every round-1 track
+    by_track = {t["track_id"]: t["round_index"] for t in des["tracks"]}
+    last0 = max(s["index"] for s in des["slot_plan"] if by_track[s["track_id"]] == 0)
+    first1 = min(s["index"] for s in des["slot_plan"] if by_track[s["track_id"]] == 1)
+    assert last0 < first1
+
+
+def test_the_pilot_fits_in_under_an_hour_as_an_estimate():
+    e = duration_estimate(PILOT)
+    assert e["total_minutes"] < 60
+    assert e["worst_case_minutes"] > e["total_minutes"], "a cap is not an estimate"
+
+
+# ---- the delta geometry ------------------------------------------------------
+def test_a_late_shift_moves_the_tone_towards_its_partner_and_an_early_one_away():
+    from tcoh.config import displaced_tone_clearance
+    lag = CFG.lag_ms(25.0)
+    late = displaced_tone_clearance(CFG, 25.0, lag, +1)
+    early = displaced_tone_clearance(CFG, 25.0, lag, -1)
+    assert late["own_a_sep_ms"] == pytest.approx(0.0, abs=1e-9), "a late shift of exactly the lag lands ON the A tone"
+    assert late["makes_more_synchronous"]
+    assert early["own_a_sep_ms"] == pytest.approx(2 * lag)
+    assert not early["makes_more_synchronous"]
+
+
+def test_late_shifts_are_unusable_across_the_sweep_and_early_ones_reach_50ms():
+    from tcoh.config import max_safe_delta_ms
+    pcts = [0.0, 25.0, 50.0, 75.0, 100.0]
+    assert max_safe_delta_ms(CFG, pcts, +1) == 0.0
+    assert max_safe_delta_ms(CFG, pcts, -1) == pytest.approx(50.0)
+
+
+def test_the_pilot_delta_ceiling_is_within_what_the_geometry_supports():
+    from tcoh.config import max_safe_delta_ms
+    pcts = sorted({c.lag_pct for c in validate(PILOT).conditions})
+    assert PILOT.delta_direction == "backward"
+    assert PILOT.delta_max_ms <= max_safe_delta_ms(PILOT, pcts, -1)
+    assert PILOT.delta_max_ms < PILOT.soa_ms - PILOT.tone_ms      # no collision with the previous B
+    assert not any("exceeds the" in n for n in validate(PILOT).notes)
+
+
+def test_a_too_wide_ceiling_is_flagged_rather_than_accepted():
+    notes = validate(CFG.replace(delta_max_ms=70.0, delta_direction="backward")).notes
+    assert any("fusion margin" in n for n in notes)
+
+
+def test_nothing_clips_at_the_pilot_ceiling():
+    d = validate(PILOT)
+    peak = 0.0
+    for c in d.conditions:
+        for dl in (PILOT.delta_min_ms, 20.0, PILOT.delta_max_ms):
+            tr = S.build_trial(PILOT, c, dl, np.random.default_rng(1))
+            iv = S.Interval(tr.first.a_onsets_ms, tr.first.b_onsets_ms, tr.first.delta_ms,
+                            PILOT.level_rove_db, c.a_kind, c.lag_pct)
+            peak = max(peak, float(np.max(np.abs(S.render_interval(PILOT, iv, d, tr.phases)))))
+    assert peak < 0.95
+
+
+# ---- catch trials ------------------------------------------------------------
+def test_catch_trials_are_built_from_one_easy_condition_wherever_they_land(tmp_path):
+    """A fixed shift is not an easy trial in a hard condition, so it cannot measure lapses."""
+    assert PILOT.catch_at_pct == 0.0
+    r = Runner(PILOT, tmp_path, audio=False, auto="coherence", seed=4)
+    sdir = r.run(code="P")
+    rows = list(csv.DictReader(open(sdir / "trials.csv")))
+    catch = [x for x in rows if x["phase"] == "catch"]
+    assert catch
+    assert {x["condition"] for x in catch} == {"coh_0"}
+    assert all(abs(float(x["delta_ms"]) - PILOT.catch_delta_ms) < 1e-9 for x in catch)
+    assert all(x["track_trial_index"] == "" for x in catch)     # still no effect on any staircase
+
+
+def test_a_catch_condition_the_design_does_not_contain_is_refused():
+    from tcoh.config import ConfigError
+    with pytest.raises(ConfigError, match="never otherwise hears"):
+        validate(PILOT.replace(catch_at_pct=37.5))
+
+
+def test_leaving_the_catch_condition_unset_is_flagged():
+    assert any("hard condition is not easy" in n for n in validate(PILOT.replace(catch_at_pct=None)).notes)
+
+
+# ---- the output --------------------------------------------------------------
+def test_the_pilot_refuses_to_compute_kappa():
+    """No B-only ceiling in this preset, so there is nothing to normalise against."""
+    from tcoh.analysis import CondResult
+    res = {c.name: CondResult(c.name, c.lag_pct, c.a_kind, PILOT.n_precursor,
+                              [8.0, 9.0], 2, 8.5, None, 40, 0.79, 0, 0)
+           for c in validate(PILOT).conditions}
+    out = coherence_index(res, PILOT, n_boot=200)
+    assert not out["ok"]
+    assert "b_only" in out["reason"]
+
+
+def test_the_pilot_curve_separates_usable_tracks_from_bounded_ones(tmp_path):
+    from tcoh.analysis import CondResult
+    from tcoh.plots import pilot_curve
+    conds = validate(PILOT).conditions
+    res = {}
+    for i, c in enumerate(conds):
+        cens = [PILOT.delta_max_ms] if c.lag_pct == 100.0 else []
+        good = [] if cens else [4.0 + i, 5.0 + i]
+        res[c.name] = CondResult(c.name, c.lag_pct, c.a_kind, PILOT.n_precursor, good, 2,
+                                 (float(np.exp(np.mean(np.log(good)))) if good else None),
+                                 None, 40, 0.79, 0, 0, cens, "ceiling" if cens else "")
+    fig = pilot_curve(PILOT, res, path=tmp_path / "curve.png")
+    ax = fig.axes[0]
+    lo, hi = ax.get_xlim()
+    assert lo > hi, "100% alternation must be on the LEFT and 0% synchrony on the right"
+    labels = " ".join(t.get_text() for t in ax.get_legend().get_texts()).lower()
+    assert "ceiling" in labels and "individual track" in labels
+    assert "lambda" not in (ax.get_ylabel() + ax.get_title()).lower()
+    assert "ms" in ax.get_ylabel()
+    assert (tmp_path / "curve.png").exists()
+
+
+def test_block_size_divides_the_conditions_so_none_is_systematically_late():
+    from tcoh.design import choose_block_size
+    assert choose_block_size(5) == 5
+    assert choose_block_size(16) == 4
+    a = audit_design(PILOT, make_design(PILOT, "P01", 1))
+    assert a["serial_position_spread"] < 0.05
+
+
+def test_the_feasibility_preset_admits_it_cannot_separate_condition_from_time():
+    feas = Config.from_dict(_json.load(open("tcoh/configs/tcoh_pilot_feasibility.json")))
+    assert feas.tracks_per_condition == 1
+    checks = {c.name: c for v in V.run_battery(feas, quick=True).values() for c in v}
+    c = checks["no condition is confounded with time in the session"]
+    assert not c.passed
+    assert "only a second track can" in c.detail
+
+
+def test_the_older_presets_are_untouched():
+    for name, want_tracks in (("tcoh_core", 33), ("tcoh_full", 57), ("tcoh_screen", 18)):
+        cfg = Config.from_dict(_json.load(open(f"tcoh/configs/{name}.json")))
+        assert validate(cfg).n_tracks == want_tracks, name
+        assert cfg.catch_at_pct is None, f"{name} must keep its recorded behaviour"
+        assert cfg.delta_max_ms == 45.0 and cfg.delta_direction == "random", name

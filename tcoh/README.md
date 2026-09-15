@@ -235,3 +235,54 @@ repository root runs them alongside everything else).
 - κ is normalised by two conditions measured in the same session, so a bad floor or ceiling
   moves the whole curve. Both are reported in milliseconds beside it.
 - One listener generalises to one listener, and the report says so.
+
+---
+
+## The descriptive pilot (`tcoh_pilot`)
+
+A smaller preset whose only job is to **plot behavioural sensitivity across onset asynchrony**,
+so the shape can be compared by eye with Figure 8B of Elhilali et al. (2009).
+
+**Scope, stated plainly: this pilot estimates a behavioural curve. It does not by itself
+establish temporal binding, and it cannot discriminate between the mechanisms that predict such
+a curve.** It has no scrambled control, no pair-only control and no B-only ceiling, so H2 and H3
+cannot run and κ is not computed. The validator says so on every run. What comes out is a
+detection threshold in milliseconds against onset lag — not λ₂/λ₁, not a rescaling of it, and
+not claimed to be equivalent to it.
+
+    five coherent conditions   ΔT = 0, 25, 50, 75, 100%
+    two tracks each            10 tracks, run one round of five before the second round
+    same staircase             3-down 1-up, ×4/×2/×√2, six reversals at the final step
+    duration                   about 45 minutes; up to 90 if every track ran to its cap
+
+```bash
+python -m tcoh run --config tcoh/configs/tcoh_pilot.json --data data --code P01
+python -m tcoh plots data/P01/<session> --config tcoh/configs/tcoh_pilot.json --out <dir>
+```
+
+`tcoh_pilot_feasibility` is the same design with one track per condition, about 26 minutes. It
+is labelled feasibility rather than pilot because with a single round each condition is heard
+once at a fixed point in the session, so condition is confounded with time and no ordering can
+fix it. Its verification battery fails that check on purpose.
+
+### Two things the first real session forced
+
+**The δ ceiling.** Tracks kept hitting 45 ms, and two of the six reversals averaged into those
+thresholds *were* the clamp. Checking the geometry rather than just raising the limit turned up
+something worse: a **late** shift moves the displaced tone *towards* its own A partner, and at
+δ = lag it lands exactly on it, so the listener hears a chord the standard interval did not
+contain — a different cue, not a bigger one, and it is available at every ΔT above zero. An
+**early** shift moves the tone away from its partner instead. So the pilot shifts early only,
+and 50 ms is the most the geometry allows while keeping 25 ms clear of every A tone and of the
+preceding B tone. Nothing clips (17 dB of headroom). `config.max_safe_delta_ms` computes this,
+and `validate` now warns when `delta_max_ms` exceeds it.
+
+Fifty is not much more than forty-five. If a listener's threshold exceeds it, this stimulus
+cannot measure it, and the remedy is a longer repetition period — a different experiment.
+
+**Catch trials.** A fixed 50 ms probe is eight times threshold at ΔT = 0% and barely above it at
+ΔT = 100%, so its difficulty tracked the condition it was hosted in and a miss meant nothing
+about attention. Both misses in the first session were in the two hardest conditions. The pilot
+sets `catch_at_pct = 0.0`, so every probe is the same easy stimulus wherever it lands; the
+listener cannot pick them out because trials at that lag occur normally anyway. The earlier
+session's catch verdict stands as recorded — the rule was not loosened to rescue it.

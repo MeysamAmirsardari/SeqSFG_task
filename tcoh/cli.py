@@ -183,9 +183,17 @@ def cmd_plots(args):
             cfg = Config.from_dict(metas[0]["config"])
         simulated = any(m.get("auto") for m in metas)
         res = thresholds(rows, cfg)
-        idx = coherence_index(res, cfg, n_boot=args.boot)
-        ctl = coherence_index(res, cfg, n_boot=args.boot, a_kind="scrambled")
-        inter = interaction_test(res, cfg, n_boot=args.boot)
+        if cfg.include_b_only:
+            idx = coherence_index(res, cfg, n_boot=args.boot)
+            ctl = coherence_index(res, cfg, n_boot=args.boot, a_kind="scrambled")
+            inter = interaction_test(res, cfg, n_boot=args.boot)
+        else:
+            # a descriptive preset has no ceiling to normalise against, so there is no kappa to
+            # plot and the output is the threshold curve itself
+            from .plots import pilot_curve
+            out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
+            pilot_curve(cfg, res, path=out / "tcoh_pilot_curve.png", simulated=simulated)
+            print(" ", out / "tcoh_pilot_curve.png")
     for p in write_all(cfg, Path(args.out), rows, idx, ctl, inter, simulated=simulated):
         print(" ", p)
 

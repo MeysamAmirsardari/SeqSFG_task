@@ -142,6 +142,9 @@ class Runner:
         self.fast = fast
         self.sim = SimulatedListener(cfg, mode=auto, seed=seed or 20260913) if auto else None
         self.cond = {c.name: c for c in self.d.conditions}
+        self.catch_cond = next((c for c in self.d.conditions
+                                if c.a_kind == "coherent" and cfg.catch_at_pct is not None
+                                and abs(c.lag_pct - cfg.catch_at_pct) < 1e-9), None)
         self.seed = int(seed)
         # replaced in start() by a stream keyed on the session. Seeding the per-trial draws --
         # which interval holds the target, which way the tone moves, the starting phases -- from
@@ -422,16 +425,22 @@ class Runner:
 
             is_catch = bool(slot["is_catch"])
             delta = cfg.catch_delta_ms if is_catch else track.delta
+            probe = cond
+            if is_catch and cfg.catch_at_pct is not None:
+                # the probe is the SAME easy stimulus wherever it lands, so that a miss means a
+                # lapse rather than a hard condition. It is still logged against the track whose
+                # slot it occupied, and still does not update it.
+                probe = self.catch_cond
             n_before = len(track.trials)
             try:
-                out = self._present(cond, delta, is_catch, cfg.feedback)
+                out = self._present(probe, delta, is_catch, cfg.feedback)
             except QuitRequested:
                 self._finish("quit")
                 return
             # a catch trial is a probe, not part of the staircase
             if not is_catch:
                 track.update(out["correct"])
-            self.log.write(self._row("catch" if is_catch else "main", cond, out, slot=slot,
+            self.log.write(self._row("catch" if is_catch else "main", probe, out, slot=slot,
                                      track=None if is_catch else track,
                                      track_trial=None if is_catch else n_before,
                                      feedback=cfg.feedback))

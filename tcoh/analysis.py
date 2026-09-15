@@ -644,6 +644,12 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None, n_boot: Optional
         A(f"  catch trials at {cfg.catch_delta_ms:g} ms: {diag['catch_p_correct']:.1%} correct "
           f"(miss rate {diag['catch_miss_rate']:.1%}, limit {cfg.max_catch_miss_rate:.0%})"
           f"  -> {'OK' if diag['catch_ok'] else 'FAILED: treat every threshold below as unsafe'}")
+        if cfg.catch_at_pct is None:
+            A("    CAVEAT: these probes were built from whichever condition hosted them, so their")
+            A("    difficulty tracked that condition -- many times threshold in an easy one, barely")
+            A("    above it in a hard one. A miss therefore cannot be read as a lapse, and the")
+            A("    verdict above is not a measure of attention either way. The verdict stands as")
+            A("    recorded; the remedy is to re-run with catch_at_pct set, not to reinterpret it.")
     else:
         A("  no catch trials: nothing here can tell you whether the listener stayed awake.")
     A(f"  tracks converged {diag['tracks_converged']}/{diag['tracks_attempted']} "

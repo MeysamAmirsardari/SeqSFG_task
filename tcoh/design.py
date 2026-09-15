@@ -61,8 +61,27 @@ def session_seed(cfg: Config, code: str, session_index: int) -> int:
     return int(h[:12], 16)
 
 
-def make_design(cfg: Config, code: str, session_index: int, tracks_per_block: int = 3) -> dict:
+def choose_block_size(n_conditions: int, want: int = 3) -> int:
+    """A block size that divides the conditions evenly, as near `want` as it can manage.
+
+    An uneven split leaves one short block per round, and whichever condition lands in it every
+    round is heard systematically later than the others -- which is a confound with fatigue and
+    learning, the very thing the round structure exists to prevent. With a small design the
+    answer is simply to interleave everything.
+    """
+    if n_conditions <= 6:
+        return n_conditions
+    exact = [b for b in range(3, 7) if n_conditions % b == 0]
+    if exact:
+        return min(exact, key=lambda b: (abs(b - want), -b))
+    return min(range(3, 7), key=lambda b: (n_conditions % b, abs(b - want)))
+
+
+def make_design(cfg: Config, code: str, session_index: int,
+                tracks_per_block: Optional[int] = None) -> dict:
     d = validate(cfg)
+    if tracks_per_block is None:
+        tracks_per_block = cfg.tracks_per_block or choose_block_size(len(d.conditions))
     seed = session_seed(cfg, code, session_index)
     rng = np.random.default_rng(seed)
     names = [c.name for c in d.conditions]
@@ -265,10 +284,21 @@ def duration_estimate(cfg: Config) -> dict:
     sound_s = d.trial_ms / 1000.0
     per_trial_s = sound_s + 1.6                      # response, feedback, inter-trial
     minutes = n_trials * per_trial_s / 60.0
-    breaks = max(0, (d.n_tracks // max(cfg.break_every, 1)) - 1) * 1.5
+    # breaks are offered between BLOCKS, not between tracks. Counting tracks put fourteen
+    # minutes of imaginary resting into a design that has two blocks and one break.
+    n_blocks = make_design(cfg, "DURATION", 1)["n_blocks"]
+    n_breaks = max(0, (n_blocks - 1) // max(cfg.break_every, 1))
+    breaks = n_breaks * 1.5
     practice = cfg.practice_trials * (sound_s + 2.5) / 60.0
-    return {"n_tracks": d.n_tracks, "median_trials_per_track": per_track,
+    setup = 7.0     # participant panel, level calibration, instructions and familiarisation
+    total = minutes + practice + breaks + setup
+    worst = (d.n_tracks * cfg.max_trials_per_track * (1.0 + cfg.catch_rate) * per_trial_s / 60.0
+             + practice + breaks + setup)
+    return {"n_tracks": d.n_tracks, "n_blocks": n_blocks, "n_breaks": n_breaks,
+            "median_trials_per_track": per_track,
             "n_trials": int(round(n_trials)), "sound_per_trial_s": sound_s,
             "main_minutes": minutes, "practice_minutes": practice, "break_minutes": breaks,
-            "total_minutes": minutes + practice + breaks,
-            "sessions_at_50_min": max(1, int(np.ceil((minutes + practice + breaks) / 50.0)))}
+            "setup_minutes": setup, "total_minutes": total,
+            "worst_case_minutes": worst,
+            "max_trials": int(d.n_tracks * cfg.max_trials_per_track * (1.0 + cfg.catch_rate)),
+            "sessions_at_50_min": max(1, int(np.ceil(total / 50.0)))}
