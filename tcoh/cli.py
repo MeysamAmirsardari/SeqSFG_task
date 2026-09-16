@@ -138,18 +138,69 @@ def cmd_demo(args):
 
 
 def cmd_calibrate(args):
+    """Loop the reference tone, read the machine's output state, and do the arithmetic."""
+    import math
     import numpy as np
     cfg = load_config(args)
-    from .runner import Audio, getkey
+    from .audiolevel import amplitude_for, describe_output, scene_db_spl, system_output
+    from .runner import Audio, ask, getkey
     from .stimulus import to_output
+    d = validate(cfg)
+
+    rms_db = 20 * math.log10(cfg.tone_amplitude / math.sqrt(2))
+    print(f"\n--- level calibration ---")
+    print(f"  reference   {cfg.f_a_hz:.0f} Hz at one stimulus tone's amplitude "
+          f"({cfg.tone_amplitude:g} FS peak, {rms_db:.1f} dB FS rms)")
+    print(f"  target      {cfg.tone_level_db_spl:.0f} dB SPL for ONE tone; the two together come "
+          f"to {scene_db_spl(cfg.tone_level_db_spl):.0f} dB SPL")
+    print(f"  right now   {describe_output()}")
+    if cfg.monaural:
+        print("  NOTE: this configuration is monaural -- LEFT earpiece only.")
+    print("\n  Put the headphones on a coupler or an in-ear probe, or hold a phone SPL app at the")
+    print("  earpiece. Set the system volume, then leave it alone: it is what the measurement is")
+    print("  about, and `tcoh run` records it and warns if it moves.")
+
     a = Audio(cfg.sample_rate, args.device)
-    t = np.arange(int(5 * cfg.sample_rate)) / cfg.sample_rate
+    t = np.arange(int(args.seconds * cfg.sample_rate)) / cfg.sample_rate
     x = cfg.tone_amplitude * np.sin(2 * np.pi * cfg.f_a_hz * t)
-    print(f"a {cfg.f_a_hz:.0f} Hz tone at one stimulus tone's amplitude ({cfg.tone_amplitude}). "
-          f"Set the system so it reads {cfg.tone_level_db_spl:.0f} dB SPL.")
-    print("space = play again, q = quit")
-    while getkey({" ", "q"}) == " ":
-        a.play(to_output(cfg, x))
+    while True:
+        print(f"\n  space = play {args.seconds:g} s, m = enter a measurement, q = quit")
+        k = getkey({" ", "m", "q"})
+        if k == "q":
+            return
+        if k == " ":
+            s_ = system_output()
+            if s_.get("muted"):
+                print("  output is MUTED.")
+                continue
+            print(f"  playing... ({describe_output(s_)})")
+            a.play(to_output(cfg, x))
+            continue
+        v = ask("  measured dB SPL for ONE tone")
+        try:
+            measured = float(v)
+        except ValueError:
+            print("  not a number")
+            continue
+        want = amplitude_for(cfg.tone_level_db_spl, measured, cfg.tone_amplitude)
+        off = measured - cfg.tone_level_db_spl
+        sysnow = system_output()
+        print(f"\n  measured    {measured:.1f} dB SPL  ({off:+.1f} dB from target)")
+        print(f"  scene       {scene_db_spl(measured):.1f} dB SPL with both tones sounding")
+        print(f"  at          {describe_output(sysnow)}")
+        if abs(off) <= 1.0:
+            print("  -> within 1 dB. Leave the volume where it is and run the session.")
+        else:
+            print(f"  -> to hit {cfg.tone_level_db_spl:.0f} dB exactly, keep the volume where it is "
+                  f"and set\n       tone_amplitude = {want:.4f}   "
+                  f"({20 * math.log10(want / cfg.tone_amplitude):+.1f} dB)")
+            print(f"     python -m tcoh run --config <preset> --set tone_amplitude={want:.4f} ...")
+            print("     Digital scaling is linear, so that is exact. Moving the system volume "
+                  "would\n     also work, but it is an undocumented taper and you would have to "
+                  "measure again.")
+        if scene_db_spl(measured) > 80:
+            print(f"  WARNING: {scene_db_spl(measured):.0f} dB SPL for a session of this length is "
+                  "louder than this experiment needs. Turn it down.")
 
 
 def cmd_run(args):
@@ -246,8 +297,10 @@ def main(argv=None):
     add_common(q); q.add_argument("--out", default="demo"); q.add_argument("--delta", type=float, default=25.0)
     q.add_argument("--seed", type=int, default=1); q.set_defaults(func=cmd_demo)
 
-    q = sub.add_parser("calibrate", help="loop the reference tone for level calibration")
-    add_common(q); q.add_argument("--device"); q.set_defaults(func=cmd_calibrate)
+    q = sub.add_parser("calibrate", help="loop the reference tone, read the output level, do the sums")
+    add_common(q); q.add_argument("--device")
+    q.add_argument("--seconds", type=float, default=5.0, help="length of each reference burst")
+    q.set_defaults(func=cmd_calibrate)
 
     q = sub.add_parser("run", help="run a session")
     add_common(q); q.add_argument("--data", default="data"); q.add_argument("--code")

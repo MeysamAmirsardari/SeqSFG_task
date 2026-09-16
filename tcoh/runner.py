@@ -41,6 +41,8 @@ from .observer import SimulatedListener
 from .session import (DesignChanged, TrialLog, check_resumable, existing_sessions,
                       load_participants, next_session_index, now_iso, provenance, read_json,
                       read_trials, session_dir, upsert_participant, write_json)
+from .audiolevel import (amplitude_for, describe_output, drift, scene_db_spl,
+                         system_output)
 from .stimulus import build_trial, render_trial, to_output
 from .track import Track
 
@@ -266,34 +268,80 @@ class Runner:
         cfg = self.cfg
         if self.meta.get("calibration"):
             print("calibration already recorded:", self.meta["calibration"])
+            self._check_output_drift()
             return
         if self.auto:
             self.meta["calibration"] = {"measured_db_spl": cfg.tone_level_db_spl, "note": "auto",
-                                        "time": now_iso()}
+                                        "time": now_iso(), "system": system_output()}
             write_json(self.sdir / "session.json", self.meta)
             return
         rms_db = 20 * math.log10(cfg.tone_amplitude / math.sqrt(2))
         print(f"\n--- calibration ---\nA {cfg.f_a_hz:.0f} Hz tone at the amplitude of ONE stimulus "
               f"tone ({cfg.tone_amplitude} FS peak, {rms_db:.1f} dB FS rms) will play for 5 s.\n"
-              f"Set the system so it reads {cfg.tone_level_db_spl:.0f} dB SPL at the ear. Both tones "
-              f"are at this amplitude, so the two together are at most 3 dB above it.")
+              f"Target is {cfg.tone_level_db_spl:.0f} dB SPL at the ear for ONE tone; the two "
+              f"together come to {scene_db_spl(cfg.tone_level_db_spl):.0f} dB SPL.")
         if cfg.monaural:
             print("  NOTE: this session is monaural -- LEFT earpiece only.")
+        print("  " + describe_output())
+        print("  Set the system volume now and DO NOT TOUCH IT AGAIN. It is recorded with the\n"
+              "  measurement, and the session will warn you if it changes.")
         while True:
             print("  space = play, then enter the measured level; q = skip (recorded as not calibrated)")
             k = getkey({" ", "q"})
             if k == "q":
                 self.meta["calibration"] = {"measured_db_spl": None, "note": "skipped",
-                                            "time": now_iso()}
+                                            "time": now_iso(), "system": system_output()}
+                print("  skipped. The level at the ear is now unknown, and every level this session "
+                      "reports is nominal.")
                 break
+            sysnow = system_output()
+            if sysnow.get("muted"):
+                print("  output is MUTED -- unmute before measuring.")
+                continue
             t = np.arange(int(5 * cfg.sample_rate)) / cfg.sample_rate
             x = cfg.tone_amplitude * np.sin(2 * np.pi * cfg.f_a_hz * t)
             self.audio.play(to_output(cfg, x))
             s = ask("measured dB SPL (blank to replay)")
             if s:
-                self.meta["calibration"] = {"measured_db_spl": float(s), "note": "measured",
-                                            "time": now_iso()}
+                measured = float(s)
+                want = amplitude_for(cfg.tone_level_db_spl, measured, cfg.tone_amplitude)
+                off = measured - cfg.tone_level_db_spl
+                self.meta["calibration"] = {
+                    "measured_db_spl": measured, "note": "measured", "time": now_iso(),
+                    "system": sysnow, "tone_amplitude": cfg.tone_amplitude,
+                    "target_db_spl": cfg.tone_level_db_spl, "offset_db": off,
+                    "suggested_tone_amplitude": want}
+                print(f"  measured {measured:.1f} dB SPL, {off:+.1f} dB from target.")
+                if abs(off) > 2.0:
+                    print(f"  To hit {cfg.tone_level_db_spl:.0f} dB exactly, rerun with "
+                          f"--set tone_amplitude={want:.4f} (digital scaling is linear, so this "
+                          f"is exact). Changing the system volume instead would work too, but it "
+                          f"is an undocumented taper and you would have to re-measure.")
                 break
+        write_json(self.sdir / "session.json", self.meta)
+
+    def _check_output_drift(self) -> None:
+        """Has the system volume or output device moved since the level was measured?
+
+        A calibration is a statement about the whole chain. Recording only the SPL pins one end
+        of it; if the volume slider moves afterwards the number in session.json is quietly
+        false and nothing in the data would ever show it.
+        """
+        cal = self.meta.get("calibration") or {}
+        d = drift(cal.get("system"))
+        if not d["known"] or not d["changed"]:
+            return
+        print("\n  *** THE OUTPUT HAS CHANGED SINCE CALIBRATION ***")
+        for n in d["notes"]:
+            print("   -", n)
+        print("   The recorded level no longer describes what the listener is hearing.")
+        if self.auto:
+            return
+        print("   space = carry on anyway (it is recorded), q = stop and re-calibrate")
+        if getkey({" ", "q"}) == "q":
+            raise SystemExit("stopped so the level can be re-measured")
+        self.meta.setdefault("output_drift", []).append({"time": now_iso(), "notes": d["notes"],
+                                                         "now": d["now"]})
         write_json(self.sdir / "session.json", self.meta)
 
     # -- one trial -----------------------------------------------------------------
@@ -399,8 +447,10 @@ class Runner:
         est = duration_estimate(cfg)
         print(f"\n--- main block: {len(design['tracks'])} tracks, about {est['n_trials']} trials, "
               f"about {est['main_minutes']:.0f} minutes ---")
+        self._check_output_drift()
         print(INSTRUCTIONS)
         if not self.auto:
+            print("  " + describe_output())
             getkey({" "}, "press space to begin ")
 
         seen_blocks = set()

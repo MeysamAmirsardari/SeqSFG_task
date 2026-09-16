@@ -742,3 +742,66 @@ def test_the_older_presets_are_untouched():
         assert validate(cfg).n_tracks == want_tracks, name
         assert cfg.catch_at_pct is None, f"{name} must keep its recorded behaviour"
         assert cfg.delta_max_ms == 45.0 and cfg.delta_direction == "random", name
+
+
+# ============================================================ level and calibration
+def test_the_amplitude_correction_is_exact():
+    """Digital scaling is linear, so one measurement fixes the amplitude for any target."""
+    from tcoh.audiolevel import amplitude_for
+    assert amplitude_for(65.0, 65.0, 0.05) == pytest.approx(0.05)
+    # a factor of two is 6.0206 dB, not 6, and the function is right about that
+    assert amplitude_for(65.0, 65.0 + 20 * math.log10(2), 0.05) == pytest.approx(0.025)
+    assert amplitude_for(65.0, 65.0 - 20 * math.log10(2), 0.05) == pytest.approx(0.100)
+    assert amplitude_for(65.0, 71.0, 0.05) == pytest.approx(0.05 * 10 ** (-6 / 20))
+    # and it round-trips: apply it, and the predicted level is the target
+    got = amplitude_for(65.0, 58.3, 0.05)
+    assert 58.3 + 20 * math.log10(got / 0.05) == pytest.approx(65.0)
+
+
+def test_two_tones_are_three_decibels_above_one():
+    from tcoh.audiolevel import scene_db_spl
+    assert scene_db_spl(65.0) == pytest.approx(68.01, abs=0.02)
+    assert scene_db_spl(65.0, 1) == pytest.approx(65.0)
+
+
+def test_reading_the_system_output_never_raises_and_says_what_it_knows():
+    from tcoh.audiolevel import describe_output, system_output
+    s = system_output()
+    assert set(("platform", "volume", "muted", "device", "readable")) <= set(s)
+    assert isinstance(describe_output(s), str) and describe_output(s)
+
+
+def test_drift_notices_a_changed_volume_or_device_and_nothing_else():
+    from tcoh.audiolevel import drift
+    then = {"volume": 60, "device": "Headphones", "muted": False}
+    assert not drift(then, {"volume": 60, "device": "Headphones", "muted": False})["changed"]
+    d = drift(then, {"volume": 35, "device": "Headphones", "muted": False})
+    assert d["changed"] and "system volume" in d["notes"][0]
+    d = drift(then, {"volume": 60, "device": "Speakers", "muted": False})
+    assert d["changed"] and "output device" in d["notes"][0]
+    assert drift(then, {"volume": 60, "device": "Headphones", "muted": True})["changed"]
+    # an unreadable field is not a change
+    assert not drift(then, {"volume": None, "device": None, "muted": None})["changed"]
+    assert not drift(None)["known"]
+
+
+def test_a_simulated_session_records_the_output_state_with_its_calibration(tmp_path):
+    r = Runner(CFG, tmp_path, audio=False, auto="coherence", seed=5)
+    sdir = r.run(code="P")
+    cal = json.loads((sdir / "session.json").read_text())["calibration"]
+    assert cal["measured_db_spl"] is not None
+    assert "system" in cal and "platform" in cal["system"]
+
+
+def test_the_report_says_so_when_the_level_was_never_measured(tmp_path):
+    from tcoh.analysis import analyse
+    from tcoh.session import read_json, write_json
+    r = Runner(CFG, tmp_path, audio=False, auto="coherence", seed=5)
+    sdir = r.run(code="P")
+    meta = read_json(sdir / "session.json")
+    meta["calibration"] = {"measured_db_spl": None, "note": "skipped",
+                           "system": {"volume": 69, "device": "Headphones"}}
+    write_json(sdir / "session.json", meta)
+    text = analyse([sdir], n_boot=200)
+    assert "level was NOT measured" in text
+    assert "volume 69/100" in text

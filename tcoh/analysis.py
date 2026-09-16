@@ -595,6 +595,8 @@ def diagnostics(rows: Sequence[dict], metas: Sequence[dict], cfg: Config,
         "feedback": [m.get("feedback") for m in metas],
         "auto": [m.get("auto") for m in metas],
         "calibrated": [bool((m.get("calibration") or {}).get("measured_db_spl")) for m in metas],
+        "calibration": [m.get("calibration") for m in metas],
+        "output_drift": [e for m in metas for e in (m.get("output_drift") or [])],
     }
 
 
@@ -675,8 +677,28 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None, n_boot: Optional
         dr = diag["drift"]
         A(f"  first half {dr['p_first_half']:.1%} correct at {dr['median_delta_first']:.1f} ms, "
           f"second half {dr['p_second_half']:.1%} at {dr['median_delta_second']:.1f} ms")
-    if not any(diag["calibrated"]):
-        A("  WARNING: no measured calibration recorded for any session.")
+    for cal in diag["calibration"]:
+        cal = cal or {}
+        sysinfo = cal.get("system") or {}
+        where = ", ".join(x for x in (
+            f"volume {sysinfo['volume']}/100" if sysinfo.get("volume") is not None else "",
+            f"device {sysinfo['device']!r}" if sysinfo.get("device") else "") if x)
+        if cal.get("measured_db_spl") is not None:
+            off = cal.get("offset_db")
+            A(f"  level: {cal['measured_db_spl']:.1f} dB SPL measured for one tone"
+              + (f" ({off:+.1f} dB from the {cal.get('target_db_spl', 0):.0f} dB target)" if off is not None else "")
+              + (f"; {math.log10(2) * 10 + cal['measured_db_spl']:.1f} dB SPL with both tones")
+              + (f"  [{where}]" if where else ""))
+        else:
+            A("  WARNING: level was NOT measured for this session"
+              + (f"  [{where}]" if where else "")
+              + ". Every level quoted here is nominal, and the")
+            A("    session cannot be compared on absolute level with any other.")
+    if diag["output_drift"]:
+        A(f"  WARNING: the output changed {len(diag['output_drift'])} time(s) after calibration:")
+        for e in diag["output_drift"]:
+            for n in e.get("notes", []):
+                A(f"    - {n}  (at {e.get('time')})")
     if any(f is not None and not f for f in diag["feedback"]):
         A("  feedback was OFF in at least one session.")
     A("")
