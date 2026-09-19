@@ -238,11 +238,19 @@ def audit_design(cfg: Config, design: dict) -> dict:
     first_slot: Dict[int, int] = {}
     for s in slots:
         first_slot.setdefault(s["track_id"], s["index"])
-    n = max(first_slot.values()) + 1 if first_slot else 1
+    # Where each condition's TRIALS sit in the session, as a fraction of it -- not where its
+    # first trial falls. The earlier version measured the first slot and divided by the last
+    # track's first slot, which reported a spread near 1.0 for a design where every track was
+    # interleaved through the whole session and every condition in fact averaged dead centre.
+    # This is the number the surrounding comment always claimed to be about: if a condition's
+    # trials cluster early and another's cluster late, a drift over the session can masquerade
+    # as an effect of dT.
+    n = max(len(slots), 1)
     pos: Dict[str, List[float]] = {c: [] for c in names}
     rounds: Dict[str, List[int]] = {c: [] for c in names}
+    for s in slots:
+        pos[s["condition"]].append(s["index"] / n)
     for t in tracks:
-        pos[t["condition"]].append(first_slot.get(t["track_id"], 0) / n)
         rounds[t["condition"]].append(t["round_index"])
     mean_pos = {c: float(np.mean(v)) for c, v in pos.items() if v}
     mean_round = {c: float(np.mean(v)) for c, v in rounds.items() if v}

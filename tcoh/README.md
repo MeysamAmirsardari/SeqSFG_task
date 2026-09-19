@@ -180,6 +180,9 @@ H1 and drops to **9%** for H2. It is a screen, not a test, and `validate` says s
 | `tcoh_screen` | 9 | 768 | 67 | a screen. 9% power on H2 — not a test |
 | `tcoh_fine` | 13 | 1089 | 95 | nine ΔT levels, control at three |
 | `tcoh_elhilali_replication` | 5 | 837 | 73 | her Figure 2 directly, tempo controls, monaural |
+| `tcoh_pilot` | 5 | 428 | 45 | the descriptive curve, pure tones — see below |
+| `tcoh_complex_feasibility` | 7 | 315 | 30 | complex tones, one track each — run this first |
+| `tcoh_complex` | 7 | 944 | 89 | complex tones, three tracks each, two sittings |
 
 ```bash
 python -m tcoh run --config tcoh/configs/tcoh_full.json --data data
@@ -295,3 +298,70 @@ about attention. Both misses in the first session were in the two hardest condit
 sets `catch_at_pct = 0.0`, so every probe is the same easy stimulus wherever it lands; the
 listener cannot pick them out because trials at that lag occur normally anyway. The earlier
 session's catch verdict stands as recorded — the rule was not loosened to rescue it.
+
+## Complex tones (`tcoh_complex`)
+
+Each tone becomes **two inharmonic partials** instead of one sinusoid, and the repetition
+period grows to 200 ms with 100 ms tones — the same 50% duty cycle, so the model's prediction
+is unchanged in shape.
+
+| | pure | complex |
+|---|---|---|
+| A | 1000 Hz | 801 + 1489 Hz |
+| B | 2378 Hz | 2754 + 4957 Hz |
+| tone / SOA | 75 / 150 ms | 100 / 200 ms |
+| δ ceiling | 50 ms | **75 ms** |
+| trial | 3.40 s | 4.05 s |
+
+**The model predicts nothing different for complex tones.** Partials within a tone are
+perfectly coherent with each other, so the four-channel coherence matrix has the same leading
+eigenvalue ratio as the two-channel one — identical to three decimals, which
+`test_the_model_predicts_nothing_different_for_complex_tones` pins down. What the manipulation
+buys is psychophysical, not theoretical: the task can no longer be solved inside a single
+auditory filter, and an inharmonic set removes harmonic fusion as a grouping cue the design
+does not control. It is a stronger test of the same prediction.
+
+### Choosing the four frequencies
+
+Three separate requirements, easy to conflate, all checked by `config.partial_audit`:
+
+* **resolved** — every pair at least 3 ERB apart, so each partial owns a channel;
+* **not a simple ratio** — no pair near 1:1, 2:1, 3:1, 3:2 or 4:1, which fuse or beat;
+* **no common fundamental** — the set as a whole is not a low-numbered harmonic series. This is
+  the cue that actually welds components into one object, and a pairwise test cannot see it.
+  The check refuses to answer for fewer than three components, because *any* two frequencies
+  are some n:m and a pair would always appear to "fit" a fundamental.
+
+300 000 random quadruples were searched; 353 pass all three. The chosen set is 4.8 ERB apart at
+the closest and 7% from the nearest simple ratio.
+
+### Separated and interleaved
+
+`tone_freqs` splits the same four partials two ways. **Separated** gives A the lower pair and B
+the upper pair — the direct analogue of the pure-tone design, so the curves are comparable.
+**Interleaved** alternates them (A = 801 + 2754, B = 1489 + 4957), so no frequency boundary
+separates A from B and common onset is the only thing that can group each tone. Same partials,
+same spectrum, same level; only the assignment changes. If the curve is the same in both,
+frequency region was not doing the grouping.
+
+Interleaved conditions carry their own B-alone cue, so `verify` compares them against each
+other and never point-by-point against the separated sweep.
+
+### What the pure-tone session fed into this design
+
+* **Lags near 100% are sampled densely** (87.5, 93.75) because ΔT = 100% is the only lag at
+  which the combined A+B onset train is *isochronous* — a rhythmic cue with nothing to do with
+  coherence, and the leading explanation for the dip measured there. A discontinuity at exactly
+  100% and nowhere else would be that cue; a smooth decline would not.
+* **Three tracks per condition, not two.** Test–retest on the pilot spanned 0.60× to 2.00×, far
+  too coarse for the ~1.3× differences in question.
+* **All seven tracks interleave at once** (`tracks_per_block: 7`). Seven conditions do not
+  divide into blocks of 3–6, and whichever lands in the short block is heard systematically
+  later every round.
+* **δ ceiling 75 ms**, the exact limit the 200 ms period allows: at ΔT = 100% a 75 ms early
+  shift leaves exactly 25 ms — the fusion margin — to both the preceding B tone and the A tone
+  it moves toward. Early shifts only, for the reason given above.
+
+Run the feasibility preset first. It is one track per condition, which **confounds condition
+with time** — `verify` fails that check rather than hiding it — so it answers "are these tones
+usable and roughly where do thresholds land", not "what is the curve".

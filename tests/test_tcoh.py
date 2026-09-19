@@ -805,3 +805,140 @@ def test_the_report_says_so_when_the_level_was_never_measured(tmp_path):
     text = analyse([sdir], n_boot=200)
     assert "level was NOT measured" in text
     assert "volume 69/100" in text
+
+
+# ============================================================ complex tones
+COMPLEX = Config(
+    tone_ms=100.0, soa_ms=200.0, delta_start_ms=18.0, delta_max_ms=75.0,
+    delta_direction="backward", partials_hz=(801.0, 1489.0, 2754.0, 4957.0),
+    sweep_pcts=(0.0, 50.0, 100.0), interleaved_pcts=(0.0, 100.0),
+    scrambled_pcts=(), include_b_only=False, tracks_per_condition=1, tracks_per_block=5,
+)
+
+
+def test_tone_freqs_splits_the_partials_both_ways():
+    a, b = COMPLEX.tone_freqs(interleaved=False)
+    assert a == (801.0, 1489.0) and b == (2754.0, 4957.0)
+    a, b = COMPLEX.tone_freqs(interleaved=True)
+    assert a == (801.0, 2754.0) and b == (1489.0, 4957.0)
+    # the two arrangements use exactly the same partials, which is what makes them comparable
+    assert sorted(sum(COMPLEX.tone_freqs(False), ())) == sorted(sum(COMPLEX.tone_freqs(True), ()))
+    # a pure-tone config is untouched by the flag
+    assert DEFAULT.tone_freqs(False) == DEFAULT.tone_freqs(True) == ((DEFAULT.f_a_hz,), (DEFAULT.f_b_hz,))
+
+
+def test_a_complex_tone_carries_the_same_power_as_a_pure_one():
+    """`tone_amplitude` means the same thing however many partials a tone has.
+
+    If it did not, a level calibrated with pure tones would not transfer, and the complex
+    version could not be compared with the pure-tone sessions on absolute level.
+    """
+    pure = Config(tone_ms=100.0, soa_ms=200.0, sweep_pcts=(100.0,), scrambled_pcts=(),
+                  include_b_only=False)
+    cpx = pure.replace(partials_hz=COMPLEX.partials_hz)
+    rms = []
+    for cfg in (pure, cpx):
+        c = conditions(cfg)[0]
+        tr = S.build_trial(cfg, c, 10.0, np.random.default_rng(3), target_position=1)
+        x = S.render_interval(cfg, tr.first, validate(cfg), tr.phases)
+        rms.append(float(np.sqrt(np.mean(x ** 2))))
+    assert rms[1] == pytest.approx(rms[0], rel=0.02)
+
+
+def test_common_f0_detects_harmonic_sets_and_clears_the_chosen_one():
+    from tcoh.config import _common_f0
+    assert _common_f0([800.0, 1600.0, 2400.0, 3200.0]) is not None      # 1:2:3:4
+    assert _common_f0([900.0, 1500.0, 2100.0, 2700.0]) is not None      # 3:5:7:9
+    assert _common_f0([816.0, 1584.0, 2448.0, 3264.0]) is not None      # harmonic, 2% jittered
+    assert _common_f0(list(COMPLEX.partials_hz)) is None
+    # two frequencies are always SOME n:m, so the test must refuse to answer for a pair
+    assert _common_f0([801.0, 1489.0]) is None
+
+
+def test_validate_rejects_a_harmonic_or_malformed_partial_set():
+    from tcoh.config import ConfigError
+    # harmonics 4, 7, 11, 17 of 250 Hz: resolved (3.8 ERB apart at the closest), so it clears
+    # the channel check and has to be caught by the harmonicity one
+    with pytest.raises(ConfigError, match="harmonic"):
+        validate(COMPLEX.replace(partials_hz=(1000.0, 1750.0, 2750.0, 4250.0),
+                                 interleaved_pcts=()))
+    with pytest.raises(ConfigError, match="even"):
+        validate(COMPLEX.replace(partials_hz=(801.0, 1489.0, 2754.0), interleaved_pcts=()))
+    with pytest.raises(ConfigError, match="ERB"):
+        validate(COMPLEX.replace(partials_hz=(801.0, 830.0, 2754.0, 4957.0),
+                                 interleaved_pcts=()))
+    with pytest.raises(ConfigError, match="interleaved_pcts"):
+        validate(DEFAULT.replace(interleaved_pcts=(0.0,)))
+
+
+def test_interleaving_changes_the_waveform_but_not_the_invariants():
+    d = validate(COMPLEX)
+    sep = next(c for c in d.conditions if c.name == "coh_0")
+    inter = next(c for c in d.conditions if c.name == "int_0")
+    xs = {}
+    for c in (sep, inter):
+        tr = S.build_trial(COMPLEX, c, 12.0, np.random.default_rng(5), target_position=1,
+                           direction=-1)
+        xs[c.name] = S.render_interval(COMPLEX, tr.first, d, tr.phases)
+        # invariant 1 still holds inside each arrangement: A never moves
+        a1 = V._render_channel(COMPLEX, tr.first, d, "a", tr.phases)
+        a2 = V._render_channel(COMPLEX, tr.second, d, "a", tr.phases)
+        assert np.array_equal(a1, a2)
+    assert not np.allclose(xs["coh_0"], xs["int_0"])
+    # same total energy: the two arrangements differ in assignment, not in what is played
+    assert float(np.sum(xs["coh_0"] ** 2)) == pytest.approx(float(np.sum(xs["int_0"] ** 2)), rel=0.05)
+
+
+def test_serial_position_is_a_fraction_of_the_session():
+    """The metric normalises by session length, not by where the last track starts.
+
+    Normalising by the last track's first slot reported a spread near 1.0 for a design in
+    which every track ran through the whole session -- the opposite of what it claimed.
+    """
+    for cfg in (COMPLEX, DEFAULT):
+        au = audit_design(cfg, make_design(cfg, "P9", 1))
+        assert 0.0 <= au["serial_position_spread"] <= 1.0
+        for v in au["mean_serial_position"].values():
+            assert 0.0 <= v <= 1.0
+    au = audit_design(COMPLEX, make_design(COMPLEX, "P9", 1))
+    assert au["serial_position_spread"] < 0.25       # all tracks interleaved across the session
+
+
+def test_the_model_predicts_nothing_different_for_complex_tones():
+    """Partials within a tone are perfectly coherent, so the index is the pure-tone one.
+
+    Worth pinning down: it is the reason the complex version is a stronger TEST of the same
+    prediction rather than a test of a new one, and the write-up says so.
+    """
+    from tcoh.model import coherence_matrix
+    fs, soa, tone, n = 1000.0, 200.0, 100.0, 6
+
+    def env(onsets, total):
+        e = np.zeros(int(total)); w = int(tone)
+        for o in onsets:
+            e[int(o):int(o) + w] += 1.0
+        return e
+
+    for pct in (0.0, 50.0, 100.0):
+        lag = pct / 100.0 * soa / 2.0
+        a_on = [k * soa for k in range(n)]
+        b_on = [o + lag for o in a_on]
+        total = n * soa + tone + lag + 50
+        ea, eb = env(a_on, total), env(b_on, total)
+        two = coherence_matrix(np.stack([ea, eb]), fs).ratio
+        four = coherence_matrix(np.stack([ea, ea, eb, eb]), fs).ratio
+        assert four == pytest.approx(two, abs=1e-6)
+
+
+def test_prediction_band_reports_the_size_of_any_reversal():
+    from tcoh.model import prediction_band
+    b = prediction_band((0.0, 25.0, 50.0, 75.0, 87.5, 93.75, 100.0), tone_ms=100.0, soa_ms=200.0)
+    assert b["max_decrease"] >= 0.0
+    # the tolerant flags must never be stricter than the strict ones
+    assert b["all_monotone_within_tol"] or not b["all_monotone"]
+    assert b["all_agree_on_order_within_tol"] or not b["all_agree_on_order"]
+    # and a genuinely non-monotone set must still fail them
+    import numpy as _np
+    from tcoh.model import _order_agreement_within
+    bad = _np.array([[0.0, 0.9, 0.2], [0.0, 0.2, 0.9]])
+    assert not _order_agreement_within(bad, 0.01)

@@ -53,6 +53,7 @@ class Interval:
     level_db: float                  # rove applied to this interval, dB re the nominal amplitude
     a_kind: str
     lag_pct: float
+    interleaved: bool = False        # complex tones only: which partials belong to which tone
 
     @property
     def is_target(self) -> bool:
@@ -177,7 +178,7 @@ def build_interval(cfg: Config, cond: Condition, delta_signed_ms: float, level_d
         b = b.copy()
         b[-1] += delta_signed_ms
     return Interval(a_onsets(cfg, cond, scramble), b, float(delta_signed_ms), float(level_db),
-                    cond.a_kind, cond.lag_pct)
+                    cond.a_kind, cond.lag_pct, cond.interleaved)
 
 
 def build_trial(cfg: Config, cond: Condition, delta_ms: float, rng: np.random.Generator,
@@ -208,8 +209,12 @@ def build_trial(cfg: Config, cond: Condition, delta_ms: float, rng: np.random.Ge
     # invariant the design claims and `verify.invariants` checks.
     ss = np.random.SeedSequence(int(rng.integers(0, 2 ** 63)))
     r_b, r_a, r_s, r_l = (np.random.default_rng(c) for c in ss.spawn(4))
-    phases = (r_a.uniform(0, 2 * math.pi, size=max(n_a, 1)),
-              r_b.uniform(0, 2 * math.pi, size=n_b))
+    # One starting phase per (partial, onset). Drawn at the FIXED partial count rather than at
+    # the count this condition happens to use, so that the B stream stays bit-identical between
+    # a separated condition and an interleaved one at the same seed -- invariant 2.
+    n_p = max(len(cfg.partials_hz) // 2, 1)
+    phases = (r_a.uniform(0, 2 * math.pi, size=(n_p, max(n_a, 1))),
+              r_b.uniform(0, 2 * math.pi, size=(n_p, n_b)))
     scramble = None
     if cond.a_kind == "scrambled":
         lo, hi = scramble_window(cfg, cond)
@@ -269,17 +274,21 @@ def render_interval(cfg: Config, iv: Interval, d: Optional[Derived] = None,
     n_total = int(round(total_ms * fs / 1000.0))
     x = np.zeros(n_total)
     env = tone_envelope(cfg)
-    amp = cfg.tone_amplitude * 10.0 ** (iv.level_db / 20.0)
+    amp = cfg.tone_amplitude * 10.0 ** (iv.level_db / 20.0) / cfg.partial_amplitude_scale
     t = np.arange(env.size) / fs
-    for onsets, f, ph in ((iv.a_onsets_ms, cfg.f_a_hz, None if phases is None else phases[0]),
-                          (iv.b_onsets_ms, cfg.f_b_hz, None if phases is None else phases[1])):
+    a_f, b_f = cfg.tone_freqs(iv.interleaved)
+    for onsets, freqs, ph in ((iv.a_onsets_ms, a_f, None if phases is None else phases[0]),
+                              (iv.b_onsets_ms, b_f, None if phases is None else phases[1])):
+        # phases are (n_partials, n_onsets); a 1-D array from a pure-tone caller still works
+        pp = None if ph is None else np.atleast_2d(np.asarray(ph, dtype=float))
         for k, on in enumerate(onsets):
             i = int(round(on * fs / 1000.0))
             if i < 0 or i >= n_total:
                 raise ConfigError(f"a tone at {on:.2f} ms falls outside the {total_ms:.0f} ms interval")
             j = min(n_total, i + env.size)
-            p = 0.0 if ph is None else float(ph[k])
-            x[i:j] += amp * env[: j - i] * np.sin(2 * np.pi * f * t[: j - i] + p)
+            for q, f in enumerate(freqs):
+                p = 0.0 if pp is None else float(pp[q % pp.shape[0], k])
+                x[i:j] += amp * env[: j - i] * np.sin(2 * np.pi * f * t[: j - i] + p)
     return x
 
 

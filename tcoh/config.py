@@ -104,12 +104,15 @@ class Condition:
     reference: str = "yoked"
     n_precursor: Optional[int] = None    # None -> cfg.n_precursor. Set to vary build-up.
     tempo_gap_ms: Optional[float] = None # reference='tempo' only: A's silent gap (Elhilali: 30/50/70)
+    interleaved: bool = False            # complex tones only: see Config.tone_freqs
     role: str = "main"                   # main | control | anchor -- reporting only
 
     def label(self) -> str:
         bits = [f"dT={self.lag_pct:g}%"]
         if self.a_kind != "coherent":
             bits.append(self.a_kind)
+        if self.interleaved:
+            bits.append("interleaved")
         if self.reference != "yoked":
             bits.append(self.reference)
         if self.n_precursor is not None:
@@ -135,6 +138,13 @@ class Config:
     # ---- the two tones -------------------------------------------------------
     f_a_hz: float = 1000.0               # the LOW tone; Elhilali's A
     df_semitones: float = 15.0           # B is this far above A. Her largest separation (1.25 oct)
+    partials_hz: Tuple[float, ...] = ()  # empty -> A and B are pure tones at f_a_hz / f_b_hz
+    # Non-empty makes each tone a complex of several partials: an even number of frequencies,
+    # split between A and B by `tone_freqs`. It changes nothing about what the model predicts
+    # -- partials within a tone are perfectly coherent with each other, so the coherence matrix
+    # has the same leading two eigenvalues as the pure-tone case, verified to three decimals --
+    # and everything about what the listener can do with a single auditory filter. The point is
+    # to remove the one-channel solution and, with an inharmonic set, harmonic fusion too.
     tone_ms: float = 75.0                # must be soa_ms / 2; see the module docstring
     ramp_ms: float = 10.0                # raised-cosine onset and offset
     soa_ms: float = 150.0                # onset-to-onset within one channel
@@ -165,6 +175,12 @@ class Config:
 
     # ---- conditions ----------------------------------------------------------
     sweep_pcts: Tuple[float, ...] = CORE_PCTS
+    interleaved_pcts: Tuple[float, ...] = ()
+    # dT levels to repeat with the partials interleaved instead of separated. Needs
+    # `partials_hz`. Same tones, same spectrum, same level; only which partial belongs to which
+    # tone changes. If the curve is the same in both, frequency region was not what grouped
+    # the partials -- and if it is not, the separated curve owed something to spectral
+    # proximity that the coherence account does not claim.
     scrambled_pcts: Tuple[float, ...] = CORE_PCTS
     # Matched at EVERY dT of the sweep, not at a subset. Measured power for the test that
     # actually separates the accounts (H2) is 97% with five matched levels and 70% with three,
@@ -234,7 +250,8 @@ class Config:
             raise ConfigError(f"unknown parameter(s): {sorted(unknown)}")
         kw = dict(d)
         for name in ("step_factors", "reversals_per_step", "sweep_pcts", "scrambled_pcts",
-                     "pair_only_pcts", "nopartner_pcts", "buildup_pcts"):
+                     "pair_only_pcts", "nopartner_pcts", "buildup_pcts", "partials_hz",
+                     "interleaved_pcts"):
             if name in kw and kw[name] is not None:
                 kw[name] = tuple(kw[name])
         return cls(**kw)
@@ -246,6 +263,40 @@ class Config:
     @property
     def f_b_hz(self) -> float:
         return self.f_a_hz * 2.0 ** (self.df_semitones / 12.0)
+
+    @property
+    def is_complex(self) -> bool:
+        return bool(self.partials_hz)
+
+    def tone_freqs(self, interleaved: bool = False) -> Tuple[Tuple[float, ...], Tuple[float, ...]]:
+        """The frequencies of A and B, as (a_partials, b_partials).
+
+        With `partials_hz` empty this is the pure-tone pair and `interleaved` is meaningless.
+        Otherwise the sorted set is split in half: SEPARATED gives A the lower half and B the
+        upper half, which is the direct analogue of the pure-tone design and keeps the two
+        curves comparable; INTERLEAVED alternates them, so no frequency boundary separates A
+        from B and common onset is the only thing left that can group a tone's partials
+        together. Same partials, same long-term spectrum, same level -- only the assignment
+        changes, which is what makes the pair of conditions a test of spectral proximity.
+        """
+        if not self.partials_hz:
+            return (self.f_a_hz,), (self.f_b_hz,)
+        p = tuple(sorted(float(f) for f in self.partials_hz))
+        if interleaved:
+            return p[0::2], p[1::2]
+        h = len(p) // 2
+        return p[:h], p[h:]
+
+    @property
+    def partial_amplitude_scale(self) -> float:
+        """Per-partial amplitude divisor that holds the POWER of one tone constant.
+
+        `tone_amplitude` stays the amplitude of a whole tone whatever it is made of, so a
+        level calibration measured with pure tones carries over to the complex version
+        unchanged and the two can be compared on absolute level.
+        """
+        n = max(len(self.partials_hz) // 2, 1)
+        return math.sqrt(float(n))
 
     @property
     def n_tones(self) -> int:
@@ -331,6 +382,9 @@ def conditions(cfg: Config) -> Tuple[Condition, ...]:
         out.append(Condition(f"par_{_tag(p)}", p, "pair_only", "yoked", role="control"))
     for p in cfg.nopartner_pcts:
         out.append(Condition(f"nop_{_tag(p)}", p, "nopartner", "yoked", role="control"))
+    for p in cfg.interleaved_pcts:
+        out.append(Condition(f"int_{_tag(p)}", p, "coherent", "yoked",
+                             interleaved=True, role="control"))
     for p in cfg.buildup_pcts:
         out.append(Condition(f"bld_{_tag(p)}", p, "coherent", "yoked",
                              n_precursor=cfg.buildup_n_precursor, role="control"))
@@ -349,6 +403,97 @@ def conditions(cfg: Config) -> Tuple[Condition, ...]:
             out.append(Condition(f"tempo_{gap:g}", 0.0, "coherent", "tempo",
                                  tempo_gap_ms=gap, role="control"))
     return tuple(out)
+
+
+SIMPLE_RATIO_MAX_ORDER = 5
+# p:q counts as a 'simple' ratio when p + q <= this: 1:1, 2:1, 3:1, 3:2, 4:1. Those are the
+# ones two simultaneous components actually fuse or beat at. Searching further out finds
+# ratios like 19:8 that are arithmetically close to everything and perceptually close to
+# nothing, which is why `harmonic_proximity` caps its own search too.
+
+COMMON_F0_RANGE_HZ = (120.0, 600.0)
+COMMON_F0_MAX_HARMONIC = 12
+COMMON_F0_TOLERANCE = 0.04
+# For a complex of several partials the fusion cue that matters is a shared fundamental, not
+# any one pairwise ratio: that is what makes a set of components one harmonic object instead
+# of several. A set is inharmonic when no f0 in this range explains every partial as a
+# low-numbered harmonic to within this tolerance.
+
+
+def _simple_ratio_mistuning(x: float, y: float) -> Tuple[float, str]:
+    """Distance from the nearest genuinely simple frequency ratio, as a percentage."""
+    r = max(x, y) / min(x, y)
+    best = (float("inf"), "")
+    for q in range(1, SIMPLE_RATIO_MAX_ORDER):
+        for p in range(q, SIMPLE_RATIO_MAX_ORDER + 1):
+            if math.gcd(p, q) != 1 or p + q > SIMPLE_RATIO_MAX_ORDER:
+                continue
+            err = abs(r - p / q) / (p / q)
+            if err < best[0]:
+                best = (err, f"{p}:{q}")
+    return 100.0 * best[0], best[1]
+
+
+def _common_f0(freqs: Sequence[float]) -> Optional[dict]:
+    """The best low-order harmonic template for this set, if one fits within tolerance.
+
+    Meaningless below three components: ANY two frequencies are some n:m, so a pair always
+    "fits" a fundamental and the test would fire on every set. What makes a pair fuse is a
+    LOW-order ratio, and `_simple_ratio_mistuning` is the test for that. Returns None rather
+    than a false positive.
+    """
+    if len(freqs) < 3:
+        return None
+    lo, hi = COMMON_F0_RANGE_HZ
+    best = None
+    f0 = lo
+    while f0 <= hi:
+        ns = [round(f / f0) for f in freqs]
+        if all(1 <= n <= COMMON_F0_MAX_HARMONIC for n in ns) and len(set(ns)) == len(ns):
+            err = max(abs(f - n * f0) / (n * f0) for f, n in zip(freqs, ns))
+            if best is None or err < best["error"]:
+                best = {"f0_hz": float(f0), "harmonics": list(ns), "error": float(err)}
+        f0 += 0.5
+    if best is None or best["error"] >= COMMON_F0_TOLERANCE:
+        return None
+    return best
+
+
+def partial_audit(cfg: Config, interleaved: bool = False) -> dict:
+    """Is this partial set resolved, inharmonic, and free of a common fundamental?
+
+    Three separate things, easy to conflate:
+
+    * RESOLVED -- every pair at least 3 ERBs apart, so each partial owns an auditory filter and
+      the model's one-channel-per-component reduction still applies.
+    * NOT A SIMPLE RATIO -- no pair close to 1:1, 2:1, 3:1, 3:2 or 4:1, which fuse or beat.
+    * NO COMMON FUNDAMENTAL -- the set as a whole is not a low-numbered harmonic series, which
+      is the cue that actually welds several components into one perceived object and the one
+      thing a pairwise test cannot see.
+
+    Reported for one arrangement at a time, because interleaving changes which partials are
+    simultaneous within a tone but not which pairs exist.
+    """
+    from .model import channel_crosstalk
+    a_f, b_f = cfg.tone_freqs(interleaved)
+    allf = sorted(a_f + b_f)
+    worst_erb, worst_erb_pair = float("inf"), None
+    worst_mis, worst_mis_pair, worst_mis_ratio = float("inf"), None, ""
+    for i, x in enumerate(allf):
+        for y in allf[i + 1:]:
+            e = channel_crosstalk(x, y)["erbs"]
+            if e < worst_erb:
+                worst_erb, worst_erb_pair = e, (x, y)
+            m, lbl = _simple_ratio_mistuning(x, y)
+            if m < worst_mis:
+                worst_mis, worst_mis_pair, worst_mis_ratio = m, (x, y), lbl
+    return {"arrangement": "interleaved" if interleaved else "separated",
+            "a_hz": list(a_f), "b_hz": list(b_f), "n_partials_per_tone": len(a_f),
+            "min_erbs": float(worst_erb), "min_erb_pair": worst_erb_pair,
+            "min_simple_ratio_mistuning_pct": float(worst_mis),
+            "min_simple_ratio_pair": worst_mis_pair, "min_simple_ratio": worst_mis_ratio,
+            "common_f0": _common_f0(allf),
+            "within_a_f0": _common_f0(list(a_f)), "within_b_f0": _common_f0(list(b_f))}
 
 
 FUSION_MARGIN_MS = 25.0
@@ -589,6 +734,45 @@ def validate(cfg: Config) -> Derived:
             "harmonicity, which is a grouping cue this experiment does not manipulate and cannot "
             "separate from synchrony. Consider an df_semitones further from a small-integer ratio.")
 
+    if cfg.is_complex:
+        if len(cfg.partials_hz) % 2:
+            raise ConfigError(
+                f"partials_hz has {len(cfg.partials_hz)} entries; it must be even so the set can "
+                "be split evenly between A and B.")
+        if len(set(cfg.partials_hz)) != len(cfg.partials_hz):
+            raise ConfigError("partials_hz contains a repeated frequency")
+        want = {c.interleaved for c in conds}
+        for il in sorted(want):
+            au = partial_audit(cfg, il)
+            where = au["arrangement"]
+            if au["min_erbs"] < 3.0:
+                lo, hi = au["min_erb_pair"]
+                raise ConfigError(
+                    f"{where}: partials at {lo:.0f} and {hi:.0f} Hz are {au['min_erbs']:.1f} ERBs "
+                    "apart. Below about 3 they share an auditory filter, so they are not two "
+                    "channels and the whole point of using a complex tone is lost.")
+            if au["common_f0"] is not None:
+                f0 = au["common_f0"]
+                raise ConfigError(
+                    f"{where}: all partials fit harmonics {f0['harmonics']} of "
+                    f"{f0['f0_hz']:.1f} Hz to within {100 * f0['error']:.1f}%. A harmonic set "
+                    "fuses into one object through harmonicity, which is exactly the grouping "
+                    "cue this experiment must not supply. Choose an inharmonic set.")
+            if au["min_simple_ratio_mistuning_pct"] < 3.0:
+                lo, hi = au["min_simple_ratio_pair"]
+                notes.append(
+                    f"{where}: {lo:.0f}/{hi:.0f} Hz is only "
+                    f"{au['min_simple_ratio_mistuning_pct']:.1f}% from {au['min_simple_ratio']}, "
+                    "close enough for those two partials to fuse or beat.")
+            for lbl, key in (("A", "within_a_f0"), ("B", "within_b_f0")):
+                if au[key] is not None:
+                    notes.append(
+                        f"{where}: tone {lbl}'s own partials are harmonics "
+                        f"{au[key]['harmonics']} of {au[key]['f0_hz']:.1f} Hz. That tone will fuse "
+                        "through harmonicity rather than through common onset.")
+    elif cfg.interleaved_pcts:
+        raise ConfigError("interleaved_pcts needs partials_hz; pure tones cannot interleave")
+
     mc = _model_curve(tuple(sorted(lag_by_pct)), cfg.tone_ms, cfg.soa_ms, cfg.n_tones)
     mbc = _model_by_condition(cfg, conds, interval)
 
@@ -701,14 +885,30 @@ DEFAULT = Config()
 
 def describe(cfg: Config) -> str:
     d = validate(cfg)
-    L = [f"two-tone coherence  |  config {cfg.hash()}",
-         f"  tones      A {cfg.f_a_hz:.0f} Hz, B {d.f_b_hz:.0f} Hz "
-         f"({cfg.df_semitones:g} st, {cfg.df_semitones / 12:.2f} oct, {d.erbs_apart:.1f} ERB)",
-         f"             {cfg.tone_ms:g} ms tones, {cfg.ramp_ms:g} ms ramps, {cfg.soa_ms:g} ms SOA "
-         f"(duty {cfg.duty:.2f}), {cfg.n_tones} per channel",
-         f"             cross-channel leak {'<' if d.roex_leak_is_floor else ''}"
-         f"-{d.roex_attenuation_db:.0f} dB; nearest low-order ratio {d.harmonic['ratio']} "
-         f"({d.harmonic['mistuning_pct']:.1f}% away)",
+    L = [f"two-tone coherence  |  config {cfg.hash()}"]
+    if cfg.is_complex:
+        arrangements = sorted({c.interleaved for c in d.conditions})
+        for il in arrangements:
+            au = partial_audit(cfg, il)
+            a_lbl = " + ".join(f"{f:.0f}" for f in au["a_hz"])
+            b_lbl = " + ".join(f"{f:.0f}" for f in au["b_hz"])
+            head = "  tones     " if il == arrangements[0] else "            "
+            L.append(f"{head} {au['arrangement']:11} A {a_lbl} Hz   B {b_lbl} Hz")
+            L.append(f"                         {au['min_erbs']:.1f} ERB apart at the closest, "
+                     f"{au['min_simple_ratio_mistuning_pct']:.0f}% from {au['min_simple_ratio']}, "
+                     f"{'no common f0' if au['common_f0'] is None else 'COMMON F0'}")
+    else:
+        L.append(f"  tones      A {cfg.f_a_hz:.0f} Hz, B {d.f_b_hz:.0f} Hz "
+                 f"({cfg.df_semitones:g} st, {cfg.df_semitones / 12:.2f} oct, {d.erbs_apart:.1f} ERB)")
+    L.append(f"             {cfg.tone_ms:g} ms tones, {cfg.ramp_ms:g} ms ramps, {cfg.soa_ms:g} ms SOA "
+             f"(duty {cfg.duty:.2f}), {cfg.n_tones} per channel")
+    if not cfg.is_complex:
+        # for a complex set these are properties of every partial pair, and the audit lines
+        # above already report the worst of them; f_a/f_b are not the tones being played
+        L.append(f"             cross-channel leak {'<' if d.roex_leak_is_floor else ''}"
+                 f"-{d.roex_attenuation_db:.0f} dB; nearest low-order ratio {d.harmonic['ratio']} "
+                 f"({d.harmonic['mistuning_pct']:.1f}% away)")
+    L += [
          f"  trial      {d.interval_ms:.0f} ms + {cfg.isi_ms:.0f} ms + {d.interval_ms:.0f} ms "
          f"= {d.trial_ms / 1000:.2f} s of sound",
          f"  track      {cfg.n_down}-down 1-up, steps x{'/x'.join(f'{s:g}' for s in cfg.step_factors)}, "

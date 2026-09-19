@@ -60,7 +60,7 @@ def _render_channel(cfg: Config, iv: Interval, d, which: str,
     total = interval_ms(cfg, iv.b_onsets_ms.size - 1)
     stripped = Interval(iv.a_onsets_ms if which == "a" else np.zeros(0),
                         iv.b_onsets_ms if which == "b" else np.zeros(0),
-                        iv.delta_ms, 0.0, iv.a_kind, iv.lag_pct)
+                        iv.delta_ms, 0.0, iv.a_kind, iv.lag_pct, iv.interleaved)
     return render_interval(cfg, stripped, d, phases, total_ms=total)
 
 
@@ -111,20 +111,31 @@ def invariants(cfg: Config, delta_ms: float = 8.0, seed: int = 4) -> List[Check]
     refs, diffs, groups = {}, [], set()
     for c in conds:
         n = cfg.n_precursor if c.n_precursor is None else c.n_precursor
-        groups.add(n)
+        # An interleaved condition gives B different partials, so its B channel cannot be
+        # identical to a separated one and must not be compared against it. That is the whole
+        # manipulation, not a violation -- but it does mean the interleaved conditions carry
+        # their own B-alone cue, so they are read against each other and never against the
+        # separated sweep.
+        key = (n, c.interleaved)
+        groups.add(key)
         tr = build_trial(cfg, c, delta_ms, np.random.default_rng(seed), target_position=1,
                          direction=+1)
         pair = (_render_channel(cfg, tr.second, d, "b", tr.phases),
                 _render_channel(cfg, tr.first, d, "b", tr.phases))
-        if n not in refs:
-            refs[n] = pair
+        if key not in refs:
+            refs[key] = pair
         else:
-            diffs.append(max(float(np.max(np.abs(pair[0] - refs[n][0]))),
-                             float(np.max(np.abs(pair[1] - refs[n][1])))))
-    extra = ("" if len(groups) == 1 else
-             f"  Precursor lengths {sorted(groups)} are compared separately: a build-up condition "
-             "has a longer B sequence by design, so its comparison rests on its own ceiling "
-             "(b_only_long) rather than on this invariant.")
+            diffs.append(max(float(np.max(np.abs(pair[0] - refs[key][0]))),
+                             float(np.max(np.abs(pair[1] - refs[key][1])))))
+    extra = ""
+    if len({n for n, _ in groups}) > 1:
+        extra += (f"  Precursor lengths {sorted({n for n, _ in groups})} are compared separately: a "
+                  "build-up condition has a longer B sequence by design, so its comparison rests on "
+                  "its own ceiling (b_only_long) rather than on this invariant.")
+    if len({il for _, il in groups}) > 1:
+        extra += ("  Separated and interleaved conditions are compared separately: interleaving "
+                  "changes which partials B is made of, so the two arrangements are read against "
+                  "each other as a whole and never point by point.")
     out.append(Check("the B channel is bit-identical across conditions of the same length",
                      bool(diffs) and max(diffs) == 0.0,
                      f"max |difference| over {len(diffs)} comparisons = "
@@ -137,16 +148,18 @@ def invariants(cfg: Config, delta_ms: float = 8.0, seed: int = 4) -> List[Check]
         tr = build_trial(cfg, c, delta_ms, np.random.default_rng(seed), target_position=1)
         for iv in (tr.first, tr.second):
             x = render_interval(cfg, Interval(iv.a_onsets_ms, iv.b_onsets_ms, iv.delta_ms, 0.0,
-                                              iv.a_kind, iv.lag_pct), d, tr.phases)
+                                              iv.a_kind, iv.lag_pct, iv.interleaved), d, tr.phases)
             lens.add((c.name, x.size))
             es.append(float(np.sum(x ** 2)))
     tr = build_trial(cfg, conds[0], delta_ms, np.random.default_rng(seed), target_position=1)
     e1 = np.sum(render_interval(cfg, Interval(tr.first.a_onsets_ms, tr.first.b_onsets_ms,
                                               tr.first.delta_ms, 0.0, tr.first.a_kind,
-                                              tr.first.lag_pct), d, tr.phases) ** 2)
+                                              tr.first.lag_pct, tr.first.interleaved),
+                                d, tr.phases) ** 2)
     e2 = np.sum(render_interval(cfg, Interval(tr.second.a_onsets_ms, tr.second.b_onsets_ms,
                                               tr.second.delta_ms, 0.0, tr.second.a_kind,
-                                              tr.second.lag_pct), d, tr.phases) ** 2)
+                                              tr.second.lag_pct, tr.second.interleaved),
+                                d, tr.phases) ** 2)
     rel = abs(e1 - e2) / max(e1, e2)
     from .config import interval_ms as _ivms
     n_lengths = len({(cfg.n_precursor if c.n_precursor is None else c.n_precursor) for c in conds})
@@ -239,49 +252,81 @@ def peripheral_audit(cfg: Config, delta_ms: float = 8.0, n_filters: int = 28,
     """
     d = validate(cfg)
     fs = cfg.sample_rate
-    lo, hi = cfg.f_a_hz / 2.0, d.f_b_hz * 2.0
-    fcs = np.geomspace(lo, hi, n_filters)
-    c = next(x for x in d.conditions if x.a_kind == "coherent")
-    tr = build_trial(cfg, c, delta_ms, np.random.default_rng(seed), target_position=1, direction=+1)
-    x1 = render_interval(cfg, Interval(tr.first.a_onsets_ms, tr.first.b_onsets_ms,
-                                       tr.first.delta_ms, 0.0, c.a_kind, c.lag_pct), d, tr.phases)
-    x2 = render_interval(cfg, Interval(tr.second.a_onsets_ms, tr.second.b_onsets_ms,
-                                       tr.second.delta_ms, 0.0, c.a_kind, c.lag_pct), d, tr.phases)
-
     from scipy.signal import fftconvolve, hilbert
-    rel = []
-    for fc in fcs:
-        h = _gammatone(fc, fs)
-        e1 = np.abs(hilbert(fftconvolve(x1, h)[: x1.size]))
-        e2 = np.abs(hilbert(fftconvolve(x2, h)[: x2.size]))
-        ref = max(float(e1.max()), 1e-12)
-        rel.append(float(np.max(np.abs(e1 - e2)) / ref))
-    rel = np.asarray(rel)
 
     def erbn(f):
         return 21.4 * math.log10(4.37 * f / 1000.0 + 1.0)
 
-    # How far from B does the shift still move anything? A gammatone centred near B must of
-    # course respond -- that IS the signal. The question is whether the disturbance reaches A.
-    e_fcs = np.array([erbn(f) for f in fcs])
-    e_b, e_a = erbn(d.f_b_hz), erbn(cfg.f_a_hz)
-    moved = rel > 0.01
-    reach = float(np.max(np.abs(e_fcs[moved] - e_b))) if moved.any() else 0.0
-    sep = abs(e_b - e_a)
-    near_a = np.abs(e_fcs - e_a) <= 1.0
-    worst_a = float(rel[near_a].max()) if near_a.any() else float("nan")
-    mid = np.argmin(np.abs(e_fcs - (e_a + e_b) / 2.0))
-    return [
-        Check("displacing B leaves A's auditory filters alone", worst_a < 0.01,
-              f"largest envelope change within one ERB of {cfg.f_a_hz:.0f} Hz: "
-              f"{100 * worst_a:.3f}% of that filter's peak; at the midpoint between the tones "
-              f"({fcs[mid]:.0f} Hz) it is {100 * rel[mid]:.3f}%"),
-        Check("the disturbance stays inside B's own auditory region", reach < sep,
-              f"filters more than {reach:.1f} ERB from B are unmoved (change under 1%); A is "
-              f"{sep:.1f} ERB away, so the disturbance falls short of it by {sep - reach:.1f} ERB. "
-              f"Bank of {n_filters} gammatones from {lo:.0f} to {hi:.0f} Hz. This is what makes "
-              "the one-channel-per-tone reduction the model prediction rests on safe here."),
-    ]
+    out: List[Check] = []
+    # Every arrangement present gets its own audit. Interleaving puts A's partials between B's,
+    # so the distance the disturbance has to stay inside is much smaller there -- the test is
+    # the same one, and it is supposed to be harder to pass.
+    for interleaved in sorted({c.interleaved for c in d.conditions}):
+        c = next((x for x in d.conditions
+                  if x.a_kind == "coherent" and x.interleaved == interleaved), None)
+        if c is None:
+            continue
+        a_f, b_f = cfg.tone_freqs(interleaved)
+        allf = sorted(a_f + b_f)
+        lo, hi = allf[0] / 2.0, allf[-1] * 2.0
+        fcs = np.geomspace(lo, hi, n_filters)
+        tr = build_trial(cfg, c, delta_ms, np.random.default_rng(seed), target_position=1,
+                         direction=+1)
+        x1 = render_interval(cfg, Interval(tr.first.a_onsets_ms, tr.first.b_onsets_ms,
+                                           tr.first.delta_ms, 0.0, c.a_kind, c.lag_pct,
+                                           c.interleaved), d, tr.phases)
+        x2 = render_interval(cfg, Interval(tr.second.a_onsets_ms, tr.second.b_onsets_ms,
+                                           tr.second.delta_ms, 0.0, c.a_kind, c.lag_pct,
+                                           c.interleaved), d, tr.phases)
+        rel = []
+        for fc in fcs:
+            h = _gammatone(fc, fs)
+            e1 = np.abs(hilbert(fftconvolve(x1, h)[: x1.size]))
+            e2 = np.abs(hilbert(fftconvolve(x2, h)[: x2.size]))
+            rel.append(float(np.max(np.abs(e1 - e2)) / max(float(e1.max()), 1e-12)))
+        rel = np.asarray(rel)
+
+        e_fcs = np.array([erbn(f) for f in fcs])
+        e_a = np.array([erbn(f) for f in a_f])
+        e_b = np.array([erbn(f) for f in b_f])
+        # distance from each filter to the NEAREST partial of each tone
+        d_to_b = np.min(np.abs(e_fcs[:, None] - e_b[None, :]), axis=1)
+        d_to_a = np.min(np.abs(e_fcs[:, None] - e_a[None, :]), axis=1)
+        near_a = d_to_a <= 1.0
+        worst_a = float(rel[near_a].max()) if near_a.any() else float("nan")
+        mid = int(np.argmin(np.abs(d_to_a - d_to_b)))
+
+        # How far does the disturbance travel from B TOWARDS A? Measured only in the gap
+        # between the closest A-B partial pair, because that is the only direction in which
+        # reaching further could contaminate A. Distance from a B partial on its own is not
+        # the quantity: filters an octave ABOVE the highest B partial are far from every B
+        # partial and further still from every A partial, and counting those was enough to
+        # fail a configuration whose A filters do not move at all.
+        pair = np.unravel_index(int(np.argmin(np.abs(e_a[:, None] - e_b[None, :]))),
+                                (e_a.size, e_b.size))
+        ea_c, eb_c = float(e_a[pair[0]]), float(e_b[pair[1]])
+        sep = abs(ea_c - eb_c)
+        lo_e, hi_e = min(ea_c, eb_c), max(ea_c, eb_c)
+        between = (e_fcs >= lo_e) & (e_fcs <= hi_e)
+        moved = between & (rel > 0.01)
+        reach = float(np.abs(e_fcs[moved] - eb_c).max()) if moved.any() else 0.0
+
+        tag = "" if not cfg.is_complex else f" [{'interleaved' if interleaved else 'separated'}]"
+        a_lbl = "/".join(f"{f:.0f}" for f in a_f)
+        out.append(Check(
+            "displacing B leaves A's auditory filters alone" + tag, worst_a < 0.01,
+            f"largest envelope change within one ERB of A ({a_lbl} Hz): "
+            f"{100 * worst_a:.3f}% of that filter's peak; midway between the nearest A and B "
+            f"partials ({fcs[mid]:.0f} Hz) it is {100 * rel[mid]:.3f}%"))
+        out.append(Check(
+            "the disturbance does not reach across to A" + tag, reach < sep,
+            f"in the gap between the closest A-B partial pair ({min(a_f[pair[0]], b_f[pair[1]]):.0f} "
+            f"and {max(a_f[pair[0]], b_f[pair[1]]):.0f} Hz, {sep:.1f} ERB apart) the >1% region "
+            f"extends {reach:.1f} ERB from B, falling {sep - reach:.1f} ERB short of A. Filters "
+            f"midway between the two do move -- {100 * rel[mid]:.0f}% at {fcs[mid]:.0f} Hz, which "
+            "is B's own filter skirt and belongs to neither tone -- but A's own filters do not. "
+            f"Bank of {n_filters} gammatones from {lo:.0f} to {hi:.0f} Hz."))
+    return out
 
 
 # ----------------------------------------------------------------------------
@@ -314,13 +359,21 @@ def model_checks(cfg: Config) -> List[Check]:
 
     pcts = sorted({c.lag_pct for c in d.conditions if c.a_kind == "coherent"})
     band = prediction_band(pcts, tone_ms=cfg.tone_ms, soa_ms=cfg.soa_ms, n_tones=cfg.n_tones)
+    strict = band["all_monotone"] and band["all_agree_on_order"]
+    caveat = "" if strict else (
+        f"  Strictly, one or more variants step DOWN somewhere, by at most "
+        f"{band['max_decrease']:.4f} against a between-variant spread of {band['max_spread']:.2f} "
+        f"at the same levels -- below the {band['monotone_tolerance']:g} tolerance, and far below "
+        "anything the behaviour could resolve. Sampling dT finely enough to put two levels that "
+        "close guarantees this; it is not the model predicting a reversal. The strict flags are "
+        "carried in the band for anyone who wants them.")
     out.append(Check("the prediction survives every defensible reading of the filter bank",
-                     band["all_monotone"] and band["all_agree_on_order"],
-                     f"{len(band['curves'])} variants: all monotone {band['all_monotone']}, all "
-                     f"agreeing on the ordering of dT levels {band['all_agree_on_order']}, "
-                     f"largest disagreement in height {band['max_spread']:.2f}. The ORDER is "
-                     "predicted robustly; the heights are not, which is why the shape test is "
-                     "reported with a caveat."))
+                     band["all_monotone_within_tol"] and band["all_agree_on_order_within_tol"],
+                     f"{len(band['curves'])} variants over {len(pcts)} dT levels: all monotone "
+                     f"{band['all_monotone_within_tol']}, all agreeing on the ordering "
+                     f"{band['all_agree_on_order_within_tol']}, largest disagreement in height "
+                     f"{band['max_spread']:.2f}. The ORDER is predicted robustly; the heights are "
+                     "not, which is why the shape test is reported with a caveat." + caveat))
 
     # Do the controls predict the interaction H2 is built to detect?
     #
@@ -453,8 +506,14 @@ def run_battery(cfg: Config, quick: bool = True) -> Dict[str, List[Check]]:
 
 def format_report(cfg: Config, battery: Dict[str, List[Check]]) -> str:
     d = validate(cfg)
+    if cfg.is_complex:
+        a_f, b_f = cfg.tone_freqs(False)
+        tones = ("A " + "+".join(f"{f:.0f}" for f in a_f) +
+                 " / B " + "+".join(f"{f:.0f}" for f in b_f) + " Hz")
+    else:
+        tones = f"A {cfg.f_a_hz:.0f} Hz / B {d.f_b_hz:.0f} Hz"
     L = ["=" * 78, f"tcoh verification battery   |   config {cfg.hash()}",
-         f"A {cfg.f_a_hz:.0f} Hz / B {d.f_b_hz:.0f} Hz, {cfg.tone_ms:g} ms tones, "
+         f"{tones}, {cfg.tone_ms:g} ms tones, "
          f"{cfg.soa_ms:g} ms SOA, {cfg.n_precursor} precursors, {len(d.conditions)} conditions",
          "=" * 78]
     n_fail = 0

@@ -123,9 +123,14 @@ def cmd_demo(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(args.seed)
+    # Honour the configured direction. Hardcoding a LATE shift here -- which this did at first
+    # -- renders a demo the experiment never plays whenever delta_direction is 'backward', and
+    # a late shift is exactly the one that walks the displaced tone onto its own A partner, so
+    # the files demonstrated a cue the design excludes.
+    direction = {"random": +1, "forward": +1, "backward": -1}[cfg.delta_direction]
     made = []
     for c in d.conditions:
-        tr = build_trial(cfg, c, args.delta, rng, target_position=1, direction=+1)
+        tr = build_trial(cfg, c, args.delta, rng, target_position=1, direction=direction)
         x = to_output(cfg, render_trial(cfg, tr, d))
         p = out / f"tcoh_{c.name}_delta{args.delta:g}ms.wav"
         sf.write(p, x, cfg.sample_rate)
@@ -133,8 +138,12 @@ def cmd_demo(args):
     for p, tr in made:
         print(f"  {p}   target interval {tr.target_position}, shift "
               f"{tr.delta_signed_ms:+.2f} ms ({'late' if tr.delta_signed_ms > 0 else 'early'})")
+    word = "late" if direction > 0 else "early"
+    note = ("" if cfg.delta_direction != "random" else
+            "  The session itself picks the direction per trial; these all use one so the files "
+            "can be compared.")
     print(f"\n{len(made)} files. In every one the FIRST interval is the target: its last high "
-          f"tone is {args.delta:g} ms late.")
+          f"tone is {args.delta:g} ms {word}.{note}")
 
 
 def cmd_calibrate(args):

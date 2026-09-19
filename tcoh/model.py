@@ -344,13 +344,42 @@ def prediction_band(pcts: Sequence[float], tone_ms: float = 75.0, soa_ms: float 
             "lo": arr.min(0).tolist(), "hi": arr.max(0).tolist(), "mid": arr.mean(0).tolist(),
             "max_spread": float((arr.max(0) - arr.min(0)).max()),
             "all_monotone": bool(all(np.all(np.diff(v) >= -1e-9) for v in arr)),
-            "all_agree_on_order": _order_agreement(arr)}
+            "all_agree_on_order": _order_agreement(arr),
+            # the same two claims, with a reversal counted only when it is big enough to be a
+            # claim -- plus the raw number, so the reader judges rather than trusts the flag
+            "max_decrease": float(max(0.0, -np.diff(arr, axis=1).min())),
+            "all_monotone_within_tol": bool(-np.diff(arr, axis=1).min() <= MONOTONE_TOLERANCE),
+            "all_agree_on_order_within_tol": _order_agreement_within(arr, MONOTONE_TOLERANCE),
+            "monotone_tolerance": MONOTONE_TOLERANCE}
 
 
 def _order_agreement(arr: np.ndarray) -> bool:
     """Do all variants rank the dT levels the same way? The ordinal claim, checked."""
     ranks = np.argsort(np.argsort(arr, axis=1), axis=1)
     return bool(np.all(ranks == ranks[0]))
+
+
+MONOTONE_TOLERANCE = 0.01
+# A reversal smaller than this is not a prediction of a reversal. The strict flag stays
+# available and `max_decrease` is always reported, so nothing is hidden -- but sampling dT
+# finely enough to put two levels 0.02 apart in the index will eventually make some variant
+# step down by a rounding error, and calling that "the model predicts a non-monotone curve"
+# would be false. The tolerance is fixed here, once, at a fifth of the typical spread BETWEEN
+# variants, and never tuned to whatever a configuration happens to need.
+
+
+def _order_agreement_within(arr: np.ndarray, tol: float) -> bool:
+    """Do all variants agree on the order of every pair they separate by more than `tol`?"""
+    n = arr.shape[1]
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = arr[:, j] - arr[:, i]
+            if np.all(np.abs(d) <= tol):
+                continue                      # no variant claims these two differ
+            signs = {int(np.sign(x)) for x in d if abs(x) > tol}
+            if len(signs) > 1:
+                return False
+    return True
 
 
 def duty_cycle_scan(duties: Sequence[float] = (0.25, 0.375, 0.5, 0.625, 0.75),

@@ -162,9 +162,16 @@ def replay_tracks(rows: Sequence[dict], cfg: Config) -> Dict[int, dict]:
                 break
             t.update(bool(_i(r, "correct", 0)))
         a = t.audit()
+        # Absolute tolerance, set by the file rather than by the quantity. delta_ms is stored
+        # as %.6f, so it round-trips to within 5e-7 ms whatever its size; a RELATIVE tolerance
+        # of 1e-6 is tighter than that at the bottom of a track (at the 0.25 ms floor the
+        # storage error is 2e-6 relative) and would fail on the text format, not on anything
+        # about the staircase. 1e-5 ms is twenty times the storage error and four orders below
+        # the smallest step the rule can take, so a genuine divergence between the live track
+        # and the replay still cannot hide under it.
         a["logged_deltas_match"] = bool(np.allclose(
             [tt.delta_ms for tt in t.trials][: len(rs)],
-            [_f(r, "delta_ms") for r in rs][: len(t.trials)], rtol=1e-6, atol=1e-9))
+            [_f(r, "delta_ms") for r in rs][: len(t.trials)], rtol=0.0, atol=1e-5))
         out[tid] = a
     return out
 
