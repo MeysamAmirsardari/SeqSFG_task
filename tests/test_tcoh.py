@@ -942,3 +942,77 @@ def test_prediction_band_reports_the_size_of_any_reversal():
     from tcoh.model import _order_agreement_within
     bad = _np.array([[0.0, 0.9, 0.2], [0.0, 0.2, 0.9]])
     assert not _order_agreement_within(bad, 0.01)
+
+
+# ============================================================ progress and rests
+def test_progress_counts_against_the_estimate_not_the_slot_plan(tmp_path, monkeypatch):
+    """The slot plan is built for max_trials_per_track on every track.
+
+    Tracks converge long before that -- 630 planned slots against about 315 trials actually
+    run for the feasibility preset -- so counting slots would tell the listener they were
+    half as far along as they really are.
+    """
+    import tcoh.runner as R
+    from tcoh.design import duration_estimate, make_design
+    cfg = Config.from_dict(json.loads(
+        Path("tcoh/configs/tcoh_complex_feasibility.json").read_text()))
+    n_slots = len(make_design(cfg, "P01", 1)["slot_plan"])
+    n_est = duration_estimate(cfg)["n_trials"]
+    assert n_slots > 1.5 * n_est                      # the gap the display has to avoid
+
+    seen = []
+    keys = iter("12" * 5000)
+
+    def fake_getkey(valid, prompt=""):
+        seen.append(prompt)
+        return " " if " " in valid else next(keys)
+
+    monkeypatch.setattr(R, "getkey", fake_getkey)
+    small = cfg.replace(max_trials_per_track=6, n_final_reversals=2, practice_trials=2,
+                        familiarise=False, break_every_trials=5)
+    r = R.Runner(small, tmp_path, audio=False, seed=3)
+    r.audio = type("S", (), {"play": lambda self, x: None})()
+    r.calibrate = lambda: None
+    r.panel = lambda code=None: dict(code="T", age="0", sex="na", handedness="na",
+                                     hearing="normal", musical_training_years="0",
+                                     headphones="x", experimenter="x", consent="yes")
+    r.run(code="T")
+
+    trials = [p for p in seen if "1 or 2" in p]
+    assert trials, "no trial prompt was shown"
+    counted = [p for p in trials if "[" in p]
+    # practice is not part of the session count and carries no counter
+    assert len(counted) < len(trials)
+    est_small = duration_estimate(small)["n_trials"]
+    assert all(f"/~{est_small}" in p for p in counted)
+    # counts start at 1 and rise; the percentage never claims completion mid-session
+    assert counted[0].strip().startswith("[1/~")
+    assert [int(p.split("[")[1].split("/")[0]) for p in counted] == list(range(1, len(counted) + 1))
+    assert "100%" not in " ".join(counted)
+
+
+def test_a_single_block_design_still_offers_rests(tmp_path, monkeypatch):
+    """Breaks on block boundaries alone are no breaks at all when there is one block."""
+    import tcoh.runner as R
+    from tcoh.design import make_design
+    cfg = Config.from_dict(json.loads(
+        Path("tcoh/configs/tcoh_complex_feasibility.json").read_text()))
+    assert make_design(cfg, "P01", 1)["n_blocks"] == 1
+    assert cfg.break_every_trials, "the preset must set a within-block rest interval"
+
+    rests = []
+    keys = iter("12" * 5000)
+    monkeypatch.setattr(R, "getkey",
+                        lambda valid, prompt="": " " if " " in valid else next(keys))
+    small = cfg.replace(max_trials_per_track=6, n_final_reversals=2, practice_trials=2,
+                        familiarise=False, break_every_trials=5)
+    r = R.Runner(small, tmp_path, audio=False, seed=3)
+    r.audio = type("S", (), {"play": lambda self, x: None})()
+    r.calibrate = lambda: None
+    r.panel = lambda code=None: dict(code="T2", age="0", sex="na", handedness="na",
+                                     hearing="normal", musical_training_years="0",
+                                     headphones="x", experimenter="x", consent="yes")
+    r._offer_rest = lambda done, n_est: rests.append(done)
+    r.run(code="T2")
+    assert len(rests) >= 2
+    assert all(b - a == 5 for a, b in zip(rests, rests[1:]))

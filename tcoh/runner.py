@@ -346,7 +346,7 @@ class Runner:
 
     # -- one trial -----------------------------------------------------------------
     def _present(self, cond: Condition, delta_ms: float, is_catch: bool,
-                 feedback: bool) -> dict:
+                 feedback: bool, progress: str = "") -> dict:
         cfg = self.cfg
         tr = build_trial(cfg, cond, delta_ms, self.rng, is_catch=is_catch)
         t0 = now_iso()
@@ -360,7 +360,7 @@ class Runner:
             t_start = time.time()
             self.audio.play(to_output(cfg, x))
             t_play = time.time()
-            k = getkey({"1", "2", "q"}, "  1 or 2? ")
+            k = getkey({"1", "2", "q"}, f"  {progress}1 or 2? ")
             if k == "q":
                 raise QuitRequested()
             rt = (time.time() - t_play) * 1000.0
@@ -455,6 +455,19 @@ class Runner:
 
         seen_blocks = set()
         done_slots = getattr(self, "done_slots", set())
+        # Progress is reported over the SESSION, never over a track or a condition. A count of
+        # trials carries nothing about which interval holds the shift, but "trial 7 of 45 in
+        # this condition" would tell the listener when a condition changed, which is a cue the
+        # design does not want them to have.
+        #
+        # The denominator is the ESTIMATE, not the number of planned slots. The slot plan is
+        # built for the worst case -- max_trials_per_track for every track -- and tracks
+        # converge long before that, so counting slots would tell the listener they were half
+        # as far along as they really are. Marked with a tilde because it is an estimate: a
+        # session can and does run past it.
+        n_est = max(int(est["n_trials"]), 1)
+        n_done = len(done_slots)
+        since_break = 0
         for slot in slots:
             if slot["index"] in done_slots:
                 seen_blocks.add(slot["block_index"])
@@ -472,6 +485,14 @@ class Runner:
                 seen_blocks.add(slot["block_index"])
                 if len(seen_blocks) > 1 and (len(seen_blocks) - 1) % max(cfg.break_every, 1) == 0:
                     self._offer_break(len(seen_blocks), design["n_blocks"])
+                    since_break = 0
+            elif cfg.break_every_trials and since_break >= cfg.break_every_trials:
+                # A design that interleaves every condition at once has ONE block, so breaks on
+                # block boundaries alone means no breaks at all -- half an hour without a pause
+                # or any sense of progress, which is how the previous session's second half
+                # acquired its response bias.
+                self._offer_rest(n_done, n_est)
+                since_break = 0
 
             is_catch = bool(slot["is_catch"])
             delta = cfg.catch_delta_ms if is_catch else track.delta
@@ -482,8 +503,12 @@ class Runner:
                 # slot it occupied, and still does not update it.
                 probe = self.catch_cond
             n_before = len(track.trials)
+            n_done += 1
+            pct = min(100.0 * n_done / n_est, 99.0)
             try:
-                out = self._present(probe, delta, is_catch, cfg.feedback)
+                out = self._present(probe, delta, is_catch, cfg.feedback,
+                                    progress=f"[{n_done}/~{n_est}  {pct:.0f}%]  ")
+                since_break += 1
             except QuitRequested:
                 self._finish("quit")
                 return
@@ -501,6 +526,15 @@ class Runner:
             return
         print(f"\n  --- break ({block_no - 1} of {n_blocks} blocks done). "
               f"Rest as long as you like. ---")
+        getkey({" "}, "  press space to carry on ")
+
+    def _offer_rest(self, done: int, n_est: int) -> None:
+        """A pause inside a block, for designs that only have one."""
+        if self.auto:
+            return
+        print(f"\n  --- rest ({done} trials done of about {n_est}, "
+              f"{min(100.0 * done / max(n_est, 1), 99.0):.0f}%). "
+              "Rest as long as you like. ---")
         getkey({" "}, "  press space to carry on ")
 
     def _finish(self, status: str) -> None:

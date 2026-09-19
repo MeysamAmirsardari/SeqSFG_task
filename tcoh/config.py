@@ -214,7 +214,12 @@ class Config:
     practice_delta_ms: float = 45.0
     familiarise: bool = True
     response_timeout_s: float = 6.0
-    break_every: int = 8                 # tracks between offered breaks
+    break_every: int = 8                 # blocks between offered breaks
+    break_every_trials: Optional[int] = None
+    # Trials between offered rests WITHIN a block. Breaks on block boundaries alone are no
+    # breaks at all when every condition is interleaved at once, because then the session is a
+    # single block: the listener sits for the whole thing with no pause. None keeps the old
+    # behaviour; a number offers a rest that often as well.
     max_same_condition_run: int = 2      # consecutive trials from one track when interleaving
     tracks_per_block: Optional[int] = None
     # How many tracks are interleaved at once. None picks it: the block size has to divide the

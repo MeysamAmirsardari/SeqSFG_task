@@ -362,6 +362,19 @@ other and never point-by-point against the separated sweep.
   shift leaves exactly 25 ms — the fusion margin — to both the preceding B tone and the A tone
   it moves toward. Early shifts only, for the reason given above.
 
+### During the session
+
+Each trial's prompt carries the count: `[42/~315  13%]  1 or 2?`. The denominator is the
+*estimate*, marked with a tilde, not the number of planned slots: the slot plan is built for
+`max_trials_per_track` on every track (630 for the feasibility preset) and tracks converge long
+before that (about 315), so counting slots would tell the listener they were half as far along
+as they are. Progress is reported over the session and never over a track, because "trial 7 of
+45 in this condition" would announce when the condition changed.
+
+`break_every_trials` offers a rest that often *within* a block. Both complex presets set it,
+because interleaving every condition at once makes the feasibility session a single block --
+and breaks on block boundaries alone would then mean no breaks at all in half an hour.
+
 Run the feasibility preset first. It is one track per condition, which **confounds condition
 with time** — `verify` fails that check rather than hiding it — so it answers "are these tones
 usable and roughly where do thresholds land", not "what is the curve".

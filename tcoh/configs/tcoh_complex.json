@@ -68,5 +68,6 @@
  "tracks_per_block": 7,
  "streams_block": false,
  "n_boot": 4000,
- "lapse_max": 0.1
+ "lapse_max": 0.1,
+ "break_every_trials": 80
 }
