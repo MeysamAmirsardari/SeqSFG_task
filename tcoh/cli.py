@@ -7,6 +7,7 @@
     python -m tcoh calibrate                   loop the reference tone
     python -m tcoh run --data data             run a session
     python -m tcoh analyze data/P01/tcoh_session_01
+    python -m tcoh pilot data/*/tcoh_session_* --out pilot/   the multi-listener report
     python -m tcoh plots --out verification/
     python -m tcoh power                       what this design can and cannot detect
     python -m tcoh simulate --mode coherence   a dataset with no listener, for the pipeline
@@ -231,6 +232,25 @@ def cmd_analyze(args):
         print(f"\nwritten to {args.out}")
 
 
+def cmd_pilot(args):
+    """The six-listener pilot report: one block per listener, then the group overview."""
+    from collections import defaultdict
+    from .pilot_report import report
+    cfg = load_config(args) if (args.config or args.set) else None
+    by_listener = defaultdict(list)
+    for d in args.dirs:
+        d = Path(d)
+        # a listener is a directory of sessions: data/<CODE>/<session>/
+        by_listener[d.parent.name].append(d)
+    if not by_listener:
+        raise SystemExit("no session directories given")
+    text = report(dict(sorted(by_listener.items())), cfg=cfg,
+                  out_dir=Path(args.out) if args.out else None, overlay=args.overlay)
+    print(text)
+    if args.out:
+        print(f"\nwritten to {args.out}/")
+
+
 def cmd_plots(args):
     cfg = load_config(args)
     from .analysis import coherence_index, interaction_test, load, thresholds
@@ -310,6 +330,12 @@ def main(argv=None):
     add_common(q); q.add_argument("--device")
     q.add_argument("--seconds", type=float, default=5.0, help="length of each reference burst")
     q.set_defaults(func=cmd_calibrate)
+
+    q = sub.add_parser("pilot", help="per-listener curves and the group overview")
+    q.add_argument("dirs", nargs="+")
+    q.add_argument("--out"); q.add_argument("--overlay", action="store_true",
+                                            help="show the model beside the data, on its own axis")
+    add_common(q); q.set_defaults(func=cmd_pilot)
 
     q = sub.add_parser("run", help="run a session")
     add_common(q); q.add_argument("--data", default="data"); q.add_argument("--code")

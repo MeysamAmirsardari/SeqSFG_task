@@ -71,20 +71,34 @@ class QuitRequested(Exception):
     pass
 
 
+class ResponseTimeout(Exception):
+    """No key within `response_timeout_s`. Raised only where a timeout was asked for."""
+
+
 # ---- terminal i/o ------------------------------------------------------------
-def _read_char() -> str:
+def _read_char(timeout_s: Optional[float] = None) -> str:
+    """One keypress. With `timeout_s`, raises ResponseTimeout instead of blocking forever.
+
+    Piped stdin (tests, --auto) ignores the timeout: there is no listener to wait for and a
+    deadline there would just make automated runs flaky.
+    """
     if not sys.stdin.isatty():
         s = sys.stdin.readline()
         if not s:
             raise QuitRequested()
         return s.strip()[:1] or " "
     try:
+        import select
         import termios
         import tty
         fd = sys.stdin.fileno()
         old = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
+            if timeout_s is not None:
+                ready, _, _ = select.select([sys.stdin], [], [], timeout_s)
+                if not ready:
+                    raise ResponseTimeout()
             ch = sys.stdin.read(1)
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
@@ -93,14 +107,29 @@ def _read_char() -> str:
         return ch
     except ImportError:
         import msvcrt
+        if timeout_s is not None:
+            deadline = time.time() + timeout_s
+            while not msvcrt.kbhit():
+                if time.time() > deadline:
+                    raise ResponseTimeout()
+                time.sleep(0.01)
         return msvcrt.getwch()
 
 
-def getkey(valid: set, prompt: str = "") -> str:
+def getkey(valid: set, prompt: str = "", timeout_s: Optional[float] = None) -> str:
+    """Block until one of `valid` is pressed. The deadline, if given, is for the WHOLE wait.
+
+    Counting it per keypress would let a listener leaning on an invalid key hold the trial
+    open indefinitely, which is the situation the timeout exists to end.
+    """
     if prompt:
         print(prompt, end="", flush=True)
+    deadline = None if timeout_s is None else time.time() + timeout_s
     while True:
-        ch = _read_char()
+        left = None if deadline is None else max(deadline - time.time(), 0.0)
+        if left is not None and left <= 0.0:
+            raise ResponseTimeout()
+        ch = _read_char(left)
         if ch in valid:
             print(ch if ch != " " else "")
             return ch
@@ -133,6 +162,7 @@ class Audio:
 # ---- the runner ---------------------------------------------------------------
 class Runner:
     RT_REFERENCE = "end of the second interval (audio playback returns)"
+    MAX_CONSECUTIVE_TIMEOUTS = 3
 
     def __init__(self, cfg: Config, data_dir: Path, device=None, audio: bool = True,
                  auto: Optional[str] = None, fast: bool = False, seed: int = 0):
@@ -195,6 +225,7 @@ class Runner:
 
         self.sdir, self.meta, self.design = sdir, meta, design
         self.rng = np.random.default_rng([design["session_seed"], self.seed, 0x7C00])
+        self.session_seed = int(design["session_seed"])
         self.log = TrialLog(sdir / "trials.csv")
         self.done = read_trials(sdir / "trials.csv")
         self.tracks: Dict[int, Track] = {}
@@ -345,10 +376,24 @@ class Runner:
         write_json(self.sdir / "session.json", self.meta)
 
     # -- one trial -----------------------------------------------------------------
+    def _slot_rng(self, slot_index: int) -> "np.random.Generator":
+        """The per-trial draws for one slot, keyed on the slot rather than on stream position.
+
+        Which interval holds the target, which way the tone moves, the starting phases and the
+        level rove were drawn from a single stream advanced trial by trial. That stream restarts
+        when a session resumes, so the second sitting re-used the draws the first sitting had
+        already used: its target-position sequence mirrored the opening trials rather than
+        continuing from them, and no resumed session could be reproduced from its seed. Keying
+        each slot separately makes the trial a function of (session, slot) alone, so resuming
+        changes nothing and the whole session is reconstructible.
+        """
+        return np.random.default_rng([self.session_seed, self.seed, 0x7C00, int(slot_index)])
+
     def _present(self, cond: Condition, delta_ms: float, is_catch: bool,
-                 feedback: bool, progress: str = "") -> dict:
+                 feedback: bool, progress: str = "", rng=None) -> dict:
         cfg = self.cfg
-        tr = build_trial(cfg, cond, delta_ms, self.rng, is_catch=is_catch)
+        tr = build_trial(cfg, cond, delta_ms, rng if rng is not None else self.rng,
+                         is_catch=is_catch)
         t0 = now_iso()
         if self.auto:
             correct = self.sim.respond(cond, abs(tr.delta_realised_ms))
@@ -360,7 +405,15 @@ class Runner:
             t_start = time.time()
             self.audio.play(to_output(cfg, x))
             t_play = time.time()
-            k = getkey({"1", "2", "q"}, f"  {progress}1 or 2? ")
+            try:
+                k = getkey({"1", "2", "q"}, f"  {progress}1 or 2? ",
+                           timeout_s=cfg.response_timeout_s or None)
+            except ResponseTimeout:
+                print(f"\n   no response within {cfg.response_timeout_s:g} s "
+                      "-- not scored, moving on")
+                return {"trial": tr, "response": "", "correct": False,
+                        "rt_ms": float("nan"), "timed_out": True, "t_start": t0,
+                        "t_response": now_iso(), "wall_start": t_start}
             if k == "q":
                 raise QuitRequested()
             rt = (time.time() - t_play) * 1000.0
@@ -369,7 +422,8 @@ class Runner:
         if feedback and not self.auto:
             print("   correct" if correct else f"   no -- it was {tr.target_position}")
         return {"trial": tr, "response": resp, "correct": bool(correct), "rt_ms": rt,
-                "t_start": t0, "t_response": now_iso(), "wall_start": t_start}
+                "timed_out": False, "t_start": t0, "t_response": now_iso(),
+                "wall_start": t_start}
 
     def _row(self, phase: str, cond: Condition, out: dict, slot: Optional[dict] = None,
              track: Optional[Track] = None, track_trial=None, feedback: bool = False) -> dict:
@@ -394,7 +448,7 @@ class Runner:
                "correct": int(out["correct"]),
                "rt_ms": "" if out["rt_ms"] != out["rt_ms"] else f"{out['rt_ms']:.1f}",
                "rove_db_1": f"{tr.first.level_db:.3f}", "rove_db_2": f"{tr.second.level_db:.3f}",
-               "feedback": int(feedback), "t_start": out["t_start"], "t_response": out["t_response"]}
+               "feedback": int(feedback), "timed_out": int(bool(out.get("timed_out"))), "t_start": out["t_start"], "t_response": out["t_response"]}
         self.trial_index += 1
         return row
 
@@ -468,6 +522,7 @@ class Runner:
         n_est = max(int(est["n_trials"]), 1)
         n_done = len(done_slots)
         since_break = 0
+        n_timeouts = consecutive_timeouts = 0
         for slot in slots:
             if slot["index"] in done_slots:
                 seen_blocks.add(slot["block_index"])
@@ -507,18 +562,38 @@ class Runner:
             pct = min(100.0 * n_done / n_est, 99.0)
             try:
                 out = self._present(probe, delta, is_catch, cfg.feedback,
-                                    progress=f"[{n_done}/~{n_est}  {pct:.0f}%]  ")
+                                    progress=f"[{n_done}/~{n_est}  {pct:.0f}%]  ",
+                                    rng=self._slot_rng(slot["index"]))
                 since_break += 1
             except QuitRequested:
                 self._finish("quit")
                 return
+            # A timed-out trial is not evidence about anything: scoring it as wrong would
+            # push the staircase up for a reason that has nothing to do with audibility, and
+            # scoring it right would pull it down. It is logged, counted, and skipped -- the
+            # same treatment a catch trial gets, and for the same reason.
+            if out.get("timed_out"):
+                n_timeouts += 1
+                consecutive_timeouts += 1
+                if consecutive_timeouts >= self.MAX_CONSECUTIVE_TIMEOUTS:
+                    print(f"\n  {consecutive_timeouts} trials in a row with no response. "
+                          "Stopping so the session is not recorded as inattentive.")
+                    self.log.write(self._row("main", probe, out, slot=slot, track=None,
+                                             track_trial=None, feedback=cfg.feedback))
+                    self.meta["n_timeouts"] = n_timeouts
+                    self._finish("abandoned")
+                    return
+            else:
+                consecutive_timeouts = 0
             # a catch trial is a probe, not part of the staircase
-            if not is_catch:
+            if not is_catch and not out.get("timed_out"):
                 track.update(out["correct"])
+            scored = not is_catch and not out.get("timed_out")
             self.log.write(self._row("catch" if is_catch else "main", probe, out, slot=slot,
-                                     track=None if is_catch else track,
-                                     track_trial=None if is_catch else n_before,
+                                     track=track if scored else None,
+                                     track_trial=n_before if scored else None,
                                      feedback=cfg.feedback))
+        self.meta["n_timeouts"] = n_timeouts
         self._finish("complete")
 
     def _offer_break(self, block_no: int, n_blocks: int) -> None:

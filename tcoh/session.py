@@ -38,8 +38,11 @@ TRIAL_FIELDS = [
     "is_catch", "delta_ms", "delta_signed_ms", "delta_realised_ms", "direction",
     "step_index", "reversal", "at_ceiling", "at_floor",
     "target_position", "response", "correct", "rt_ms",
-    "rove_db_1", "rove_db_2", "feedback", "t_start", "t_response",
+    "rove_db_1", "rove_db_2", "feedback", "timed_out", "t_start", "t_response",
 ]
+# `timed_out` was added on 2026-09-21 with the response timeout. Files written before that
+# date do not have the column; every reader here goes through `_f`/`_i`, which default a
+# missing field, so old sessions load unchanged.
 
 
 def now_iso() -> str:

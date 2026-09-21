@@ -282,6 +282,16 @@ def audit_design(cfg: Config, design: dict) -> dict:
     }
 
 
+PER_TRIAL_OVERHEAD_S = 0.55
+BLOCK_BREAK_MIN = 1.5
+REST_MIN = 0.75
+# Measured, not guessed. Across P01's two completed sessions the mean interval between trial
+# starts, excluding every pause of 30 s or more, ran 0.56 s and 0.51 s beyond the duration of
+# the sound itself -- response, feedback and the next render. The constant here was 1.6 s,
+# which put about eight minutes of imaginary time into a twelve-track design and would have
+# had us shorten a session that already fits.
+
+
 def duration_estimate(cfg: Config) -> dict:
     """How long this will really take, using the simulated track length rather than a guess."""
     from .track import simulate
@@ -290,13 +300,17 @@ def duration_estimate(cfg: Config) -> dict:
     per_track = sim["median_trials"]
     n_trials = d.n_tracks * per_track * (1.0 + cfg.catch_rate)
     sound_s = d.trial_ms / 1000.0
-    per_trial_s = sound_s + 1.6                      # response, feedback, inter-trial
+    per_trial_s = sound_s + PER_TRIAL_OVERHEAD_S
     minutes = n_trials * per_trial_s / 60.0
-    # breaks are offered between BLOCKS, not between tracks. Counting tracks put fourteen
-    # minutes of imaginary resting into a design that has two blocks and one break.
+    # Breaks are offered between BLOCKS, and -- since break_every_trials exists -- also within
+    # one. Counting only the block breaks understated a design that interleaves every condition
+    # at once, because that design has a single block and therefore no boundaries at all.
     n_blocks = make_design(cfg, "DURATION", 1)["n_blocks"]
     n_breaks = max(0, (n_blocks - 1) // max(cfg.break_every, 1))
-    breaks = n_breaks * 1.5
+    n_rests = 0
+    if cfg.break_every_trials:
+        n_rests = max(0, int(n_trials // cfg.break_every_trials) - n_breaks)
+    breaks = n_breaks * BLOCK_BREAK_MIN + n_rests * REST_MIN
     practice = cfg.practice_trials * (sound_s + 2.5) / 60.0
     setup = 7.0     # participant panel, level calibration, instructions and familiarisation
     total = minutes + practice + breaks + setup
@@ -305,6 +319,7 @@ def duration_estimate(cfg: Config) -> dict:
     return {"n_tracks": d.n_tracks, "n_blocks": n_blocks, "n_breaks": n_breaks,
             "median_trials_per_track": per_track,
             "n_trials": int(round(n_trials)), "sound_per_trial_s": sound_s,
+            "n_rests": n_rests,
             "main_minutes": minutes, "practice_minutes": practice, "break_minutes": breaks,
             "setup_minutes": setup, "total_minutes": total,
             "worst_case_minutes": worst,

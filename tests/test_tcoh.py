@@ -963,7 +963,7 @@ def test_progress_counts_against_the_estimate_not_the_slot_plan(tmp_path, monkey
     seen = []
     keys = iter("12" * 5000)
 
-    def fake_getkey(valid, prompt=""):
+    def fake_getkey(valid, prompt="", timeout_s=None):
         seen.append(prompt)
         return " " if " " in valid else next(keys)
 
@@ -1003,7 +1003,8 @@ def test_a_single_block_design_still_offers_rests(tmp_path, monkeypatch):
     rests = []
     keys = iter("12" * 5000)
     monkeypatch.setattr(R, "getkey",
-                        lambda valid, prompt="": " " if " " in valid else next(keys))
+                        lambda valid, prompt="", timeout_s=None:
+                        " " if " " in valid else next(keys))
     small = cfg.replace(max_trials_per_track=6, n_final_reversals=2, practice_trials=2,
                         familiarise=False, break_every_trials=5)
     r = R.Runner(small, tmp_path, audio=False, seed=3)
@@ -1016,3 +1017,109 @@ def test_a_single_block_design_still_offers_rests(tmp_path, monkeypatch):
     r.run(code="T2")
     assert len(rests) >= 2
     assert all(b - a == 5 for a, b in zip(rests, rests[1:]))
+
+
+# ============================================================ response timeout
+def test_getkey_deadline_covers_the_whole_wait_not_each_keypress(monkeypatch):
+    """Otherwise a listener resting on an invalid key holds the trial open forever.
+
+    That is the exact situation the timeout exists to end, so the deadline is absolute.
+    """
+    import tcoh.runner as R
+    t = {"now": 0.0}
+    monkeypatch.setattr(R.time, "time", lambda: t["now"])
+
+    def creeping_read(timeout_s=None):
+        t["now"] += 0.4          # an invalid key every 0.4 s, forever
+        return "x"
+
+    monkeypatch.setattr(R, "_read_char", creeping_read)
+    with pytest.raises(R.ResponseTimeout):
+        R.getkey({"1", "2"}, timeout_s=2.0)
+    assert t["now"] <= 2.4       # it gave up on time rather than after N keys
+
+
+def test_a_timed_out_trial_never_reaches_the_staircase(tmp_path, monkeypatch):
+    """Logged, counted, excluded -- and above all not scored.
+
+    Scoring a no-response as wrong would push the track up for a reason unrelated to
+    audibility; scoring it right would pull it down. Either one corrupts the threshold.
+    """
+    import tcoh.runner as R
+    cfg = DEFAULT.replace(sweep_pcts=(0.0, 100.0), scrambled_pcts=(), include_b_only=False,
+                          tracks_per_condition=1, max_trials_per_track=8, n_final_reversals=2,
+                          practice_trials=2, familiarise=False, catch_rate=0.0,
+                          response_timeout_s=1.0)
+    state = {"n": 0}
+    keys = iter("12" * 4000)
+
+    def flaky(valid, prompt="", timeout_s=None):
+        if " " in valid:
+            return " "
+        state["n"] += 1
+        if timeout_s is not None and state["n"] % 4 == 0:     # every 4th trial, no answer
+            raise R.ResponseTimeout()
+        return next(keys)
+
+    monkeypatch.setattr(R, "getkey", flaky)
+    r = R.Runner(cfg, tmp_path, audio=False, seed=11)
+    r.audio = type("S", (), {"play": lambda self, x: None})()
+    r.calibrate = lambda: None
+    r.panel = lambda code=None: dict(code="TO", age="0", sex="na", handedness="na",
+                                     hearing="normal", musical_training_years="0",
+                                     headphones="x", experimenter="x", consent="yes")
+    sdir = r.run(code="TO")
+
+    rows = list(csv.DictReader(open(sdir / "trials.csv")))
+    timed = [x for x in rows if x.get("timed_out") == "1"]
+    assert timed, "the run produced no timeouts, so this test proves nothing"
+    # logged under phase 'main', but with no staircase bookkeeping attached
+    for x in timed:
+        assert x["phase"] == "main"
+        assert x["track_trial_index"] == "" and x["step_index"] == ""
+        assert x["response"] == ""
+    # and the recomputed staircase agrees with the live one, which it cannot if the
+    # timed-out rows were replayed as errors
+    loaded, _ = load([sdir])
+    rep = replay_tracks(loaded, cfg)
+    for tid, a in rep.items():
+        assert a["logged_deltas_match"]
+        assert a["threshold_ms"] == pytest.approx(r.tracks[tid].threshold_ms(), rel=1e-9)
+    assert json.loads((sdir / "session.json").read_text())["n_timeouts"] == len(timed)
+    # the analysis counts them and keeps them out of the usable totals
+    from tcoh.analysis import diagnostics, thresholds
+    diag = diagnostics(loaded, [json.loads((sdir / "session.json").read_text())], cfg,
+                       thresholds(loaded, cfg))
+    assert diag["n_timeouts"] == len(timed)
+    assert diag["n_main"] == sum(1 for x in rows
+                                 if x["phase"] == "main" and x.get("timed_out") != "1")
+
+
+def test_three_timeouts_in_a_row_stop_the_session(tmp_path, monkeypatch):
+    import tcoh.runner as R
+    cfg = DEFAULT.replace(sweep_pcts=(0.0, 100.0), scrambled_pcts=(), include_b_only=False,
+                          tracks_per_condition=1, max_trials_per_track=20, n_final_reversals=2,
+                          practice_trials=2, familiarise=False, catch_rate=0.0,
+                          response_timeout_s=1.0)
+    state = {"n": 0}
+    keys = iter("12" * 400)
+
+    def walks_away(valid, prompt="", timeout_s=None):
+        if " " in valid:
+            return " "
+        state["n"] += 1
+        if timeout_s is not None and state["n"] > 5:
+            raise R.ResponseTimeout()
+        return next(keys)
+
+    monkeypatch.setattr(R, "getkey", walks_away)
+    r = R.Runner(cfg, tmp_path, audio=False, seed=11)
+    r.audio = type("S", (), {"play": lambda self, x: None})()
+    r.calibrate = lambda: None
+    r.panel = lambda code=None: dict(code="AW", age="0", sex="na", handedness="na",
+                                     hearing="normal", musical_training_years="0",
+                                     headphones="x", experimenter="x", consent="yes")
+    sdir = r.run(code="AW")
+    meta = json.loads((sdir / "session.json").read_text())
+    assert meta["status"] == "abandoned"
+    assert meta["n_timeouts"] == R.Runner.MAX_CONSECUTIVE_TIMEOUTS

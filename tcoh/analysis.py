@@ -148,7 +148,10 @@ def replay_tracks(rows: Sequence[dict], cfg: Config) -> Dict[int, dict]:
     from .track import Track
     by_track: Dict[int, List[dict]] = defaultdict(list)
     for r in rows:
-        if r.get("phase") != "main":
+        # A timed-out trial is logged under phase "main" and carries the track_id of the slot
+        # it occupied, but it never reached the staircase. Replaying it would feed the rule a
+        # 'wrong' answer the listener never gave and walk every later delta off course.
+        if r.get("phase") != "main" or _i(r, "timed_out", 0):
             continue
         tid = _i(r, "track_id")
         if tid >= 0:
@@ -206,7 +209,7 @@ def thresholds(rows: Sequence[dict], cfg: Config, use: str = "replay") -> Dict[s
 
     by_cond_trials: Dict[str, List[dict]] = defaultdict(list)
     for r in rows:
-        if r.get("phase") in ("main", "catch"):
+        if r.get("phase") in ("main", "catch") and not _i(r, "timed_out", 0):
             by_cond_trials[r["condition"]].append(r)
 
     out = {}
@@ -531,8 +534,8 @@ def endpoint_check(res: Dict[str, CondResult]) -> dict:
 # ----------------------------------------------------------------------------
 def diagnostics(rows: Sequence[dict], metas: Sequence[dict], cfg: Config,
                 res: Dict[str, CondResult]) -> dict:
-    main = [r for r in rows if r.get("phase") == "main"]
-    catch = [r for r in rows if r.get("phase") == "catch"]
+    main = [r for r in rows if r.get("phase") == "main" and not _i(r, "timed_out", 0)]
+    catch = [r for r in rows if r.get("phase") == "catch" and not _i(r, "timed_out", 0)]
     prac = [r for r in rows if r.get("phase") == "practice"]
 
     catch_p = float(np.mean([_i(r, "correct", 0) for r in catch])) if catch else float("nan")
@@ -586,6 +589,9 @@ def diagnostics(rows: Sequence[dict], metas: Sequence[dict], cfg: Config,
     n_att = sum(r.n_tracks_attempted for r in res.values())
     return {
         "n_main": len(main), "n_catch": len(catch), "n_practice": len(prac),
+        # A timed-out trial is logged but never scored, so it is not in `main`'s usable count
+        # and has to be counted from the raw rows.
+        "n_timeouts": sum(1 for r in rows if _i(r, "timed_out", 0)),
         "catch_p_correct": catch_p, "catch_miss_rate": 1.0 - catch_p if catch else float("nan"),
         "catch_ok": bool(catch and (1.0 - catch_p) <= cfg.max_catch_miss_rate),
         "practice_rounds": [p for m in metas for p in m.get("practice", [])],
@@ -648,7 +654,14 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None, n_boot: Optional
 
     # ---- is this session usable at all ----------------------------------------
     A("-- session validity " + "-" * 57)
-    A(f"  main trials {diag['n_main']}   catch {diag['n_catch']}   practice {diag['n_practice']}")
+    A(f"  main trials {diag['n_main']}   catch {diag['n_catch']}   practice {diag['n_practice']}"
+      + (f"   timed out {diag['n_timeouts']}" if diag["n_timeouts"] else ""))
+    if diag["n_timeouts"]:
+        A(f"  {diag['n_timeouts']} trial(s) drew no response within {cfg.response_timeout_s:g} s. "
+          "They are logged, excluded from")
+        A("    every threshold, and never updated a staircase; they are reported because a "
+          "listener who")
+        A("    stops responding is a fact about the session, not noise to be dropped quietly.")
     if diag["n_catch"]:
         A(f"  catch trials at {cfg.catch_delta_ms:g} ms: {diag['catch_p_correct']:.1%} correct "
           f"(miss rate {diag['catch_miss_rate']:.1%}, limit {cfg.max_catch_miss_rate:.0%})"

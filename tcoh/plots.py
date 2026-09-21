@@ -272,7 +272,9 @@ def tracks(cfg: Config, rows: Sequence[dict], path: Optional[Path] = None, max_p
     from collections import defaultdict
     by = defaultdict(list)
     for r in rows:
-        if r.get("phase") == "main":
+        # timed-out trials never entered the staircase, so drawing them would show a step the
+        # rule did not take
+        if r.get("phase") == "main" and not str(r.get("timed_out", "")).strip() in ("1", "True"):
             by[(r["condition"], r.get("track_id"))].append(r)
     keys = sorted(by, key=lambda k: (k[0], str(k[1])))[:max_panels]
     n = max(len(keys), 1)
