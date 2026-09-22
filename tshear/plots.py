@@ -154,9 +154,170 @@ def curve(cfg: Config, res, path: Optional[Path] = None, title: Optional[str] = 
     return path
 
 
+def explained(cfg: Config, path: Optional[Path] = None):
+    """One figure that explains the whole design: the tones, a trial, the jitter, the model,
+    the two predicted shapes, and the two references a listener can use."""
+    plt = _mpl()
+    import matplotlib
+    from matplotlib.patches import Rectangle
+    from matplotlib.ticker import NullFormatter
+    import numpy as np
+    from .stimulus import build_trial
+    from .model import effective_objects
+    d = validate(cfg)
+    K = cfg.target_index
+    CT, CO = "#c0392b", "#5d6d7e"
+    plt.rcParams.update({"font.size": 9, "axes.spines.top": False, "axes.spines.right": False})
+    
+    fig = plt.figure(figsize=(15.5, 10.2))
+    gs = fig.add_gridspec(3, 6, height_ratios=[1.0, 0.95, 1.05], hspace=.72, wspace=.55,
+                          left=.055, right=.985, top=.935, bottom=.075)
+    
+    def panel(ax, letter, text):
+        ax.set_title(f"{letter}   {text}", fontsize=10.5, loc="left", pad=8)
+    
+    # ================================================== A: the four tones
+    ax = fig.add_subplot(gs[0, 0:2])
+    for i, f in enumerate(cfg.freqs_hz):
+        c = CT if i == K else CO
+        ax.plot([f, f], [0, 1], color=c, lw=4, solid_capstyle="butt")
+        ax.plot(f, 1, "s" if i == K else "o", color=c, ms=9)
+        ax.annotate(f"{f:.0f}", (f, 1.10), ha="center", fontsize=8.5, color=c,
+                    fontweight="bold" if i == K else "normal")
+    ax.set_xscale("log"); ax.set_xlim(480, 5800); ax.set_ylim(0, 1.5)
+    ax.xaxis.set_minor_formatter(NullFormatter())
+    ax.set_xticks([700, 1200, 2200, 4000]); ax.set_xticklabels(["700", "1200", "2200", "4000"])
+    ax.set_yticks([]); ax.set_xlabel("frequency (Hz)")
+    panel(ax, "A", "four tones; red is the target")
+    ax.text(0, -.25, "4.4 ERB apart, inharmonic, no common fundamental.\nThe target is the 3rd of four: interior, same every trial.",
+            transform=ax.transAxes, va="top", fontsize=8, color="#444")
+    
+    # ================================================== B: one trial
+    ax = fig.add_subplot(gs[0, 2:6])
+    cond = next(c for c in d.conditions if c.name == "step_50")
+    tr = build_trial(cfg, cond, 35.0, np.random.default_rng(1), target_position=1, direction=+1)
+    IV = cfg.interval_ms()
+    for off, (name, iv) in zip((0.0, IV + cfg.isi_ms),
+                               (("interval 1   TARGET", tr.first),
+                                ("interval 2   standard", tr.second))):
+        for rep in range(cfg.n_repeats):
+            for k in range(cfg.n_tones):
+                ax.add_patch(Rectangle((off + iv.onsets_ms[rep, k], k - .34), cfg.tone_ms, .68,
+                                       color=CT if k == K else CO, alpha=.95 if k == K else .72))
+        ax.text(off + 25, cfg.n_tones - .15, name, fontsize=9.5,
+                fontweight="bold" if "TARGET" in name else "normal")
+    nom, shifted = tr.second.onsets_ms[-1, K], tr.first.onsets_ms[-1, K]
+    ax.add_patch(Rectangle((nom, K - .48), cfg.tone_ms, .96, fill=False, ec="k", lw=1.3, ls=":"))
+    ax.set_xlim(-60, 2 * IV + cfg.isi_ms + 60); ax.set_ylim(-.7, cfg.n_tones + .45)
+    ax.set_yticks(range(cfg.n_tones))
+    ax.set_yticklabels([f"{f:.0f}" for f in cfg.freqs_hz], fontsize=8)
+    ax.set_xlabel("time (ms)"); ax.set_ylabel("Hz", fontsize=8)
+    panel(ax, "B", "one trial at step 50%  —  the intervals differ in ONE tone of the LAST "
+                   "repetition, and nothing else")
+    
+    # ================================================== C: the jitter, magnified
+    ax = fig.add_subplot(gs[1, 0:2])
+    for k in range(cfg.n_tones):
+        ax.add_patch(Rectangle((tr.first.onsets_ms[-1, k], k - .34), cfg.tone_ms, .68,
+                               color=CT if k == K else CO, alpha=.95 if k == K else .72))
+    ax.add_patch(Rectangle((nom, K - .48), cfg.tone_ms, .96, fill=False, ec="k", lw=1.6, ls=":"))
+    yy = K + .78
+    ax.annotate("", (nom, yy), (shifted, yy), arrowprops=dict(arrowstyle="<->", lw=1.9, color="k"))
+    ax.text((nom + shifted) / 2, yy + .14, f"δ = {abs(tr.delta_signed_ms):.0f} ms", ha="center",
+            fontsize=10, fontweight="bold")
+    lo = float(tr.first.onsets_ms[-1].min()) - 50
+    ax.set_xlim(lo, lo + 380); ax.set_ylim(-.7, cfg.n_tones + .45)
+    ax.set_yticks([]); ax.set_xlabel("time (ms)")
+    ax.spines["left"].set_visible(False)
+    panel(ax, "C", "the last repetition, magnified")
+    ax.text(0, -.34, "dotted = where the standard puts it.\nThe staircase tracks δ; direction is "
+            "random.", transform=ax.transAxes, va="top", fontsize=8, color="#444")
+    
+    # ================================================== D: model index
+    ax = fig.add_subplot(gs[1, 2:4])
+    fine = np.arange(0, 101, 5.0)
+    idx = np.array([effective_objects(cfg, p)["normalised"] for p in fine])
+    l2 = np.array([effective_objects(cfg, p)["lambda2_over_lambda1"] for p in fine])
+    ax.plot(fine, 1 + idx * 3, "-", color="#2c3e50", lw=2.6, label="effective objects (used)")
+    ax.plot(fine, 1 + l2 * 3, ":", color="#b7950b", lw=2,
+            label="$\\lambda_2/\\lambda_1$ rescaled (not used)")
+    for p in cfg.step_pcts:
+        ax.plot(p, 1 + effective_objects(cfg, p)["normalised"] * 3, "o", color="#2c3e50", ms=8,
+                zorder=3)
+    ax.axhline(1, color="grey", ls=":", lw=1); ax.axhline(4, color="grey", ls=":", lw=1)
+    ax.set_xticks([0, 15, 30, 50, 75, 100]); ax.set_ylim(0.75, 4.35); ax.grid(alpha=.22)
+    ax.set_xlabel("shear step (%)"); ax.set_ylabel("effective number of objects")
+    panel(ax, "D", "what the model sees")
+    ax.legend(frameon=False, fontsize=7.5, loc="lower right")
+    ax.text(0, -.34, "1.00 objects at step 0, 3.84 at 100%.\n$\\lambda_2/\\lambda_1$ is NOT monotone "
+            "here — which is\nwhy the design does not use it.",
+            transform=ax.transAxes, va="top", fontsize=8, color="#444")
+    
+    # ================================================== E: the two predictions
+    ax = fig.add_subplot(gs[1, 4:6])
+    floor, plateau = 2.5, 9.0
+    fig_only = floor * (plateau / floor * 2.2) ** idx
+    ax.plot(fine, fig_only, ":", color="#1a5276", lw=1.8, label="figure reference alone")
+    ax.axhline(plateau, color=CT, lw=1.8, ls=":", label="own-rhythm reference alone")
+    ax.plot(fine, np.minimum(fig_only, plateau), "-", color="#117864", lw=3.2, zorder=4,
+            label="what a listener produces")
+    ax.set_xticks([0, 15, 30, 50, 75, 100]); ax.set_yscale("log"); ax.set_ylim(1.6, 22)
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    ax.set_yticks([2, 3, 5, 8, 12, 20]); ax.set_yticklabels(["2", "3", "5", "8", "12", "20"])
+    ax.grid(alpha=.22); ax.set_xlabel("shear step (%)"); ax.set_ylabel("jitter threshold (ms)")
+    panel(ax, "E", "the two strategies differ in SHAPE")
+    ax.legend(frameon=False, fontsize=7.5, loc="lower right")
+    ax.text(0, -.34, "Illustrative levels; the shapes are the claim.\nA flat curve is a positive "
+            "result about strategy,\nnot a null result about binding.",
+            transform=ax.transAxes, va="top", fontsize=8, color="#444")
+    
+    # ================================================== F: the two references
+    for col, p in enumerate((0.0, 50.0, 100.0)):
+        ax = fig.add_subplot(gs[2, 2 * col:2 * col + 2])
+        for rep in range(3):
+            o = onsets_ms(cfg, p, rep) - cfg.lead_ms
+            ax.add_patch(Rectangle((o[K], 1.16), cfg.tone_ms, .46, color=CT))
+            for k in range(cfg.n_tones):
+                if k == K:
+                    continue
+                row = [j for j in range(cfg.n_tones) if j != K].index(k)
+                ax.add_patch(Rectangle((o[k], row * .30), cfg.tone_ms, .24, color=CO, alpha=.78))
+        o0 = onsets_ms(cfg, p, 0)[K] - cfg.lead_ms
+        for rep in range(2):
+            x0 = o0 + rep * cfg.period_ms + cfg.tone_ms / 2
+            ax.annotate("", (x0, 1.78), (x0 + cfg.period_ms, 1.78),
+                        arrowprops=dict(arrowstyle="<->", lw=1.2, color=CT))
+        ax.text(o0 + cfg.period_ms, 1.90, f"{cfg.period_ms:.0f} ms", fontsize=8.5, ha="center",
+                color=CT, fontweight="bold")
+        ax.axhline(1.06, color="#ccc", lw=1)
+        ax.set_xlim(-300 if col == 0 else -40, 3 * cfg.period_ms + 30)
+        ax.set_ylim(-.16, 2.20)
+        ax.set_yticks([]); ax.set_xlabel("time →", fontsize=8); ax.set_xticks([])
+        for s in ("left", "bottom"):
+            ax.spines[s].set_visible(False)
+        ax.set_title(f"step {p:g}%", fontsize=10, pad=4)
+        if col == 0:
+            ax.text(-285, 1.39, "the target's\nown channel", ha="left", va="center",
+                    fontsize=8.5, color=CT, fontweight="bold")
+            ax.text(-285, .34, "the figure\nit sits in", ha="left", va="center",
+                    fontsize=8.5, color=CO, fontweight="bold")
+            ax.text(-300, 2.42, "F   the two references, and why a flat curve is interpretable",
+                    fontsize=10.5, fontweight="bold", ha="left", va="bottom")
+    fig.text(.52, .028,
+             "ABOVE THE LINE: the target repeats every 333 ms at every step — identical in all "
+             "three panels. That reference does not know the step exists,\n"
+             "so a listener using only it gives a FLAT curve.    BELOW THE LINE: the figure spreads "
+             "apart. A listener using it gives a RISING curve.",
+             ha="center", va="bottom", fontsize=9.2, color="#222")
+    if path:
+        fig.savefig(path, dpi=150); plt.close(fig)
+    return path
+
+
 def write_all(cfg: Config, out_dir: Path, dirs: Sequence[Path] = ()) -> List[Path]:
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
-    made = [schematic(cfg, out_dir / "tshear_schematic.png"),
+    made = [explained(cfg, out_dir / "tshear_explained.png"),
+            schematic(cfg, out_dir / "tshear_schematic.png"),
             prediction(cfg, out_dir / "tshear_prediction.png")]
     if dirs:
         from .analysis import load, thresholds
