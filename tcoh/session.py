@@ -25,7 +25,7 @@ import socket
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from .config import Config
 
@@ -132,16 +132,23 @@ def provenance(cfg: Config) -> dict:
 
 
 # ---- session directories -----------------------------------------------------
-def session_dir(data_dir: Path, code: str, index: int) -> Path:
-    return Path(data_dir) / code / f"tcoh_session_{index:02d}"
+SESSION_PREFIX = "tcoh"
+# The session-file helpers below are task-agnostic apart from this name and the column list, so
+# `prefix` and `fields` are parameters with the tcoh values as defaults. Sibling tasks reuse
+# them rather than growing a second copy of append-only logging and resume bookkeeping that
+# would then have to be kept in step.
 
 
-def existing_sessions(data_dir: Path, code: str) -> List[int]:
+def session_dir(data_dir: Path, code: str, index: int, prefix: str = SESSION_PREFIX) -> Path:
+    return Path(data_dir) / code / f"{prefix}_session_{index:02d}"
+
+
+def existing_sessions(data_dir: Path, code: str, prefix: str = SESSION_PREFIX) -> List[int]:
     p = Path(data_dir) / code
     if not p.exists():
         return []
     out = []
-    for q in p.glob("tcoh_session_*"):
+    for q in p.glob(f"{prefix}_session_*"):
         try:
             out.append(int(q.name.rsplit("_", 1)[1]))
         except ValueError:
@@ -149,8 +156,8 @@ def existing_sessions(data_dir: Path, code: str) -> List[int]:
     return sorted(out)
 
 
-def next_session_index(data_dir: Path, code: str) -> int:
-    return (existing_sessions(data_dir, code) or [0])[-1] + 1
+def next_session_index(data_dir: Path, code: str, prefix: str = SESSION_PREFIX) -> int:
+    return (existing_sessions(data_dir, code, prefix) or [0])[-1] + 1
 
 
 class DesignChanged(RuntimeError):
@@ -171,17 +178,18 @@ def check_resumable(meta: dict, cfg: Config, design: dict) -> None:
 class TrialLog:
     """Append-only CSV, flushed every row, so a crashed session loses nothing."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, fields: Optional[Sequence[str]] = None):
         self.path = Path(path)
+        self.fields = list(fields) if fields else list(TRIAL_FIELDS)
         self.new = not self.path.exists()
         self.f = open(self.path, "a", newline="")
-        self.w = csv.DictWriter(self.f, fieldnames=TRIAL_FIELDS, extrasaction="ignore")
+        self.w = csv.DictWriter(self.f, fieldnames=self.fields, extrasaction="ignore")
         if self.new:
             self.w.writeheader()
             self.f.flush()
 
     def write(self, row: dict) -> None:
-        self.w.writerow({k: row.get(k, "") for k in TRIAL_FIELDS})
+        self.w.writerow({k: row.get(k, "") for k in self.fields})
         self.f.flush()
         os.fsync(self.f.fileno())
 

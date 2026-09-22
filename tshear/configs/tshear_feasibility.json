@@ -1,0 +1,63 @@
+{
+ "sample_rate": 48000,
+ "monaural": false,
+ "tone_amplitude": 0.05,
+ "tone_level_db_spl": 65.0,
+ "level_rove_db": 3.0,
+ "freqs_hz": [
+  683.0,
+  1229.0,
+  2241.0,
+  3985.0
+ ],
+ "rate_hz": 3.0,
+ "tone_ms": 60.0,
+ "ramp_ms": 10.0,
+ "n_repeats": 5,
+ "step_pcts": [
+  0.0,
+  15.0,
+  30.0,
+  50.0,
+  75.0,
+  100.0
+ ],
+ "target_index": 2,
+ "delta_start_ms": 12.0,
+ "delta_min_ms": 0.25,
+ "delta_max_ms": 50.0,
+ "delta_direction": "random",
+ "lead_ms": 200.0,
+ "tail_ms": 200.0,
+ "isi_ms": 500.0,
+ "n_down": 3,
+ "step_factors": [
+  4.0,
+  2.0,
+  1.4142135623730951
+ ],
+ "reversals_per_step": [
+  1,
+  2
+ ],
+ "n_final_reversals": 6,
+ "max_trials_per_track": 90,
+ "tracks_per_condition": 1,
+ "include_single_tone": true,
+ "catch_rate": 0.07,
+ "catch_delta_ms": 45.0,
+ "catch_at_pct": 0.0,
+ "max_catch_miss_rate": 0.15,
+ "feedback": true,
+ "practice_trials": 12,
+ "practice_criterion": 0.75,
+ "practice_delta_ms": 45.0,
+ "familiarise": true,
+ "response_timeout_s": 6.0,
+ "break_every": 1,
+ "break_every_trials": 70,
+ "max_same_condition_run": 2,
+ "tracks_per_block": null,
+ "n_boot": 4000,
+ "lapse_max": 0.1
+}
