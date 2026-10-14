@@ -22,6 +22,10 @@ Without a rove both cues are available and the change is audible either way, whi
 rove is the design and not a detail. No rove of finite size destroys a cue completely, so each
 trial type has a ceiling: the threshold of an ideal observer that uses ONLY the destroyed cue.
 `ceiling` computes it, and at the default 10 dB both sit near 8 dB.
+
+This module is the prototype behind `notebooks/level_probe.ipynb`. For experiments use `tcbound`:
+here a fused listener can still do type B from the change of timbre into the last repetition
+(an ideal observer of that cue alone needs only 4 dB), which `tcbound` closes.
 """
 from __future__ import annotations
 

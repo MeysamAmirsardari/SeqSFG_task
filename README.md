@@ -1330,3 +1330,23 @@ Five presets in `tcoh/configs/`: `tcoh_core` (the default, 121 min), `tcoh_full`
 control and a build-up manipulation scored against its own ceiling), `tcoh_screen` (short, and *not* a test of the
 hypothesis), `tcoh_fine` (nine ΔT levels), and `tcoh_elhilali_replication` (her Figure 2
 directly, tempo controls, monaural).
+
+## 14. A separate task: the binding bound in a sheared figure (`tcbound/`)
+
+Four pure tones repeat at 3 Hz with their onsets sheared from a chord (0 ms) to an arpeggio
+(64 ms). The target tone is louder on the last repetition in one of two intervals. Two randomly
+interleaved trial types rove the levels so that the judgment needs the four tones bound (type A,
+target re the others at that moment) or the target segregated (type B, target re its own past).
+The shear at which the listener's reliance moves from the first comparison to the second is the
+bound of temporal coherence, and two readings of the coherence model put it at 18 and 35 ms.
+
+```bash
+python -m tcbound design      # conditions, levels, shortcut ceilings, duration (about 36 min)
+python -m tcbound verify      # 19 checks, no listener needed
+python -m tcbound run --config tcbound/configs/tcbound_main.json --data data_tcbound --code L01
+python -m tcbound group data_tcbound/L*/tcbound_session_* --out group_out/
+```
+
+- [`tcbound/README.md`](tcbound/README.md): the design, the controls, what is new, the limits
+- [`tcbound/PROTOCOL_2026-10-14.md`](tcbound/PROTOCOL_2026-10-14.md): hypotheses, sample size,
+  exclusion rules and analysis, fixed before any listener, with the operator checklist

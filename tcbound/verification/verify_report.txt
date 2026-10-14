@@ -1,0 +1,49 @@
+tcbound verification  |  config 5010d4525779b21a  |  19/19 checks pass
+
+stimulus
+  [PASS] the cue each type keeps is exact: signal minus standard = the increment
+         13 conditions x 2 increments x 300 draws, error < 1e-9 dB
+  [PASS] no shortcut: every cue other than the kept one needs >= 8 dB
+         A/capture: target_level 8.5 dB, A/figure: target_level 8.5 dB, B/alone: target_level 8.5 dB, B/capture: timbre_change 8.5 dB, B/figure: timbre_change 8.5 dB
+  [PASS] A and B are indistinguishable before the probe, and alike at it
+         before the probe: one code path, target offset KS p = 0.83; on the probe: jump of the others KS p = 0.31, jump of the target relative to them KS p = 0.81 (4000 intervals each)
+  [PASS] both intervals of a trial share every onset and phase
+         13 conditions
+  [PASS] the rendered waveform reads back the gain matrix
+         every tone of every repetition, four conditions, both intervals: largest error 0.0136 dB
+  [PASS] target onsets on the waveform match the geometry; no channel overlaps itself
+         largest onset error 0.000 ms over 13 conditions; closest same-channel gap at least 40 ms
+  [PASS] nothing clips
+         worst case 0.83 FS (all four in phase at the top of the rove and the track); largest of 300 rendered trials at the cap 0.79 FS
+  [PASS] the gated target puts no energy at the other tones' frequencies
+         spectrum of one gated target tone at the nearest other frequency: -96 dB re its peak
+
+periphery
+  [PASS] the target dominates its own place on the cochlea at the worst-case levels
+         target at 43 dB SPL; 683 Hz at 67 dB SPL -> -3 dB at the target's place; 1229 Hz at 67 dB SPL -> 25 dB at the target's place; 3985 Hz at 67 dB SPL -> -32 dB at the target's place; smallest margin 18 dB
+
+model
+  [PASS] rho_T is 1 at step 0 and falls monotonically, under both readings
+         half-wave 1.00 0.85 0.64 0.37 0.17; magnitude 1.00 0.98 0.94 0.85 0.65
+  [PASS] the two readings predict bounds the steps can tell apart
+         half-way 18.2 ms against 35.0 ms
+  [PASS] the capture control lowers rho_T without asynchrony
+         rho_T 0.71, the value a shear of 13.3 ms gives (half-wave reading)
+
+procedure
+  [PASS] the SRS staircase is the tcoh rule on dA/A, reversal for reversal
+         200 random response sequences, 0 mismatches
+  [PASS] the staircase recovers a known threshold
+         thresholds -12..+4 dB SRS, slopes 0.7-1.5: worst bias 1.77 dB, median spread 3.19 dB, median 26 trials (90th pct 37), unconverged 2.5%
+  [PASS] every condition is interleaved evenly over the session
+         13 tracks; serial-position spread 0.006; longest planned run 1; catch 6.0%
+  [PASS] the session fits in 40 minutes
+         median 36.5 min, 90th percentile 39.3 min over 10 simulated sessions (398 trials incl. 23 catch and 19 fillers); 41.0 min if practice needs three rounds
+
+inference
+  [PASS] a listener whose binding follows the model gives the model's bound
+         10 simulated listeners, one session each: H1 p = 1e-07, H2 p = 1e-10, bound 21.0 ms against a true 18.2 ms; alpha 1.13
+  [PASS] captors at synchrony lower the timbre weight, as the model says
+         w(capture) - w(0) = -0.21, p = 0.003; predicted w 0.68, observed 0.73
+  [PASS] a listener for whom shear changes nothing gives no effect
+         H1 p = 0.03, H2 p = 0.36, bound undefined

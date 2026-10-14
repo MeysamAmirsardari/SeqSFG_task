@@ -1,0 +1,38 @@
+binding bound in a sheared four-tone figure  |  config 5010d4525779b21a
+  tones      683 + 1229 + 2241 + 3985 Hz   (4.4 ERB apart at the closest, 8% from the nearest simple ratio)
+             60 ms tones, 10 ms ramps, repeating at 3 Hz, 5 repetitions; the last is the probe
+  target     tone 3 of 4 (2241 Hz), the same on every trial
+  shear      steps 0, 8, 16, 32, 64 ms between adjacent tones
+  roves      d, v, w uniform +/-12 dB; interval rove +/-0 dB; flanker jitter +/-0 dB
+  tracking   SRS from +4 dB (dL 8.2 dB), steps 4/2 dB, 3-down 1-up, 4 final reversals, cap +9.5 dB (dL 12.0 dB)
+  levels     one tone 55 dB SPL nominal, range 43 to 79 dB SPL; worst-case peak 0.83 FS
+  trial      3.59 to 3.97 s of sound
+
+  condition  task  step ms     kind  role
+  A_0           A        0   figure  main
+  B_0           B        0   figure  main
+  A_8           A        8   figure  main
+  B_8           B        8   figure  main
+  A_16          A       16   figure  main
+  B_16          B       16   figure  main
+  A_32          A       32   figure  main
+  B_32          B       32   figure  main
+  A_64          A       64   figure  main
+  B_64          B       64   figure  main
+  A_cap         A        0  capture  control
+  B_cap         B        0  capture  control
+  B_alone       B        0    alone  control
+  catch      none        0   figure  6% of trials, dL 8 dB, no rove
+
+  shortcut ceilings: the increment (dL, dB) at which an ideal observer of ONE cue reaches 79.4%
+    A figure   exact: timbre, nearest; lowest shortcut target level, across intervals at 8.5 dB (SRS +4.5)
+    B figure   exact: own; lowest shortcut change of timbre into the probe at 8.5 dB (SRS +4.4)
+    A capture  exact: timbre, nearest; lowest shortcut target level, across intervals at 8.5 dB (SRS +4.5)
+    B capture  exact: own; lowest shortcut change of timbre into the probe at 8.5 dB (SRS +4.4)
+    B alone    exact: own, overall_change; lowest shortcut target level, across intervals at 8.5 dB (SRS +4.5)
+
+  duration   398 trials (349-429 over 10 simulated sessions), 25 per track, 23 catch, 19 fillers
+             36 min median, 39 min 90th percentile: 28 main + 4.5 rests + 0.8 practice + 2 familiarisation + 1 instructions
+             with three practice rounds: 41 min at the 90th percentile
+
+  order      13 tracks, cycles of random permutations; serial-position spread 0.008; catch 6.0%
