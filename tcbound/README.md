@@ -21,6 +21,9 @@ python -m tcbound export data_tcbound/L01/tcbound_session_01 --out stimuli/   # 
 The protocol for the main study, with hypotheses, sample size and exclusion rules fixed in
 advance, is [PROTOCOL_2026-10-14.md](PROTOCOL_2026-10-14.md).
 
+To hear every condition, explore the stimulus and measure your own bound in the browser, open
+[the notebook in Colab](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/binding_bound.ipynb) (`notebooks/binding_bound.ipynb`).
+
 ## The question
 
 Temporal coherence (Elhilali et al. 2009; Shamma et al. 2011) says that channels whose

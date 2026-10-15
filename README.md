@@ -1350,3 +1350,5 @@ python -m tcbound group data_tcbound/L*/tcbound_session_* --out group_out/
 - [`tcbound/README.md`](tcbound/README.md): the design, the controls, what is new, the limits
 - [`tcbound/PROTOCOL_2026-10-14.md`](tcbound/PROTOCOL_2026-10-14.md): hypotheses, sample size,
   exclusion rules and analysis, fixed before any listener, with the operator checklist
+- [`notebooks/binding_bound.ipynb`](https://colab.research.google.com/github/MeysamAmirsardari/SeqSFG_task/blob/main/notebooks/binding_bound.ipynb): hear it, explore it, and measure your own bound in
+  Colab
