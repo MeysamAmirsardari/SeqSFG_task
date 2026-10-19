@@ -74,10 +74,10 @@ def cmd_model(args):
     from .observer import threshold
     from .config import conditions
     print("lambda2/lambda1 for jittered pairs, and what two model listeners can reach")
-    print(f"  {'condition':<10} {'lag':>5} {'l2/l1':>7} {'B only':>9} {'A-B lag':>9}")
+    print(f"  {'condition':<10} {'dT':>5} {'l2/l1':>7} {'B only':>9} {'A-B lag':>9}")
     for c in conditions(cfg):
         idx = "-" if c.kind == "b_alone" else f"{lag_index(cfg, c.lag_ms):.3f}"
-        print(f"  {c.name:<10} {('-' if c.kind == 'b_alone' else f'{c.lag_ms:g}'):>5} {idx:>7} "
+        print(f"  {c.name:<10} {('-' if c.kind == 'b_alone' else f'{cfg.lag_pct(c.lag_ms):g}%'):>5} {idx:>7} "
               f"{threshold(cfg, c, 'single', n=800):7.1f}ms {threshold(cfg, c, 'pair', n=800):7.1f}ms")
     lags = [c.lag_ms for c in conditions(cfg) if c.kind == "pair"]
     band = prediction_band(cfg, lags, n_seq=15)
@@ -146,7 +146,7 @@ def main(argv=None):
     q.set_defaults(func=cmd_verify)
     q = sub.add_parser("model"); add_common(q); q.set_defaults(func=cmd_model)
     q = sub.add_parser("demo"); add_common(q)
-    q.add_argument("--out", default="demo"); q.add_argument("--delta", type=float, default=25.0)
+    q.add_argument("--out", default="demo"); q.add_argument("--delta", type=float, default=20.0)
     q.add_argument("--seed", type=int, default=0); q.set_defaults(func=cmd_demo)
     q = sub.add_parser("calibrate"); add_common(q)
     q.add_argument("--data", default="data"); q.add_argument("--device")

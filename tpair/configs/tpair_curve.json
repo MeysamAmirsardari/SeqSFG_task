@@ -6,21 +6,21 @@
  "level_rove_db": 3.0,
  "f_a_hz": 700.0,
  "f_b_hz": 2262.0,
- "tone_ms": 100.0,
- "ramp_ms": 10.0,
+ "tone_ms": 75.0,
+ "ramp_ms": 5.0,
+ "a_leads": true,
  "rate_hz": 3.0,
  "n_pairs": 6,
- "pair_jitter_ms": 40.0,
+ "pair_jitter_ms": 35.0,
  "interval_ms": 2000.0,
  "lead_ms": 50.0,
  "isi_ms": 500.0,
  "lags_ms": [
   0.0,
-  10.0,
-  25.0,
-  50.0,
-  75.0,
-  100.0
+  18.75,
+  37.5,
+  56.25,
+  75.0
  ],
  "include_b_alone": true,
  "target_from_end": [
@@ -28,9 +28,10 @@
   2
  ],
  "delta_direction": "backward",
- "delta_start_ms": 20.0,
+ "delta_start_ms": 10.0,
  "delta_min_ms": 0.25,
- "delta_max_ms": 120.0,
+ "delta_max_ms": 70.0,
+ "delta_max_b_alone_ms": 120.0,
  "n_down": 3,
  "step_factors": [
   4.0,

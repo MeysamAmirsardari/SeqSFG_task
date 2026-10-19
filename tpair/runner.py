@@ -21,7 +21,7 @@ from .stimulus import build_trial, render_trial, to_output
 
 FIELDS = ["trial_index", "phase", "slot_index", "block", "track_id", "track_trial_index",
           "condition", "lag_ms", "kind", "is_catch", "delta_ms", "delta_signed_ms",
-          "delta_realised_ms", "target_pair", "pairing_preserved", "step_index", "reversal",
+          "delta_realised_ms", "target_pair", "pairing_preserved", "passes_a_onset", "step_index", "reversal",
           "at_ceiling", "at_floor", "target_position", "response", "correct", "rt_ms",
           "rove_db_1", "rove_db_2", "jitter_1", "jitter_2", "feedback", "timed_out",
           "t_start", "t_response"]
@@ -33,7 +33,7 @@ FIELDS = ["trial_index", "phase", "slot_index", "block", "track_id", "track_tria
 INSTRUCTIONS = """
 On every trial you will hear TWO sounds, one after the other, with a short gap between them.
 
-Each sound is a run of tone pairs -- a low tone and a high tone -- about three a second. The
+Each sound is a run of tone pairs -- a low tone, then a high tone -- about three a second. The
 pairs come a little irregularly; that is deliberate and is the same in both sounds.
 
 In ONE of the two sounds, near the end, one high tone comes slightly early.
@@ -132,7 +132,7 @@ class Runner:
             spec = by_id.get(tid)
             if spec is None:
                 continue
-            t = self.tracks.setdefault(tid, Track(self.cfg, spec["condition"], spec["seed"]))
+            t = self.tracks.setdefault(tid, Track(self.cfg.track_cfg(self.cond[spec["condition"]].kind), spec["condition"], spec["seed"]))
             if not t.finished:
                 t.update(bool(int(float(r["correct"]))))
         return done
@@ -296,6 +296,7 @@ class Runner:
                "delta_realised_ms": f"{tr.delta_realised_ms:.6f}",
                "target_pair": tr.target_pair,
                "pairing_preserved": int(tr.pairing_preserved),
+               "passes_a_onset": int(tr.passes_a_onset),
                "step_index": "" if track is None else track.step_index,
                "reversal": "" if track is None or not track.trials
                else int(track.trials[-1].reversal),
@@ -373,7 +374,7 @@ class Runner:
             tid = slot["track_id"]
             spec = by_id[tid]
             if tid not in self.tracks:
-                self.tracks[tid] = Track(cfg, spec["condition"], spec["seed"])
+                self.tracks[tid] = Track(cfg.track_cfg(self.cond[spec["condition"]].kind), spec["condition"], spec["seed"])
             track = self.tracks[tid]
             if track.finished:
                 continue

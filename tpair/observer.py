@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 
 from .config import Config, conditions
-from .stimulus import Interval, build_trial
+from .stimulus import Interval, build_trial, token_lags
 
 SINGLE_NOISE_MS = 8.0
 PAIR_FLOOR_MS = 1.5
@@ -34,11 +34,12 @@ def _single_score(cfg: Config, iv: Interval, rng) -> float:
 
 
 def _pair_score(cfg: Config, iv: Interval, rng) -> float:
-    lag = iv.a_onsets_ms - iv.b_onsets_ms
+    lag = token_lags(cfg, iv)
     sd = PAIR_FLOOR_MS + PAIR_WEBER * np.abs(np.nanmedian(lag))
     lag = lag + rng.normal(0, sd, lag.size)
     ref = np.median([lag[i] for i in range(cfg.n_pairs) if i not in cfg.target_pairs])
-    return float(max(lag[i] - ref for i in cfg.target_pairs))  # B early -> lag grows
+    sign = -1.0 if cfg.a_leads else 1.0                         # an early B shrinks a trailing lag
+    return float(max(sign * (lag[i] - ref) for i in cfg.target_pairs))
 
 
 def choose(cfg: Config, tr, mode: str, rng) -> int:
@@ -63,7 +64,7 @@ def p_correct(cfg: Config, cond, delta_ms: float, mode: str, n: int = 2000,
 def threshold(cfg: Config, cond, mode: str, n: int = 1500, seed: int = 0,
               target: float = 0.7937) -> float:
     """The 79.4% point of this observer in this condition, by interpolation."""
-    deltas = np.geomspace(cfg.delta_min_ms * 2, cfg.delta_max_ms, 16)
+    deltas = np.geomspace(cfg.delta_min_ms * 2, cfg.track_cfg(cond.kind).delta_max_ms, 16)
     pc = np.array([p_correct(cfg, cond, d, mode, n, seed + i) for i, d in enumerate(deltas)])
     pc = np.maximum.accumulate(pc)
     if pc[-1] < target:

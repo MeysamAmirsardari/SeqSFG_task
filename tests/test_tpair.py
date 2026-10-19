@@ -48,22 +48,49 @@ def test_validate_rejects_close_or_harmonic_tones_and_impossible_geometry():
     with pytest.raises(ConfigError, match="simple ratio|from"):
         validate(CFG.replace(f_b_hz=2100.0))   # exactly 3:1
     with pytest.raises(ConfigError, match="same frequency"):
-        validate(CFG.replace(delta_max_ms=160.0))
+        validate(CFG.replace(delta_max_b_alone_ms=200.0))
+    with pytest.raises(ConfigError, match="gap inside the token"):
+        validate(CFG.replace(delta_max_ms=80.0))      # an early B would clear A at lag 0
+    with pytest.raises(ConfigError, match="gap inside the token"):
+        validate(CFG.replace(lags_ms=(0.0, 90.0)))    # beyond 100%
     with pytest.raises(ConfigError, match="interval"):
         validate(CFG.replace(interval_ms=1700.0))
 
 
 # ============================================================ stimulus invariants
-@pytest.mark.parametrize("lag", [0.0, 10.0, 50.0, 100.0])
+def test_the_five_levels_are_0_to_100_percent_of_the_tone_with_a_first():
+    assert CFG.a_leads and CFG.tone_ms == 75.0
+    assert [CFG.lag_pct(c.lag_ms) for c in PAIR] == [0, 25, 50, 75, 100]
+    tr = S.build_trial(CFG, PAIR[2], 10.0, np.random.default_rng(1))
+    assert np.all(tr.standard.b_onsets_ms - tr.standard.a_onsets_ms == pytest.approx(37.5))
+
+
+def test_there_is_never_a_gap_inside_a_token():
+    rng = np.random.default_rng(11)
+    for c in PAIR:
+        for _ in range(200):
+            tr = S.build_trial(CFG, c, float(rng.uniform(CFG.delta_min_ms, CFG.delta_max_ms)), rng)
+            for iv in (tr.first, tr.second):
+                a, b = iv.a_onsets_ms, iv.b_onsets_ms
+                assert np.all(np.maximum(a, b) <= np.minimum(a, b) + CFG.tone_ms + 1e-9)
+
+
+def test_old_sessions_without_a_leads_still_read_as_b_first():
+    from tpair.config import Config
+    old = {k: v for k, v in CFG.to_dict().items() if k not in ("a_leads", "delta_max_b_alone_ms")}
+    assert Config.from_dict(old).a_leads is False
+
+
+@pytest.mark.parametrize("lag", [0.0, 18.75, 37.5, 75.0])
 def test_the_lag_is_exact_in_every_pair_but_the_displaced_one(lag):
     c = next(x for x in PAIR if x.lag_ms == lag)
     rng = np.random.default_rng(int(lag) + 3)
     for _ in range(100):
-        tr = S.build_trial(CFG, c, float(rng.uniform(1, 100)), rng)
+        tr = S.build_trial(CFG, c, float(rng.uniform(1, CFG.delta_max_ms)), rng)
         for iv in (tr.first, tr.second):
-            d = iv.a_onsets_ms - iv.b_onsets_ms
+            d = S.token_lags(CFG, iv)
             for k in range(CFG.n_pairs):
-                want = lag - iv.delta_ms if k == iv.target_pair else lag
+                want = lag + iv.delta_ms if k == iv.target_pair else lag
                 assert d[k] == pytest.approx(want, abs=1e-9)
 
 
@@ -73,7 +100,7 @@ def test_the_jitter_moves_whole_pairs_and_is_independent_between_intervals():
     for _ in range(3000):
         tr = S.build_trial(CFG, PAIR[2], 10.0, rng)
         for iv in (tr.first, tr.second):
-            assert np.allclose(iv.b_onsets_ms - CFG.nominal_onsets(),
+            assert np.allclose(iv.b_onsets_ms - CFG.nominal_onsets() - PAIR[2].lag_ms,
                                np.where(np.arange(CFG.n_pairs) == (iv.target_pair or -1),
                                         iv.jitter_ms + iv.delta_ms, iv.jitter_ms))
         j1.append(tr.first.jitter_ms); j2.append(tr.second.jitter_ms)
@@ -89,7 +116,7 @@ def test_a_never_moves_relative_to_its_pair():
         for _ in range(50):
             tr = S.build_trial(CFG, c, 30.0, rng)
             t = tr.target
-            assert np.allclose(t.a_onsets_ms, CFG.nominal_onsets() + t.jitter_ms + c.lag_ms)
+            assert np.allclose(t.a_onsets_ms, CFG.nominal_onsets() + t.jitter_ms)
 
 
 def test_only_b_of_pair_n_or_n_minus_1_moves_and_only_early():
@@ -109,7 +136,7 @@ def test_no_tone_ever_sums_with_one_of_its_own_frequency():
     worst = np.inf
     for c in CONDS:
         for _ in range(300):
-            tr = S.build_trial(CFG, c, CFG.delta_max_ms, rng)
+            tr = S.build_trial(CFG, c, CFG.track_cfg(c.kind).delta_max_ms, rng)
             for iv in (tr.first, tr.second):
                 for ons in (iv.b_onsets_ms, iv.a_onsets_ms):
                     o = np.sort(ons[np.isfinite(ons)])
@@ -128,8 +155,9 @@ def test_the_b_alone_control_has_no_a_tones():
 
 def test_the_realised_shift_is_what_was_rendered():
     q = 1000.0 / CFG.sample_rate
-    for d in (0.25, 1.0, 7.3, 50.0, 120.0):
-        tr = S.build_trial(CFG, PAIR[0], d, np.random.default_rng(1))
+    solo = next(x for x in CONDS if x.kind == "b_alone")
+    for c, d in [(PAIR[0], d) for d in (0.25, 1.0, 7.3, 50.0, 70.0)] + [(solo, 120.0)]:
+        tr = S.build_trial(CFG, c, d, np.random.default_rng(1))
         assert abs(abs(tr.delta_realised_ms) - d) <= q
 
 
@@ -195,9 +223,11 @@ def test_the_analysis_tells_the_two_listeners_apart(sessions):
     r2, _ = load([sessions["single"]]); res2 = thresholds(r2, CFG)
     assert trend_test(res1, n_perm=2000)["p_one_sided"] < 0.05
     assert trend_test(res2, n_perm=2000)["p_one_sided"] > 0.05
-    # the pair listener beats B alone at every lag; the single listener does not
-    assert min(what_a_adds(res1)["ratio_by_lag"].values()) > 1.2
-    assert min(what_a_adds(res2)["ratio_by_lag"].values()) < 1.2
+    # the pair listener beats B alone at every lag; the single listener does not, on average
+    w1, w2 = what_a_adds(res1)["ratio_by_lag"], what_a_adds(res2)["ratio_by_lag"]
+    assert min(w1.values()) > 1.2
+    gm = lambda w: float(np.exp(np.mean(np.log(list(w.values())))))
+    assert gm(w1) > 2.5 and gm(w2) < 1.6
     # and the strategy check flags only the one who used B alone
     assert abs(strategy_check(r1, CFG)["pair conditions"]["z"]) < 3.0
     assert strategy_check(r2, CFG)["pair conditions"]["z"] > 3.0

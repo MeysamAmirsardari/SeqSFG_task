@@ -57,6 +57,7 @@ class Trial:
     delta_realised_ms: float
     target_pair: int
     pairing_preserved: bool       # the displaced B is still nearer its own A than any other
+    passes_a_onset: bool          # the early B reached or passed its own A's onset
     condition: str
     phases: Tuple[np.ndarray, np.ndarray]     # per interval, shape (2, n_pairs): B row, A row
     is_catch: bool = False
@@ -72,8 +73,13 @@ class Trial:
 
 def build_interval(cfg: Config, cond: Condition, jitter: np.ndarray, level_db: float,
                    target_pair: Optional[int] = None, delta_signed_ms: float = 0.0) -> Interval:
-    b = cfg.nominal_onsets() + np.asarray(jitter, float)
-    a = b + cond.lag_ms if cond.kind == "pair" else np.full(cfg.n_pairs, np.nan)
+    t = cfg.nominal_onsets() + np.asarray(jitter, float)
+    if cfg.a_leads:
+        b = t + (cond.lag_ms if cond.kind == "pair" else 0.0)
+        a = t if cond.kind == "pair" else np.full(cfg.n_pairs, np.nan)
+    else:
+        b = t
+        a = t + cond.lag_ms if cond.kind == "pair" else np.full(cfg.n_pairs, np.nan)
     if target_pair is not None:
         b = b.copy()
         b[target_pair] += delta_signed_ms
@@ -85,7 +91,7 @@ def build_trial(cfg: Config, cond: Condition, delta_ms: float, rng: np.random.Ge
                 target_position: Optional[int] = None, target_pair: Optional[int] = None,
                 direction: Optional[int] = None, jitters=None, is_catch: bool = False) -> Trial:
     """One trial. Every random draw happens here, once."""
-    delta_ms = float(np.clip(delta_ms, cfg.delta_min_ms, cfg.delta_max_ms))
+    delta_ms = float(np.clip(delta_ms, cfg.delta_min_ms, cfg.track_cfg(cond.kind).delta_max_ms))
     if target_position is None:
         target_position = int(rng.integers(1, 3))
     if target_pair is None:
@@ -117,8 +123,16 @@ def build_trial(cfg: Config, cond: Condition, delta_ms: float, rng: np.random.Ge
     realised = (int(round(tgt.b_onsets_ms[target_pair] * fs / 1000.0))
                 - int(round(nominal_b * fs / 1000.0))) * 1000.0 / fs
     return Trial(ivs[0], ivs[1], int(target_position), float(delta_ms), float(signed),
-                 float(realised), int(target_pair), pairing_preserved(tgt), cond.name,
+                 float(realised), int(target_pair), pairing_preserved(tgt),
+                 bool(cond.kind == "pair" and tgt.b_onsets_ms[target_pair]
+                      <= tgt.a_onsets_ms[target_pair] + 1e-9 and cond.lag_ms > 0),
+                 cond.name,
                  phases, is_catch)
+
+
+def token_lags(cfg: Config, iv: Interval) -> np.ndarray:
+    """Onset of the trailing tone minus the leading one, per token, as the design defines it."""
+    return (iv.b_onsets_ms - iv.a_onsets_ms) if cfg.a_leads else (iv.a_onsets_ms - iv.b_onsets_ms)
 
 
 def pairing_preserved(iv: Interval) -> bool:

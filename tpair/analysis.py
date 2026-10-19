@@ -83,6 +83,7 @@ class CondResult:
     n_trials: int
     prop_correct: float
     pairing_flip_fraction: float
+    passes_a_onset_fraction: float = 0.0
 
     @property
     def censored(self) -> bool:
@@ -97,7 +98,7 @@ def replay_tracks(rows: Sequence[dict], cfg: Config) -> Dict[int, dict]:
     out = {}
     for tid, rs in by.items():
         rs.sort(key=lambda r: _i(r, "track_trial_index"))
-        t = Track(cfg, rs[0]["condition"], 0)
+        t = Track(cfg.track_cfg(rs[0].get("kind", "pair")), rs[0]["condition"], 0)
         for r in rs:
             if t.finished:
                 break
@@ -142,7 +143,8 @@ def thresholds(rows: Sequence[dict], cfg: Config) -> Dict[str, CondResult]:
             name, c.lag_ms, c.kind, u, cens.get(name, []), side.get(name, ""), att.get(name, 0),
             float(np.exp(np.mean(np.log(u)))) if u else None, f, len(tr),
             float(yy.mean()) if yy.size else float("nan"),
-            float(np.mean([1 - _i(r, "pairing_preserved", 1) for r in tr])) if tr else 0.0)
+            float(np.mean([1 - _i(r, "pairing_preserved", 1) for r in tr])) if tr else 0.0,
+            float(np.mean([_i(r, "passes_a_onset", 0) for r in tr])) if tr else 0.0)
     return out
 
 
@@ -170,12 +172,24 @@ def what_a_adds(res: Dict[str, CondResult]) -> dict:
     bound = (float(np.exp(np.mean(np.log(solo.censored_thresholds))))
              if solo.censored and not solo.geomean_ms else None)
     ref = solo.geomean_ms or bound
-    out = {}
+    # A lag whose tracks hit the ceiling is the opposite case. Dropping those tracks would keep
+    # only the lucky ones and make a listener who ignored A look as if A helped; so they are
+    # pooled with the usable tracks as values the threshold is at least, and the ratio becomes
+    # an UPPER bound on what A added there.
+    out, upper = {}, set()
     for r in sorted(res.values(), key=lambda r: r.lag_ms):
-        if r.kind == "pair" and r.geomean_ms:
-            out[r.lag_ms] = ref / r.geomean_ms
+        if r.kind != "pair":
+            continue
+        ceil = r.censored_thresholds if r.censor_side == "ceiling" else []
+        vals = list(r.track_thresholds) + list(ceil)
+        if not vals:
+            continue
+        out[r.lag_ms] = ref / float(np.exp(np.mean(np.log(vals))))
+        if ceil:
+            upper.add(r.lag_ms)
     return {"ok": True, "b_alone_ms": solo.geomean_ms, "b_alone_bound_ms": bound,
-            "is_lower_bound": bound is not None, "ratio_by_lag": out}
+            "is_lower_bound": bound is not None, "ratio_by_lag": out,
+            "upper_bound_lags": sorted(upper)}
 
 
 # ---------------------------------------------------------------------------- strategy
@@ -372,23 +386,23 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None) -> str:
     A(f"  pressed '1' on {100 * g['press_1_rate']:.1f}% (p={g['press_1_p']:.3f}); drift "
       f"rho={g['drift_rho']:+.3f} (p={g['drift_p']:.3f}); halves {100 * g['first_half']:.1f}% / "
       f"{100 * g['second_half']:.1f}% correct")
-    A(f"  the early B sat nearer the previous pair's A on {100 * g['pairing_flip_fraction']:.1f}% "
-      "of pair trials")
+
     A("  WARNING: level was NOT measured; levels are nominal." if g["level_db_spl"] is None
       else f"  level: {g['level_db_spl']:.1f} dB SPL for one tone")
     A("")
     A("-- thresholds " + "-" * 63)
-    A(f"  {'condition':<9} {'lag':>5} {'tracks':>7} {'staircase':>11} {'fit':>8} {'%corr':>7} "
-      f"{'model':>7}")
+    A(f"  {'condition':<9} {'dT':>5} {'tracks':>7} {'staircase':>11} {'fit':>8} {'%corr':>7} "
+      f"{'model':>7} {'B past A':>9}")
     for c in d.conditions:
         r = res[c.name]
         g_ = (f"{r.geomean_ms:8.2f} ms" if r.geomean_ms else
               f"  >{np.exp(np.mean(np.log(r.censored_thresholds))):5.1f}*" if r.censored else "       -  ")
         fit = f"{r.fit.threshold_ms:6.2f}" if r.fit else "     -"
         mv = d.model_index[c.name]
-        A(f"  {c.name:<9} {('-' if c.kind == 'b_alone' else f'{c.lag_ms:g}'):>5} "
+        A(f"  {c.name:<9} {('-' if c.kind == 'b_alone' else f'{cfg.lag_pct(c.lag_ms):g}%'):>5} "
           f"{len(r.track_thresholds)}/{r.n_tracks_attempted:<5} {g_:>11} {fit:>8} "
-          f"{100 * r.prop_correct:6.1f}% {('-' if mv != mv else f'{mv:.3f}'):>7}")
+          f"{100 * r.prop_correct:6.1f}% {('-' if mv != mv else f'{mv:.3f}'):>7} "
+          f"{('-' if c.kind == 'b_alone' else f'{100 * r.passes_a_onset_fraction:.0f}%'):>9}")
     if any(r.censored for r in res.values()):
         A("  * boundary-limited: a bound, not a threshold; excluded from every summary below")
     A("")
@@ -400,9 +414,16 @@ def analyse(dirs: Sequence[Path], cfg: Optional[Config] = None) -> str:
                f"at least {w['b_alone_bound_ms']:.0f} ms (boundary-limited, so a lower bound)")
         A(f"  B alone: {ref}. Each lag's threshold against it:")
         for lag, ratio in w["ratio_by_lag"].items():
-            A(f"    lag {lag:5g} ms   {ge}{ratio:5.2f}x better than B alone"
+            up = lag in w["upper_bound_lags"]
+            if up and w["is_lower_bound"]:
+                A(f"    dT {cfg.lag_pct(lag):5g}%   not determinable: both this lag and B alone "
+                  "hit the ceiling")
+                continue
+            mark = "\u2264" if up else ge
+            A(f"    dT {cfg.lag_pct(lag):5g}%   {mark}{ratio:5.2f}x better than B alone"
+              + ("   (tracks at the ceiling: at most this)" if up else "")
               + ("   <-- NO BETTER: A was not being used here"
-                 if ratio < 1.2 and not w["is_lower_bound"] else ""))
+                 if ratio < 1.2 and (up or not w["is_lower_bound"]) else ""))
     else:
         A(f"  not computed: {w['reason']}")
     sc = strategy_check(rows, cfg)

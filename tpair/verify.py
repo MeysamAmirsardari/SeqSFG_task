@@ -15,7 +15,7 @@ import numpy as np
 from scipy import stats
 
 from .config import FUSION_MARGIN_MS, Config, conditions, validate
-from .stimulus import Interval, build_trial, render_interval, render_trial
+from .stimulus import Interval, build_trial, render_interval, render_trial, token_lags
 
 
 @dataclass
@@ -44,16 +44,32 @@ def stimulus_checks(cfg: Config, n: int = 3000, seed: int = 4) -> List[Check]:
         for _ in range(200):
             tr = build_trial(cfg, c, float(rng.uniform(1, cfg.delta_max_ms)), rng)
             for iv in (tr.first, tr.second):
-                lag = iv.a_onsets_ms - iv.b_onsets_ms
+                lag = token_lags(cfg, iv)
                 keep = [k for k in range(cfg.n_pairs) if k != iv.target_pair]
                 worst = max(worst, float(np.abs(lag[keep] - c.lag_ms).max()))
-            t = tr.target
-            got = t.a_onsets_ms[tr.target_pair] - t.b_onsets_ms[tr.target_pair]
-            if abs(got - (c.lag_ms - tr.delta_signed_ms)) > 1e-9:
+            got = token_lags(cfg, tr.target)[tr.target_pair]
+            want = c.lag_ms + (tr.delta_signed_ms if cfg.a_leads else -tr.delta_signed_ms)
+            if abs(got - want) > 1e-9:
                 bad.append(c.name)
     out.append(Check("the lag is exact in every pair except the displaced one", not bad and worst < 1e-9,
                      f"{len(pair_conds)} lags x 200 trials: largest error {worst:.1e} ms; in the "
-                     "displaced pair the lag is exactly lag + delta"))
+                     "displaced pair the lag is exactly lag - delta (B early)"))
+
+    # 1b. never a gap inside a token: A and B overlap or abut, whatever delta and jitter do
+    worst_gap = -np.inf
+    for c in pair_conds:
+        for d in (cfg.delta_min_ms, cfg.delta_max_ms / 2, cfg.delta_max_ms):
+            for _ in range(100):
+                tr = build_trial(cfg, c, d, rng)
+                for iv in (tr.first, tr.second):
+                    a, b = iv.a_onsets_ms, iv.b_onsets_ms
+                    gap = np.maximum(a, b) - (np.minimum(a, b) + cfg.tone_ms)
+                    worst_gap = max(worst_gap, float(gap.max()))
+    out.append(Check("there is never a silent gap between A and B inside a token",
+                     worst_gap <= 1e-9,
+                     f"{len(pair_conds)} lags x 3 deltas up to the {cfg.delta_max_ms:g} ms ceiling: "
+                     f"the later tone starts at most {worst_gap:+.1f} ms after the earlier one ends "
+                     "(0 = abutting, negative = overlapping)"))
 
     # 2. jitter independent between intervals
     c0 = pair_conds[0]
@@ -75,10 +91,9 @@ def stimulus_checks(cfg: Config, n: int = 3000, seed: int = 4) -> List[Check]:
     a_tgt, a_std, moved = [], [], 0
     for _ in range(n):
         tr = build_trial(cfg, c0, 30.0, rng)
-        nom = cfg.nominal_onsets() + c0.lag_ms
+        nom = cfg.nominal_onsets() + (0.0 if cfg.a_leads else c0.lag_ms)
         a_tgt.append(tr.target.a_onsets_ms - nom); a_std.append(tr.standard.a_onsets_ms - nom)
-        moved += abs((tr.target.a_onsets_ms[tr.target_pair] - tr.target.b_onsets_ms[tr.target_pair])
-                     - (c0.lag_ms + 30.0)) > 1e-9
+        moved += bool(np.any(np.abs(tr.target.a_onsets_ms - nom - tr.target.jitter_ms) > 1e-9))
     p_ks = min(stats.ks_2samp(np.array(a_tgt)[:, k], np.array(a_std)[:, k]).pvalue
                for k in range(cfg.n_pairs))
     out.append(Check("the A channel carries no information about which interval moved",
@@ -105,7 +120,7 @@ def stimulus_checks(cfg: Config, n: int = 3000, seed: int = 4) -> List[Check]:
     lens, gaps = set(), []
     for c in conds:
         for _ in range(150):
-            tr = build_trial(cfg, c, cfg.delta_max_ms, rng)
+            tr = build_trial(cfg, c, cfg.track_cfg(c.kind).delta_max_ms, rng)
             lens.add(render_trial(cfg, tr).size)
             for iv in (tr.first, tr.second):
                 for ons in (iv.b_onsets_ms, iv.a_onsets_ms):
@@ -116,7 +131,8 @@ def stimulus_checks(cfg: Config, n: int = 3000, seed: int = 4) -> List[Check]:
     out.append(Check("duration is fixed and no tone ever sums with one of its own frequency",
                      len(lens) == 1 and worst_gap >= FUSION_MARGIN_MS,
                      f"{len(lens)} trial length(s); smallest silent gap between two tones of one "
-                     f"frequency, with delta at its {cfg.delta_max_ms:g} ms ceiling: "
+                     f"frequency, with delta at its ceiling ({cfg.delta_max_ms:g}, B alone "
+                     f"{cfg.delta_max_b_alone_ms:g} ms): "
                      f"{worst_gap:.1f} ms (validated worst case {validate(cfg).same_channel_gap_ms:.1f})"))
 
     # 6. realised shift

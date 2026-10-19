@@ -2,12 +2,13 @@
 
 The stimulus
 -------------
-Six pairs of pure tones at an average of 3 Hz fill a 2-second interval. In every pair the low
-tone A starts `lag` ms after the high tone B, with `lag` between 0 (synchronous) and 100 ms
-(the tones abut). Each pair is jittered AS A WHOLE by an independent uniform draw of
-+-`pair_jitter_ms`: A and B move together, so the lag inside every pair is exact while neither
-channel on its own is regular. In one of the two intervals of a trial, the B tone of the last
-or the second-to-last pair comes `delta` ms early, and the listener says which interval.
+Six AB tokens at an average of 3 Hz fill a 2-second interval. A always comes first; B starts
+`lag` ms after it, from 0 (synchronous) to `tone_ms` (B starts exactly at A's offset). That is
+the dT axis of Elhilali et al. (2009), Figure 8B, 0% to 100%, with 75 ms tones as in their
+simulation. There is never a gap between A and B inside a token. Each token is jittered AS A
+WHOLE by an independent uniform draw of +-`pair_jitter_ms`, so the lag inside every token is
+exact while neither tone on its own keeps a regular rhythm. In one of the two intervals, the B
+tone of the last or second-to-last token comes `delta` ms early, and the listener says which.
 
 Why the whole-pair jitter is the point
 ---------------------------------------
@@ -26,11 +27,11 @@ intervals directly -- the cue the jitter exists to remove, put back.
 
 Which tone moves, and which way
 --------------------------------
-B moves, as in the two earlier tasks and in Elhilali et al. (2009), and it moves EARLY, so the
-lag grows from L to L + delta. Moving it late would shrink the lag, and at delta = L the target
-B would land exactly on its own A, producing a synchronous chord the standard never contains --
-a categorical cue rather than a larger version of the same one. That is the trap the two-tone
-task fell into before its pilot was restricted to early shifts.
+B moves EARLY, into more overlap with its own A. Moving it late would open a silent gap inside
+the token at 100%, where B already starts at A's offset, and the design never has one. Early
+shifts cannot open a gap as long as delta stays below lag + tone_ms, which `validate` enforces
+for every token condition. The price: at small lags a large enough shift carries B to A's onset
+and past it. Every trial records whether that happened (`passes_a_onset`).
 
 The target sits in pair N or N-1 with equal probability, so the listener cannot simply wait for
 the very last tone, and the last pair's special status -- nothing follows it -- is diluted
@@ -53,10 +54,8 @@ class ConfigError(ValueError):
     pass
 
 
-CORE_LAGS: Tuple[float, ...] = (0.0, 10.0, 25.0, 50.0, 75.0, 100.0)
-# Close spacing near synchrony, where every behavioural result in this repository has changed
-# fastest (the sheared figure lost 79% of its synchrony advantage within 12.5 ms), and roughly
-# even spacing in the model index above it: 0.000, 0.047, 0.173, 0.399, 0.635, 0.804.
+CORE_LAGS: Tuple[float, ...] = (0.0, 18.75, 37.5, 56.25, 75.0)
+# 0, 25, 50, 75 and 100% of a 75 ms tone: the five-level version of Elhilali's dT axis.
 
 FUSION_MARGIN_MS = 25.0
 FUSION_TERM_MAX = 8
@@ -87,13 +86,14 @@ class Config:
     # ---- the tones -----------------------------------------------------------
     f_a_hz: float = 700.0           # the LOW tone, A
     f_b_hz: float = 2262.0          # the HIGH tone, B; 20.3 semitones above A
-    tone_ms: float = 100.0
-    ramp_ms: float = 10.0
+    tone_ms: float = 75.0
+    ramp_ms: float = 5.0
+    a_leads: bool = True            # A first, B trails by `lag`
 
     # ---- the sequence --------------------------------------------------------
     rate_hz: float = 3.0            # average pair rate
     n_pairs: int = 6
-    pair_jitter_ms: float = 40.0    # each pair moves as a unit by U(-J, +J)
+    pair_jitter_ms: float = 35.0    # each pair moves as a unit by U(-J, +J)
     interval_ms: float = 2000.0
     lead_ms: float = 50.0           # nominal onset of the first pair's B tone
     isi_ms: float = 500.0
@@ -109,14 +109,15 @@ class Config:
     delta_direction: str = "backward"               # B comes EARLY; see the module docstring
 
     # ---- the tracked variable ------------------------------------------------
-    delta_start_ms: float = 20.0
+    delta_start_ms: float = 10.0
     delta_min_ms: float = 0.25
-    delta_max_ms: float = 120.0
-    # High enough to MEASURE B-alone, whose threshold the jitter puts near 46-60 ms by design.
-    # At 100 ms the control's upward reversals kept landing on the clamp, and a reversal at a
-    # clamp is not a reversal: 3 of 4 simulated B-alone tracks came back censored. The geometry
-    # allows up to 128 ms (same-frequency tones then still 25 ms apart in the worst case); 120
-    # keeps 33.
+    delta_max_ms: float = 70.0
+    # For token conditions. An early B opens a gap inside its token once delta exceeds
+    # lag + tone_ms; at lag 0 that is 75 ms, so 70 keeps every token gap-free.
+    delta_max_b_alone_ms: float = 120.0
+    # B alone has no A and so no gap to open; its only limit is two B tones running into each
+    # other. It needs the room: its threshold sits far above the token conditions by design,
+    # and a ceiling near it censors the control (3 of 4 simulated tracks at a 100 ms ceiling).
 
     # ---- the adaptive rule (names match tcoh.track.Track) --------------------
     n_down: int = 3
@@ -163,6 +164,9 @@ class Config:
         if unknown:
             raise ConfigError(f"unknown parameter(s): {sorted(unknown)}")
         kw = dict(d)
+        # sessions recorded before A-first existed had B leading; keep reading them correctly
+        kw.setdefault("a_leads", False)
+        kw.setdefault("delta_max_b_alone_ms", kw.get("delta_max_ms", 120.0))
         for name in ("lags_ms", "target_from_end", "step_factors", "reversals_per_step"):
             if kw.get(name) is not None:
                 kw[name] = tuple(kw[name])
@@ -182,6 +186,17 @@ class Config:
 
     def nominal_onsets(self) -> np.ndarray:
         return self.lead_ms + np.arange(self.n_pairs) * self.slot_ms
+
+    def track_cfg(self, kind: str) -> "Config":
+        """The config a track of this kind runs under: only the ceiling differs."""
+        return self.replace(delta_max_ms=self.delta_max_b_alone_ms) if kind == "b_alone" else self
+
+    @property
+    def ceiling_max_ms(self) -> float:
+        return max(self.delta_max_ms, self.delta_max_b_alone_ms)
+
+    def lag_pct(self, lag_ms: float) -> float:
+        return 100.0 * lag_ms / self.tone_ms
 
     def trial_ms(self) -> float:
         return 2 * self.interval_ms + self.isi_ms
@@ -221,7 +236,7 @@ def ratio_audit(f_a: float, f_b: float, term_max: int = FUSION_TERM_MAX) -> dict
 def extremes_ms(cfg: Config) -> dict:
     """The earliest any sound can start and the latest any can end, over every condition."""
     J = cfg.pair_jitter_ms
-    first = cfg.lead_ms - J - (cfg.delta_max_ms if 0 in cfg.target_pairs else 0.0)
+    first = cfg.lead_ms - J - (cfg.ceiling_max_ms if 0 in cfg.target_pairs else 0.0)
     last = cfg.nominal_onsets()[-1] + J + max(cfg.lags_ms or (0.0,)) + cfg.tone_ms
     return {"earliest_onset": first, "latest_offset": last}
 
@@ -233,7 +248,7 @@ def same_channel_clearance_ms(cfg: Config) -> float:
     pair before late. Two tones of one frequency closer than this would sum.
     """
     J = cfg.pair_jitter_ms
-    return cfg.slot_ms - 2 * J - cfg.delta_max_ms - cfg.tone_ms
+    return cfg.slot_ms - 2 * J - cfg.ceiling_max_ms - cfg.tone_ms
 
 
 @dataclass(frozen=True)
@@ -254,16 +269,19 @@ def validate(cfg: Config) -> Derived:
         raise ConfigError("n_pairs must be at least 4: the listener needs pairs before the target")
     if any(not (1 <= k <= cfg.n_pairs - 2) for k in cfg.target_from_end):
         raise ConfigError("target_from_end must leave at least two pairs before the target")
-    if any(L < 0 or L > cfg.tone_ms + 1e-9 for L in cfg.lags_ms):
-        notes.append("a lag beyond tone_ms leaves a silent gap inside the pair, which the design "
-                     "does not otherwise contain")
     if cfg.delta_direction not in ("backward", "forward", "random"):
         raise ConfigError("delta_direction must be backward, forward or random")
     if cfg.delta_direction != "backward":
-        notes.append(
-            "late shifts shrink the lag, and at delta = lag the target B lands exactly on its own A: "
-            "a synchronous chord the standard never contains, i.e. a different cue rather than a "
-            "bigger one. The design's default is early shifts only.")
+        notes.append("late shifts open a silent gap inside the token at 100%; the design moves B "
+                     "early only")
+    if cfg.a_leads and cfg.delta_direction == "backward":
+        room = min(cfg.lags_ms or (0.0,)) + cfg.tone_ms
+        if cfg.delta_max_ms >= room:
+            raise ConfigError(
+                f"delta_max_ms={cfg.delta_max_ms:g} lets an early B finish before its own A starts "
+                f"at lag {min(cfg.lags_ms):g} ms, opening a gap inside the token (limit {room:g}).")
+    if any(L > cfg.tone_ms + 1e-9 for L in cfg.lags_ms):
+        raise ConfigError("a lag beyond tone_ms leaves a gap inside the token")
     if cfg.delta_min_ms <= 0 or cfg.delta_max_ms <= cfg.delta_min_ms:
         raise ConfigError("need 0 < delta_min_ms < delta_max_ms")
     if len(cfg.step_factors) != len(cfg.reversals_per_step) + 1:
@@ -300,10 +318,11 @@ def validate(cfg: Config) -> Derived:
         raise ConfigError(f"two overlapping tones at the maximum rove peak at {peak:.2f} FS")
     if not cfg.include_b_alone:
         notes.append("include_b_alone is off, so nothing shows that the listener used A at all")
-    notes.append(
-        f"at lag {max(cfg.lags_ms):g} ms with a large delta and an unlucky jitter draw, the early "
-        "B can sit nearer the PREVIOUS pair's A than its own. That is inherent to moving a tone "
-        "away from its partner; every trial records whether it happened.")
+    passing = [L for L in cfg.lags_ms if 0 < L < cfg.delta_max_ms]
+    if passing:
+        notes.append(
+            f"at lag {', '.join(f'{L:g}' for L in passing)} ms a large enough early shift carries B "
+            "to A's onset and past it. Recorded on every trial as passes_a_onset.")
 
     conds = conditions(cfg)
     model = {c.name: (float("nan") if c.kind == "b_alone" else lag_index(cfg, c.lag_ms))
@@ -319,7 +338,8 @@ def describe(cfg: Config) -> str:
          f"  tones      A {cfg.f_a_hz:.0f} Hz, B {cfg.f_b_hz:.0f} Hz: {ra['semitones']:.1f} st "
          f"({ra['octaves']:.2f} oct, {ra['erbs']:.1f} ERB), {ra['mistuning_pct']:.1f}% from "
          f"{ra['nearest']}, the nearest ratio with terms up to {FUSION_TERM_MAX}",
-         f"             {cfg.tone_ms:g} ms tones, {cfg.ramp_ms:g} ms ramps",
+         f"             {cfg.tone_ms:g} ms tones, {cfg.ramp_ms:g} ms ramps; "
+         f"{'A first, B trails by the lag' if cfg.a_leads else 'B first, A trails by the lag'}",
          f"  sequence   {cfg.n_pairs} pairs at {cfg.rate_hz:g} Hz on average, each moved as a "
          f"unit by U(+-{cfg.pair_jitter_ms:g} ms), drawn afresh for each interval",
          f"  interval   {cfg.interval_ms:g} ms; trial {cfg.interval_ms:g} + {cfg.isi_ms:g} + "
@@ -327,13 +347,15 @@ def describe(cfg: Config) -> str:
          f"  target     the B tone of pair "
          + " or ".join(f"{'N' if k == 1 else f'N-{k - 1}'}" for k in cfg.target_from_end)
          + f" comes delta ms {'early' if cfg.delta_direction == 'backward' else cfg.delta_direction}",
-         f"  delta      starts at {cfg.delta_start_ms:g} ms, capped at {cfg.delta_max_ms:g} ms; "
-         f"closest same-frequency tones in the worst case {d.same_channel_gap_ms:.0f} ms apart",
+         f"  delta      starts at {cfg.delta_start_ms:g} ms, capped at {cfg.delta_max_ms:g} ms "
+         f"(B alone {cfg.delta_max_b_alone_ms:g}); same-pitch tones at least "
+         f"{d.same_channel_gap_ms:.0f} ms apart",
          "",
-         f"  {'condition':<10} {'lag ms':>7} {'model l2/l1':>12}  role"]
+         f"  {'condition':<10} {'dT':>6} {'lag ms':>7} {'model l2/l1':>12}  role"]
     for c in d.conditions:
         mv = d.model_index[c.name]
-        L.append(f"  {c.name:<10} {('-' if c.kind == 'b_alone' else f'{c.lag_ms:g}'):>7} "
+        L.append(f"  {c.name:<10} {('-' if c.kind == 'b_alone' else f'{cfg.lag_pct(c.lag_ms):g}%'):>6} "
+                 f"{('-' if c.kind == 'b_alone' else f'{c.lag_ms:g}'):>7} "
                  f"{('-' if mv != mv else f'{mv:.3f}'):>12}  {c.role}"
                  + ("  (what A adds, measured)" if c.kind == "b_alone" else ""))
     for n in d.notes:

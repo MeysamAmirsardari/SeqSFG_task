@@ -1,126 +1,123 @@
-# tpair: jitter detection in irregular A-B pairs
+# tpair: jitter detection in irregular AB tokens
 
-Six pairs of tones fill a 2-second interval at an average of 3 Hz. In every pair the low tone A
-starts a fixed `lag` after the high tone B, from 0 ms (synchronous) to 100 ms (the tones abut).
-Each pair is jittered as a whole, so the lag inside every pair is exact while neither tone on its
-own keeps a regular rhythm. In one of the two intervals, the B tone of the last or second-to-last
-pair comes early by δ. The listener says which interval, and δ is tracked to threshold at each lag.
+Elhilali et al. (2009), Figure 8, behaviourally, with one change: the tokens are jittered.
+
+Six AB tokens fill a 2-second interval at an average of 3 Hz. A always comes first, like the
+onset of a phoneme; B starts ΔT after it, from 0% (synchronous) to 100% (B starts exactly at A's
+offset). Tones are 75 ms, as in their simulation. There is never a gap between A and B inside a
+token. Each token is jittered as a whole, so ΔT is exact in every token while neither tone on
+its own keeps a regular rhythm. In one of the two intervals, the B tone of the last or
+second-to-last token comes early by δ. The listener says which interval, and δ is tracked to
+threshold at each ΔT.
 
 ```bash
 python -m tpair verify
 python -m tpair run --config tpair/configs/tpair_feasibility.json --data data --code L01
-python -m tpair analyze data/L01/tpair_session_01
+python -m tpair analyze data/L01/tpair_session_02
 ```
 
-## What this fixes
+![design](../verification/tpair_explained.png)
 
-Both earlier tasks left the target's own rhythm intact. In the two-tone task B ran on a fixed grid;
-in the sheared figure every channel repeated isochronously. Either way a listener could judge the
-displaced tone against its own previous repetitions and ignore the other tone completely, which is
-a strategy blind to the very thing the task manipulates.
+## Conditions
 
-Here that reference is randomised away. Each pair moves by U(±40 ms) as a unit, so B on its own
-wanders by ±40 ms while the A-B lag stays exact. The only consistent structure in the stimulus is
-the relation between the two tones.
+| ΔT | lag | model λ₂/λ₁ (jittered) | Elhilali, continuous ABAB |
+|---|---|---|---|
+| 0% | 0 ms | 0.000 | 0.000 |
+| 25% | 18.75 ms | 0.147 | 0.216 |
+| 50% | 37.5 ms | 0.352 | 0.516 |
+| 75% | 56.25 ms | 0.556 | 0.770 |
+| 100% | 75 ms | 0.728 | 0.942 |
+| B alone | | | |
 
-Two model observers, deciding from the actual onsets of each trial, show what that buys:
+The jitter lowers the index without changing its shape: the curve stays monotone under all five
+readings of the filter bank. The curve is plotted as in Fig. 8, 100% on the left.
 
-| lag | listener using B alone | listener using the A-B lag |
+## Why the tokens are jittered
+
+In a regular sequence a listener can judge the displaced B against B's own previous
+repetitions and ignore A completely, a strategy blind to the thing the task manipulates. Here
+each token moves by U(±35 ms) as a unit, so B on its own wanders by ±35 ms while ΔT stays exact.
+The only consistent structure in the sound is the relation between the two tones.
+
+Two model listeners, deciding from the actual onsets of each trial:
+
+| ΔT | uses B alone | uses the A-B lag |
 |---|---|---|
-| 0 ms | 43 ms | 2.4 ms |
-| 25 ms | 43 ms | 9.0 ms |
-| 50 ms | 43 ms | 14.6 ms |
-| 100 ms | 43 ms | 27.6 ms |
+| 0% | 41 ms | 2.3 ms |
+| 25% | 41 ms | 6.8 ms |
+| 50% | 41 ms | 11.6 ms |
+| 75% | 41 ms | 15.6 ms |
+| 100% | 41 ms | 22.3 ms |
 
-The B-only listener is flat, because B's own distribution is the same whatever the lag. It cannot
-see the manipulation at all. Below about 43 ms, the answer has to come through A.
+The B-only listener is flat because B's own distribution is the same at every ΔT. Below about
+40 ms the answer has to come through A.
 
 ## Design decisions
 
-**The jitter is drawn independently for each interval.** Sharing it would make the two intervals
-identical apart from the target, and B could then be compared across intervals directly, which
-puts back exactly the cue the jitter removes. This is the logic of a level rove, applied to time.
+**A first, B moves, and only early.** B moving early pulls it further into A. Moving it late
+would open a silent gap inside the token at 100%, where B already starts at A's offset.
 
-**B moves, and only early.** Early shifts grow the lag from L to L + δ. Late shifts would shrink
-it, and at δ = L the target B would land exactly on its own A, producing a synchronous chord the
-standard never contains: a different cue rather than a bigger one. The two-tone pilot was
-restricted to early shifts for the same reason.
+**Two ceilings.** In token conditions δ is capped at 70 ms. An early B could only leave its A
+behind once δ exceeds ΔT + 75 ms, which is 75 ms at 0%, so 70 keeps every token gap-free;
+`validate` refuses any config that breaks this. B alone has no A and no gap to open, and its
+threshold sits near 40 ms by design, so it gets 120 ms: at a 100 ms ceiling, 3 of 4 simulated
+B-alone tracks were censored.
 
-**The target is in pair N or N-1, 50/50.** The listener cannot simply wait for the final tone, and
-the final pair's special status (nothing follows it) is diluted rather than built into every trial.
+**The jitter is drawn independently for each interval.** Sharing it would let B be compared
+across the two intervals directly, which puts back the cue the jitter removes.
+
+**The target is in token N or N-1, 50/50.** The listener cannot just wait for the last tone.
 Performance by position is reported.
 
-**±40 ms of jitter.** Enough to put a B-only listener at 43 ms, about 1.6 times above the A-B
-listener's worst lag. More jitter defends harder but erodes the pair structure at long lags.
-
-**A 120 ms ceiling.** The B-alone control sits near 41-46 ms by design, and at a 100 ms ceiling
-its upward reversals kept landing on the clamp: 3 of 4 simulated tracks came back censored. The
-geometry allows up to 128 ms before two tones of one frequency come within 25 ms; 120 keeps 33.
-At 120, no simulated B-alone track was censored.
-
-**700 and 2262 Hz.** 20.3 semitones, 1.69 octaves, 9.2 ERB apart. The ratio sits 7.7% from both
-3:1 and 7:2, which makes it the point above an octave furthest from every ratio with terms up to 8.
+**700 and 2262 Hz.** 1.69 octaves, 9.2 ERB apart, 7.7% from 3:1 and from 7:2: the point above an
+octave furthest from every ratio with terms up to 8.
 
 ## The controls
 
 **B alone.** The same jitter and displacement with no A. It measures what a listener ignoring A
-could do, so every lag is read against it. A lag that does no better than B alone is a lag at
-which A was not used.
+could do, and every ΔT is read against it.
 
 **The strategy check.** Every trial's jitter is logged, so the analysis rebuilds how irregular B
-looked *on its own* in each interval and asks whether the answers followed it, once δ is
-accounted for. A listener using A should not care; one using B alone should care a lot. B-alone
-trials are the positive control: there the answers must follow it, or the check has no power.
+looked on its own in each interval and asks whether the answers followed it once δ is accounted
+for. A listener using A should not care. B-alone trials are the positive control.
 
-Against simulated listeners, over twelve sessions each:
+**Ceiling-limited tracks are not dropped.** A listener ignoring A will push some token tracks to
+the 70 ms ceiling. Dropping them would keep only the lucky tracks and make that listener look as
+if A helped, so they are pooled as lower bounds and the "what A adds" ratio at that ΔT becomes an
+upper bound.
 
-| | trend fires | worst lag vs B alone | strategy check flags |
+Against simulated listeners, six sessions each (`tpair_curve`):
+
+| | trend test p | what A adds, geometric mean over ΔT | strategy check z |
 |---|---|---|---|
-| uses the A-B lag | 100% | 1.59× better | 8% |
-| uses B alone | 0% | 0.75×, no better | 100% |
-
-## Conditions
-
-| lag | model λ₂/λ₁ |
-|---|---|
-| 0 ms | 0.000 |
-| 10 ms | 0.047 |
-| 25 ms | 0.173 |
-| 50 ms | 0.399 |
-| 75 ms | 0.635 |
-| 100 ms | 0.804 |
-| B alone | |
-
-Dense near synchrony, where every behavioural result in this repository has changed fastest. The
-jitter barely moves the prediction (0.794 at 100 ms without it, 0.804 with it), because it shifts
-A and B together and leaves their relation where the lag puts it.
+| uses the A-B lag | ≤ 0.008 in 6/6 | 3.6–8.8× | −1.2 to +1.9 |
+| uses B alone | ≥ 0.26 in 6/6 | 0.97–1.32× | +7.7 to +8.1 |
 
 ## Session length
 
 | preset | tracks | trials | total |
 |---|---|---|---|
-| `tpair_feasibility` | 7 | 303 | 37 min |
-| `tpair_curve` | 14 | 607 | 66 min, two sittings |
+| `tpair_feasibility` | 6 | 257 | 32 min |
+| `tpair_curve` | 12 | 514 | 58 min, two sittings |
 
-A trial is 2.0 + 0.5 + 2.0 = 4.5 s of sound. Per-trial overhead is 0.55 s, measured across three
-completed sessions. The feasibility preset has one track per condition, and a single track's 95%
-interval spans about 3.6 times, so it answers whether the task works, not what the curve is.
+A trial is 2.0 + 0.5 + 2.0 = 4.5 s of sound plus about 0.55 s of overhead. One track's 95%
+interval spans about 3.6 times, so the feasibility preset says whether the task works, not what
+the curve is.
 
 ## Known limits
 
-* **A rise with lag does not by itself say how A was used.** Temporal coherence predicts it; so
-  does any account in which a longer A-B gap is simply harder to time. The B-alone comparison
+* **A rise with ΔT does not by itself say how A was used.** Temporal coherence predicts it; so
+  does any account in which a longer A-B lag is simply harder to time. The B-alone comparison
   establishes that A was used, not why it stops helping.
-* **At 100 ms the tones abut,** so B's offset coincides with A's onset, and an early target opens
-  a silent gap between them. Gap detection across frequency channels is poor, so this is a weak
-  cue, but it exists at no other lag.
-* **At long lags with a large δ and an unlucky jitter draw,** the early B can sit nearer the
-  previous pair's A than its own. Inherent to moving a tone away from its partner; every trial
-  records it and the analysis reports the fraction.
-* **The defence has a margin, not a guarantee.** If a real listener's A-B threshold at 100 ms
-  approaches 43 ms, the B-only route becomes competitive there. The strategy check is the
-  safeguard, and it reports per session.
-* **The model's ordering is robust; its heights are not.** All five readings of the filter bank
-  agree the index rises with lag, and disagree on how much by up to 0.69.
-* **Four pairs of build-up before the earliest target,** about 1.3 s. Streaming builds over
-  seconds.
+* **At 0%, any early B is an onset asynchrony.** That is the classic synchrony-detection cue and
+  is the floor of the curve by design.
+* **At 25-75%, a large δ carries B to A's onset and past it,** so B briefly leads. Every trial
+  records this (`passes_a_onset`) and the analysis reports the fraction per ΔT.
+* **The defence has a margin, not a guarantee.** The A-B listener at 100% needs 22 ms against
+  the B-only listener's 41. If a real listener at 100% gets close to 40, the B-only route is
+  competitive there; the strategy check reports it.
+* **The model's ordering is robust; its heights are not.** All five readings agree the index
+  rises with ΔT and disagree on height by up to 0.62.
+* **Sessions recorded before this version** (100 ms tones, B first) carry `a_leads: false` in
+  their stored config and are still analysed correctly, but are a different stimulus and are
+  never pooled with these.
