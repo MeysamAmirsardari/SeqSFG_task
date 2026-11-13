@@ -1,0 +1,84 @@
+{
+ "name": "tcmr_baseline",
+ "sample_rate": 48000,
+ "channels": 2,
+ "device_match": "Headphones",
+ "blocksize": 256,
+ "latency": "low",
+ "bands_hz": [
+  250.0,
+  500.0,
+  1000.0,
+  2000.0,
+  4000.0
+ ],
+ "target_band": 2,
+ "bandwidth_hz": 20.0,
+ "band_db": 60.0,
+ "burst_ms": 187.5,
+ "ramp_ms": 20.0,
+ "noi_ms": 250.0,
+ "n_precursors": 4,
+ "tone_hz": 1000.0,
+ "isi_ms": 400.0,
+ "min_gap_ms": 15.0,
+ "conditions": [
+  [
+   "co",
+   "sync",
+   0.0,
+   2
+  ],
+  [
+   "rand",
+   "sync",
+   0.0,
+   2
+  ]
+ ],
+ "start_db": 75.0,
+ "min_db": 20.0,
+ "max_db": 85.0,
+ "steps_db": [
+  8.0,
+  4.0,
+  2.0
+ ],
+ "step_change_after": [
+  2,
+  4
+ ],
+ "n_down": 2,
+ "trials_per_track": 36,
+ "lapse": 0.02,
+ "practice_levels_db": [
+  80.0,
+  80.0,
+  78.0,
+  78.0,
+  75.0,
+  75.0,
+  72.0,
+  72.0
+ ],
+ "ratings": [
+  [
+   "sync",
+   0.0
+  ],
+  [
+   "ascending",
+   20.0
+  ],
+  [
+   "zigzag",
+   20.0
+  ]
+ ],
+ "rating_reps": 1,
+ "ready_ms": 400,
+ "feedback_ms": 500,
+ "blank_ms": 600,
+ "break_every_rounds": 9,
+ "uncal_peak_60db": 0.02
+}

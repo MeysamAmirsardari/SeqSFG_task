@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "seqsfg"
 version = "0.1.0"
-description = "Psychoacoustics of auditory grouping: stochastic figure-ground (seqsfg) and two-tone temporal coherence (tcoh)"
+description = "Psychoacoustics of auditory grouping: stochastic figure-ground (seqsfg), two-tone temporal coherence (tcoh) and sync detection after a context (tsync)"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
@@ -15,9 +15,18 @@ dependencies = [
     "soundfile>=0.12",
 ]
 
+[project.optional-dependencies]
+app = ["PySide6-Essentials>=6.8"]
+
 [project.scripts]
 seqsfg = "seqsfg.cli:main"
 tcoh = "tcoh.cli:main"
+tsync = "tsync.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["seqsfg*", "tcoh*"]
+include = ["seqsfg*", "tcoh*", "tsync*", "taba*", "tcmr*"]
+
+[tool.setuptools.package-data]
+tsync = ["configs/*.json"]
+taba = ["configs/*.json"]
+tcmr = ["configs/*.json"]

@@ -1,0 +1,38 @@
+{
+ "name": "taba_main",
+ "sample_rate": 48000,
+ "channels": 2,
+ "device_match": "Headphones",
+ "blocksize": 256,
+ "latency": "low",
+ "f_b_hz": 1000.0,
+ "df_semitones": 15.0,
+ "off_semitones": 9.0,
+ "tone_ms": 100.0,
+ "ramp_ms": 20.0,
+ "soa_ms": 200.0,
+ "level_db": 60.0,
+ "amplitude": 0.08,
+ "d_ms": [
+  0.0,
+  20.0,
+  35.0,
+  50.0,
+  71.0,
+  100.0
+ ],
+ "controls": [
+  "dyad_only_0",
+  "dyad_only_35",
+  "dyad_only_100",
+  "offfreq_0",
+  "offfreq_35",
+  "offfreq_100"
+ ],
+ "reps": 2,
+ "control_reps": 1,
+ "trial_s": 30.0,
+ "practice_s": 15.0,
+ "rest_s": 4.0,
+ "long_rest_every": 5
+}

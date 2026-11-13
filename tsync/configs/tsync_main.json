@@ -1,0 +1,87 @@
+{
+ "name": "tsync_main",
+ "version": 1,
+ "sample_rate": 48000,
+ "channels": 2,
+ "device_match": "Headphones",
+ "blocksize": 256,
+ "latency": "low",
+ "schedule_lead_ms": 120.0,
+ "f_b_hz": 1000.0,
+ "df_semitones": 15.0,
+ "tone_ms": 100.0,
+ "ramp_ms": 20.0,
+ "soa_ms": 200.0,
+ "n_tones": 12,
+ "level_b_db": 60.0,
+ "level_a_db": 60.0,
+ "a_rove_db": 4.0,
+ "a_decoy_db": 4.0,
+ "a_decoy_counts": [
+  1,
+  2
+ ],
+ "max_peak": 0.9,
+ "context_ms": [
+  0.0,
+  35.0,
+  50.0,
+  71.0,
+  100.0
+ ],
+ "include_late_control": true,
+ "late_control_shift_ms": 50.0,
+ "ending": "sync",
+ "delta_split_b": 0.5,
+ "delta_sign": "random",
+ "min_gap_ms": 15.0,
+ "isi_ms": [
+  450.0,
+  550.0
+ ],
+ "pre_ms": 40.0,
+ "post_ms": 80.0,
+ "delta_start_ms": 20.0,
+ "delta_min_ms": 0.25,
+ "delta_max_ms": 60.0,
+ "n_down": 3,
+ "step_factors": [
+  4.0,
+  2.0,
+  1.4142135623730951
+ ],
+ "reversals_per_step": [
+  1,
+  2
+ ],
+ "n_final_reversals": 6,
+ "max_trials_per_track": 80,
+ "tracks_per_condition": 1,
+ "catch_per_track": 2,
+ "catch_delta_ms": 60.0,
+ "catch_positions": [
+  5,
+  30
+ ],
+ "demo_delta_ms": 60.0,
+ "practice_delta_ms": 30.0,
+ "practice_n": 10,
+ "practice_criterion": 8,
+ "practice_max_attempts": 3,
+ "exposure_delta_ms": 40.0,
+ "exposure_conditions": [
+  "D50",
+  "D100",
+  "D0_late"
+ ],
+ "exposure_per_condition": 2,
+ "ready_ms": 450,
+ "feedback": true,
+ "feedback_ms": 550,
+ "blank_ms": 650,
+ "reminder_after_s": 10.0,
+ "autopause_after_s": 60.0,
+ "min_rest_s": 8.0,
+ "long_rest_after_block": 3,
+ "long_rest_s": 30.0
+}
