@@ -15,20 +15,24 @@ from tcoh.session import (DesignChanged, TrialLog, check_resumable, existing_ses
                           read_trials, session_dir, upsert_participant, write_json)
 from tcoh.track import Track
 
-from .config import Condition, Config, validate
-from .design import duration_estimate, make_design
+from .config import REL_WORD, WORD, Condition, Config, validate
+from .design import audit_timing, describe_timing_audit, duration_estimate, make_design
 from .stimulus import build_trial, render_trial, to_output
 
 FIELDS = ["trial_index", "phase", "slot_index", "block", "track_id", "track_trial_index",
           "condition", "lag_ms", "kind", "is_catch", "delta_ms", "delta_signed_ms",
-          "delta_realised_ms", "target_pair", "pairing_preserved", "passes_a_onset", "step_index", "reversal",
+          "delta_realised_ms", "target_pair", "pairing_preserved", "passes_a_onset",
+          "direction", "opens_gap", "step_index", "reversal",
           "at_ceiling", "at_floor", "target_position", "response", "correct", "rt_ms",
           "rove_db_1", "rove_db_2", "jitter_1", "jitter_2", "feedback", "timed_out",
-          "t_start", "t_response"]
-# jitter_1 / jitter_2 are the whole-pair displacements of every pair in each interval, so the
-# exact onsets of every trial can be rebuilt from the log alone -- and the analysis can ask
-# whether a listener's answers tracked the B channel's own irregularity, which they should not
-# if A is being used.
+          "t_start", "t_response",
+          "a_onsets_1", "b_onsets_1", "a_onsets_2", "b_onsets_2", "token_db_1", "token_db_2",
+          "shift_a_ms", "shift_b_ms", "context_lag_ms"]
+# a_onsets_* / b_onsets_* are every tone's onset in each interval exactly as rendered (before
+# rounding to the sample), and token_db_* every token's level, so each trial can be rebuilt from
+# the log alone -- and the analysis can ask whether a listener's answers followed either tone's
+# own timing, which they should not if the relation is being used. jitter_* is the grid timing's
+# per-pair displacement, kept for sessions run on a grid.
 
 INSTRUCTIONS = """
 On every trial you will hear TWO sounds, one after the other, with a short gap between them.
@@ -36,13 +40,34 @@ On every trial you will hear TWO sounds, one after the other, with a short gap b
 Each sound is a run of tone pairs -- a low tone, then a high tone -- about three a second. The
 pairs come a little irregularly; that is deliberate and is the same in both sounds.
 
-In ONE of the two sounds, near the end, one high tone comes slightly early.
+In ONE of the two sounds, near the end, one high tone comes slightly {word}.
 
-  Your job: which sound had the early high tone -- the first or the second?
+  Your job: which sound had the {word} high tone -- the first or the second?
 
 Press 1 or 2. Guess if you are not sure; you often will be. Some trials are very easy and some
 are close to impossible, and that is how it is supposed to be.
 """
+
+INSTRUCTIONS_SPLIT = """
+On every trial you will hear TWO sounds, one after the other, with a short gap between them.
+
+Each sound is a run of tone pairs -- a low tone and a high tone, together or one just after the
+other -- coming at irregular times. The irregular timing is deliberate and means nothing: no
+single tone, and no gap between pairs, tells you anything.
+
+In ONE of the two sounds, near the end, one pair is different: its high tone comes slightly
+{word} relative to its OWN low tone.
+
+  Your job: which sound had that pair -- the first or the second?
+
+Press 1 or 2. Guess if you are not sure; you often will be. Some trials are very easy and some
+are close to impossible, and that is how it is supposed to be.
+"""
+
+
+def _join(v) -> str:
+    v = np.asarray(v, float) if v is not None else np.array([])
+    return "" if not np.isfinite(v).any() else ";".join(f"{x:.3f}" for x in v)
 
 
 class Runner:
@@ -57,9 +82,11 @@ class Runner:
         self.audio = Audio(cfg.sample_rate, device, enabled=audio and auto is None)
         self.seed = int(seed)
         self.cond = {c.name: c for c in self.d.conditions}
-        self.catch_cond = next((c for c in self.d.conditions
-                                if c.kind == "pair" and cfg.catch_at_lag_ms is not None
-                                and abs(c.lag_ms - cfg.catch_at_lag_ms) < 1e-9), None)
+        # a catch trial probes the direction of the block it sits in
+        self.catch_cond = {c.direction: c for c in reversed(self.d.conditions)
+                           if c.kind == "pair" and cfg.catch_at_lag_ms is not None and c.stationary
+                           and abs(c.lag_ms - cfg.catch_at_lag_ms) < 1e-9}
+        self.probe_cond = {c.direction: c for c in self.d.probes}
         self.rng = np.random.default_rng([self.seed, 0x5E])
 
     # -- setup ----------------------------------------------------------------
@@ -99,13 +126,20 @@ class Runner:
                     "status": "started", "calibration": None, "practice": [],
                     "rt_reference": self.RT_REFERENCE, "feedback": cfg.feedback,
                     "auto": self.auto, "start_time": now_iso()}
+            # every interval of the session, drawn from the seed and screened before anyone listens
+            meta["timing_audit"] = audit_timing(cfg, design, self.seed)
             write_json(sdir / "session.json", meta)
             print(f"new session {sdir} (seed {design['session_seed']}, "
                   f"design {design['design_hash']})")
+            print(describe_timing_audit(meta["timing_audit"]))
+            if not meta["timing_audit"]["ok"]:
+                raise RuntimeError("an interval drawn from this seed breaks the timing screen")
 
         self.sdir, self.meta, self.design = sdir, meta, design
         self.session_seed = int(design["session_seed"])
-        self.log = TrialLog(sdir / "trials.csv", fields=FIELDS)
+        # a log started under an older column list keeps its own header
+        old = read_trials(sdir / "trials.csv")
+        self.log = TrialLog(sdir / "trials.csv", fields=list(old[0].keys()) if old else FIELDS)
         self.done = read_trials(sdir / "trials.csv")
         self.tracks: Dict[int, Track] = {}
         self.trial_index = len(self.done)
@@ -119,14 +153,14 @@ class Runner:
 
     def _restore(self) -> set:
         """Rebuild every staircase from the trial log, and return the slots already done."""
-        rows = [r for r in self.done if r.get("phase") in ("main", "catch")]
+        rows = [r for r in self.done if r.get("phase") in ("main", "catch", "probe")]
         if not rows:
             return set()
         by_id = {t["track_id"]: t for t in self.design["tracks"]}
         done = set()
         for r in sorted(rows, key=lambda r: int(float(r["slot_index"] or 0))):
             done.add(int(float(r["slot_index"] or 0)))
-            if r.get("phase") == "catch" or str(r.get("timed_out", "")).strip() in ("1", "True"):
+            if r.get("phase") in ("catch", "probe") or str(r.get("timed_out", "")).strip() in ("1", "True"):
                 continue                       # neither ever touched a staircase
             tid = int(float(r["track_id"]))
             spec = by_id.get(tid)
@@ -297,6 +331,7 @@ class Runner:
                "target_pair": tr.target_pair,
                "pairing_preserved": int(tr.pairing_preserved),
                "passes_a_onset": int(tr.passes_a_onset),
+               "direction": cond.direction, "opens_gap": int(tr.opens_gap),
                "step_index": "" if track is None else track.step_index,
                "reversal": "" if track is None or not track.trials
                else int(track.trials[-1].reversal),
@@ -308,30 +343,61 @@ class Runner:
                "correct": int(out["correct"]),
                "rt_ms": "" if out["rt_ms"] != out["rt_ms"] else f"{out['rt_ms']:.1f}",
                "rove_db_1": f"{tr.first.level_db:.3f}", "rove_db_2": f"{tr.second.level_db:.3f}",
-               "jitter_1": ";".join(f"{v:.3f}" for v in tr.first.jitter_ms),
-               "jitter_2": ";".join(f"{v:.3f}" for v in tr.second.jitter_ms),
+               "jitter_1": _join(tr.first.jitter_ms), "jitter_2": _join(tr.second.jitter_ms),
                "feedback": int(feedback), "timed_out": int(bool(out.get("timed_out"))),
-               "t_start": out["t_start"], "t_response": out["t_response"]}
+               "t_start": out["t_start"], "t_response": out["t_response"],
+               "a_onsets_1": _join(tr.first.a_onsets_ms), "b_onsets_1": _join(tr.first.b_onsets_ms),
+               "a_onsets_2": _join(tr.second.a_onsets_ms),
+               "b_onsets_2": _join(tr.second.b_onsets_ms),
+               "token_db_1": _join(tr.first.token_db), "token_db_2": _join(tr.second.token_db),
+               "shift_a_ms": f"{tr.target.a_shift_ms:.6f}",
+               "shift_b_ms": f"{tr.target.b_shift_ms:.6f}",
+               "context_lag_ms": "" if cond.context_lag_ms is None else cond.context_lag_ms}
         self.trial_index += 1
         return row
 
     # -- phases ---------------------------------------------------------------
-    def familiarise(self) -> None:
+    def _word(self, direction: str) -> str:
+        return (REL_WORD if self.cfg.shift == "split" else WORD)[direction]
+
+    def _easy(self, direction: str) -> Condition:
+        lag = self.cfg.practice_lag_ms or 0.0
+        return next(c for c in self.d.conditions if c.kind == "pair" and c.stationary
+                    and abs(c.lag_ms - lag) < 1e-9 and c.direction == direction)
+
+    def introduce(self, direction: str, practise: bool) -> None:
+        """Instructions for this direction, two examples, and practice the first time it comes up."""
+        if self.auto:
+            return
+        word = self._word(direction)
+        if len(self.cfg.directions) > 1:
+            print(f"\n=== THIS PART: in the odd pair the high tone comes {word.upper()} ===")
+        print((INSTRUCTIONS_SPLIT if self.cfg.shift == "split" else INSTRUCTIONS).format(word=word))
+        self.familiarise(direction)
+        if practise:
+            self.practice(direction)
+            self.meta.setdefault("practised_directions", []).append(direction)
+            write_json(self.sdir / "session.json", self.meta)
+        getkey({" "}, "press space to begin ")
+
+    def familiarise(self, direction: str = "in") -> None:
         if self.auto or not self.cfg.familiarise:
             return
-        easy = next(c for c in self.d.conditions if c.kind == "pair" and c.lag_ms == 0.0)
-        print("\n--- familiarisation ---\nTwo examples with the early tone made very early. "
-              "You will be told the answer.")
+        word = self._word(direction)
+        easy = self._easy(direction)
+        what = (f"the odd pair's high tone made very much {word}" if self.cfg.shift == "split"
+                else f"the {word} tone made very {word}")
+        print(f"\n--- familiarisation ---\nTwo examples with {what}. You will be told the answer.")
         for _ in range(2):
             getkey({" "}, "  press space to listen ")
             out = self._present(easy, self.cfg.practice_delta_ms, False, False)
             print(f"   that was interval {out['trial'].target_position}")
 
-    def practice(self) -> None:
+    def practice(self, direction: str = "in") -> None:
         cfg = self.cfg
         if self.auto:
             return
-        easy = next(c for c in self.d.conditions if c.kind == "pair" and c.lag_ms == 0.0)
+        easy = self._easy(direction)
         for rnd in range(1, 4):
             print(f"\n--- practice round {rnd} ({cfg.practice_trials} easy trials) ---")
             n_ok = 0
@@ -346,7 +412,8 @@ class Runner:
                   f"criterion is {cfg.practice_criterion:.0%}")
             if p >= cfg.practice_criterion:
                 return
-            print("  let's try that again -- listen for the high tone that comes early.")
+            print("  let's try that again -- listen for the pair whose high tone comes "
+                  f"{self._word(direction)}.")
         print("  practice criterion not reached after three rounds. The session will still run, "
               "and the analysis will say so.")
 
@@ -357,12 +424,17 @@ class Runner:
         est = duration_estimate(cfg)
         print(f"\n--- main block: {len(design['tracks'])} tracks, about {est['n_trials']} "
               f"trials, about {est['main_minutes']:.0f} minutes ---")
+        if len(cfg.directions) > 1:
+            print("  in blocks: " + " | ".join(self._word(x) for x in design.get("direction_order", [])))
         self._check_drift()
-        print(INSTRUCTIONS)
         if not self.auto:
             print("  " + describe_output())
-            getkey({" "}, "press space to begin ")
 
+        # on a fresh session nothing is practised yet; on a resume, whatever was
+        practised = set(self.meta.get("practised_directions", []))
+        if self.meta.get("practice") and not practised:
+            practised = {cfg.directions[0]}          # sessions from before directions were logged
+        announced = None
         seen_blocks, done_slots = set(), getattr(self, "done_slots", set())
         n_est = max(int(est["n_trials"]), 1)
         n_done = len(done_slots)
@@ -388,10 +460,19 @@ class Runner:
             elif cfg.break_every_trials and since_break >= cfg.break_every_trials:
                 self._offer("rest", n_done, n_est)
                 since_break = 0
+            if cond.direction != announced:
+                self.introduce(cond.direction, practise=cond.direction not in practised)
+                practised.add(cond.direction)
+                announced = cond.direction
 
             is_catch = bool(slot["is_catch"])
-            delta = cfg.catch_delta_ms if is_catch else track.delta
-            probe = self.catch_cond if (is_catch and self.catch_cond) else cond
+            is_probe = bool(slot.get("is_probe")) and cond.direction in self.probe_cond
+            if is_probe:
+                # the decoupled probe: what is left with the relation removed, at the ceiling
+                delta, probe = cfg.delta_max_ms, self.probe_cond[cond.direction]
+            else:
+                delta = cfg.catch_delta_ms if is_catch else track.delta
+                probe = self.catch_cond.get(cond.direction, cond) if is_catch else cond
             n_before = len(track.trials)
             n_done += 1
             pct = min(100.0 * n_done / n_est, 99.0)
@@ -414,10 +495,11 @@ class Runner:
                     return
             else:
                 consecutive = 0
-            scored = not is_catch and not out.get("timed_out")
+            scored = not is_catch and not is_probe and not out.get("timed_out")
             if scored:
                 track.update(out["correct"])
-            self.log.write(self._row("catch" if is_catch else "main", probe, out, slot=slot,
+            phase = "probe" if is_probe else "catch" if is_catch else "main"
+            self.log.write(self._row(phase, probe, out, slot=slot,
                                      track=track if scored else None,
                                      track_trial=n_before if scored else None,
                                      feedback=cfg.feedback))
@@ -447,8 +529,5 @@ class Runner:
     def run(self, code=None, resume=False, session_index=None) -> Path:
         sdir = self.start(code, resume, session_index)
         self.calibrate()
-        if not resume:
-            self.familiarise()
-            self.practice()
-        self.main_block()
+        self.main_block()          # instructions, examples and practice come with each direction
         return sdir

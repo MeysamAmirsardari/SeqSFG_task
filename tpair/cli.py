@@ -8,6 +8,8 @@
     python -m tpair run --data data             run a session
     python -m tpair analyze data/L01/tpair_session_01
     python -m tpair plots --out verification/   the figures
+    python -m tpair jitters --code L01 --session 7   every interval that session will play,
+                                                     drawn from its seed and screened
 """
 from __future__ import annotations
 
@@ -56,6 +58,19 @@ def cmd_design(args):
           f"longest run {a['longest_condition_run']}")
 
 
+def cmd_jitters(args):
+    cfg = load_config(args)
+    from .design import audit_timing, describe_timing_audit, make_design
+    design = make_design(cfg, args.code, args.session)
+    a = audit_timing(cfg, design)
+    print(f"{args.code}, session {args.session}: seed {design['session_seed']}, "
+          f"{len(design['slot_plan'])} planned slots")
+    print(describe_timing_audit(a))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(json.dumps(a, indent=1))
+
+
 def cmd_verify(args):
     cfg = load_config(args)
     from .verify import format_report, run_battery
@@ -74,12 +89,12 @@ def cmd_model(args):
     from .observer import threshold
     from .config import conditions
     print("lambda2/lambda1 for jittered pairs, and what two model listeners can reach")
-    print(f"  {'condition':<10} {'dT':>5} {'l2/l1':>7} {'B only':>9} {'A-B lag':>9}")
+    print(f"  {'condition':<14} {'dT':>5} {'l2/l1':>7} {'B only':>9} {'A-B lag':>9}")
     for c in conditions(cfg):
         idx = "-" if c.kind == "b_alone" else f"{lag_index(cfg, c.lag_ms):.3f}"
-        print(f"  {c.name:<10} {('-' if c.kind == 'b_alone' else f'{cfg.lag_pct(c.lag_ms):g}%'):>5} {idx:>7} "
+        print(f"  {c.name:<14} {('-' if c.kind == 'b_alone' else f'{cfg.lag_pct(c.lag_ms):g}%'):>5} {idx:>7} "
               f"{threshold(cfg, c, 'single', n=800):7.1f}ms {threshold(cfg, c, 'pair', n=800):7.1f}ms")
-    lags = [c.lag_ms for c in conditions(cfg) if c.kind == "pair"]
+    lags = list(dict.fromkeys(c.lag_ms for c in conditions(cfg) if c.kind == "pair"))
     band = prediction_band(cfg, lags, n_seq=15)
     print(f"\n  across {len(band['curves'])} readings of the filter bank: monotone "
           f"{band['all_monotone']}, largest disagreement in height {band['max_spread']:.2f}")
@@ -89,17 +104,24 @@ def cmd_demo(args):
     import numpy as np
     import soundfile as sf
     cfg = load_config(args)
-    from .config import conditions
+    from .config import conditions, probe_conditions
     from .stimulus import build_trial, render_trial, to_output
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(args.seed)
-    for c in conditions(cfg):
-        tr = build_trial(cfg, c, args.delta, rng, target_position=1)
-        p = out / f"tpair_{c.name}_delta{args.delta:g}ms.wav"
+    for c in list(conditions(cfg)) + list(probe_conditions(cfg)):
+        d = cfg.delta_max_ms if c.kind == "decoupled" else args.delta
+        tr = build_trial(cfg, c, d, rng, target_position=1)
+        p = out / f"tpair_{c.name}_delta{d:g}ms.wav"
         sf.write(p, to_output(cfg, render_trial(cfg, tr)), cfg.sample_rate)
-        print(f"  {p}   target interval 1, pair "
-              f"{'N' if tr.target_pair == cfg.n_pairs - 1 else 'N-1'}, B {abs(tr.delta_signed_ms):g} ms early")
+        t = tr.target
+        print(f"  {p}   target interval 1, token "
+              f"{'N' if tr.target_pair == cfg.n_pairs - 1 else 'N-1'}: B {abs(tr.delta_signed_ms):g} ms "
+              f"{'later' if tr.delta_signed_ms > 0 else 'earlier'} relative to A "
+              f"(A moved {t.a_shift_ms:+g}, B {t.b_shift_ms:+g})"
+              + (" -- a gap opens after A" if tr.opens_gap else "")
+              + (" -- B now at or before A" if tr.passes_a_onset else "")
+              + (" -- decoupled probe, no relation" if c.kind == "decoupled" else ""))
 
 
 def cmd_calibrate(args):
@@ -145,6 +167,9 @@ def main(argv=None):
     q = sub.add_parser("verify"); add_common(q); q.add_argument("--out")
     q.set_defaults(func=cmd_verify)
     q = sub.add_parser("model"); add_common(q); q.set_defaults(func=cmd_model)
+    q = sub.add_parser("jitters"); add_common(q)
+    q.add_argument("--code", required=True); q.add_argument("--session", type=int, required=True)
+    q.add_argument("--out"); q.set_defaults(func=cmd_jitters)
     q = sub.add_parser("demo"); add_common(q)
     q.add_argument("--out", default="demo"); q.add_argument("--delta", type=float, default=20.0)
     q.add_argument("--seed", type=int, default=0); q.set_defaults(func=cmd_demo)
@@ -155,7 +180,7 @@ def main(argv=None):
     q.add_argument("--data", default="data"); q.add_argument("--code")
     q.add_argument("--device"); q.add_argument("--no-audio", action="store_true")
     q.add_argument("--resume", action="store_true"); q.add_argument("--session", type=int)
-    q.add_argument("--auto", choices=["pair", "single"])
+    q.add_argument("--auto", choices=["pair", "single", "tones", "change", "persist", "contrast"])
     q.set_defaults(func=cmd_run)
     q = sub.add_parser("analyze"); add_common(q)
     q.add_argument("dirs", nargs="+"); q.add_argument("--out")
