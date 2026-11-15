@@ -1,4 +1,8 @@
-"""python -m tcmr <command>: design | verify | demo | calibrate | run | simulate | analyze."""
+"""python -m tcmr <command>: design | verify | check | demo | calibrate | run | simulate | analyze.
+
+    check --seed N     every trial a session with seed N will play, drawn and checked (tcmr.audit);
+                       `run --seed N` then refuses to start unless that check passed
+"""
 from __future__ import annotations
 
 import argparse
@@ -12,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import Condition, Config, validate
+from .config import PATTERNS, Condition, Config, validate
 from .stimulus import band_envelopes, build
 
 PRESET = Path(__file__).resolve().parent / "configs" / "tcmr_main.json"
@@ -104,8 +108,13 @@ def cmd_design(a):
     for c in cfg.condition_list():
         off = cfg.offsets_ms(c.arrangement, c.dt_ms)
         gap = min(cfg.noi_ms - o - cfg.burst_ms for o in off)
-        print(f"  {c.name:<20} x{c.tracks}  offsets {off} ms, smallest gap before the final "
-              f"burst {gap:g} ms")
+        how = {"frozen": "shuffled, one order per interval", "reordered": "shuffled every repetition"}
+        if c.arrangement in PATTERNS:
+            print(f"  {c.name:<20} x{c.tracks}  offsets {sorted(off)} ms ({how[c.arrangement]}); "
+                  f"smallest gap before the final burst {gap:g} ms")
+        else:
+            print(f"  {c.name:<20} x{c.tracks}  offsets {off} ms, smallest gap before the final "
+                  f"burst {gap:g} ms")
     with tempfile.TemporaryDirectory() as td:
         from .session import Writer
         ts = []
@@ -127,18 +136,26 @@ def cmd_verify(a):
         ok &= bool(cond)
         print(f"  {'pass' if cond else 'FAIL'}  {name}: {msg}")
 
-    co = Condition("co", "ascending", 20.0)
-    tr, buf = build(cfg, co, 70.0, (1, 2, 3), signal_interval=2)
-    e = band_envelopes(cfg, buf, tr.target_on_s[0] + 0.03, 0.12)
-    r = np.corrcoef(e)
-    check("comodulation", np.min(r) > 0.9,
-          f"final-burst envelope correlation across bands min {np.min(r):.3f}")
-    rd = Condition("rand", "sync", 0.0)
-    tr2, buf2 = build(cfg, rd, 70.0, (1, 2, 4), signal_interval=2)
-    e2 = band_envelopes(cfg, buf2, tr2.target_on_s[0] + 0.03, 0.12)
-    off_diag = np.abs(np.corrcoef(e2)[np.triu_indices(5, 1)])
-    check("random envelopes", np.mean(off_diag) < 0.6,
-          f"mean |correlation| {np.mean(off_diag):.2f} (independent noise)")
+    # the final burst's level in each band, measured in the rendered sound over 40 trials: the
+    # same across comodulated bands, independent across random ones (any burst length)
+    def final_levels(env, arr, dt):
+        out = []
+        for k in range(40):
+            tr, buf = build(cfg, Condition(env, arr, dt), None, (1, 2, k), n_intervals=1)
+            t0 = tr.target_on_s[0] + cfg.ramp_ms / 1000
+            e = band_envelopes(cfg, buf, t0, (cfg.burst_ms - 2 * cfg.ramp_ms) / 1000)
+            out.append(20 * np.log10(e.mean(axis=1)))
+        return np.array(out)
+    step = max([c.dt_ms for c in cfg.condition_list()] + [0.0])
+    arr = next((c.arrangement for c in cfg.condition_list() if c.dt_ms == step), "sync")
+    co = Condition("co", arr, step)
+    r = np.corrcoef(final_levels("co", arr, step).T)
+    check("comodulation", np.min(r) > 0.95,
+          f"final-burst level across bands over 40 trials ({arr} {step:g}): correlation min {np.min(r):.3f}")
+    off_diag = np.abs(np.corrcoef(final_levels("rand", "sync", 0.0).T)[np.triu_indices(5, 1)])
+    check("random envelopes", np.mean(off_diag) < 0.4,
+          f"final-burst level across bands over 40 trials: mean |correlation| {np.mean(off_diag):.2f} "
+          f"(independent noise)")
     gaps = {c.name: min(cfg.noi_ms - o - cfg.burst_ms for o in cfg.offsets_ms(c.arrangement, c.dt_ms))
             for c in cfg.condition_list()}
     check("final burst separated", min(gaps.values()) >= cfg.min_gap_ms,
@@ -153,10 +170,45 @@ def cmd_verify(a):
     lag = lambda arr: sorted((abs(i - tgt), abs(arr[i] - arr[tgt])) for i in range(5) if i != tgt)
     check("zigzag matches ascending", lag(asc) == lag(zig) and sorted(asc) == sorted(zig),
           "same onsets and the same 1-kHz-to-flank lag at each frequency distance")
-    peak = max(float(np.abs(build(cfg, c, cfg.max_db, (5, k))[1]).max())
-               for k, c in enumerate(cfg.condition_list()))
-    check("headroom (uncalibrated)", peak < 0.95, f"peak at the maximum tone level {peak:.2f}")
+    n_head = 6 * len(cfg.condition_list())
+    try:                                   # no redraws here: a tall peak must show up as a failure
+        peak = max(float(np.abs(build(cfg, c, cfg.max_db, (5, k, j), _redraw=99)[1]).max())
+                   for k, c in enumerate(cfg.condition_list()) for j in range(6))
+    except RuntimeError as e:
+        peak = float(str(e).split()[1].rstrip(":"))
+    check("headroom (uncalibrated)", peak < 0.95,
+          f"tallest peak in {n_head} trials at the maximum tone level {peak:.2f}")
+    from .stimulus import band_bursts
+    rng = np.random.default_rng(11)
+    lv = np.array([[10 * np.log10(np.mean(x ** 2)) for x in band_bursts(cfg, rng, True)]
+                   for _ in range(300)])
+    sd = float(lv[:, cfg.target_band].std())
+    spread = float(np.abs(lv - lv[:, [cfg.target_band]]).max())
+    if cfg.burst_level == "natural":
+        check("natural burst level", 1.0 < sd < 6.5 and spread < 0.5,
+              f"a burst's level varies by {sd:.1f} dB sd, the same in all comodulated bands "
+              f"(within {spread:.2f} dB)")
+    else:
+        check("equalised burst level", sd < 0.01,
+              "every burst has exactly the band level (legacy: removes the level cue)")
     sys.exit(0 if ok else 1)
+
+
+def cmd_check(a):
+    from . import audit
+    cfg = _cfg(a.config)
+    cal = _load_cal(a.data) if a.calibrated else None
+    if a.calibrated and cal is None:
+        print("\u2717 no calibration in", Path(a.data) / "calibration")
+        sys.exit(2)
+    amp = (lambda f, db: cal.amplitude(f, db)) if cal else None
+    t0 = time.time()
+    rep = audit.audit(cfg, a.seed, amp, progress=lambda i, n: print(f"  {i}/{n} trials", end="\r"))
+    rep["seconds"] = round(time.time() - t0, 1)
+    path = audit.save(rep, audit.report_path(a.data, cfg, a.seed))
+    print(audit.describe(rep))
+    print(f"  report: {path}  ({rep['seconds']:.0f} s)")
+    sys.exit(0 if rep["ok"] else 1)
 
 
 def cmd_demo(a):
@@ -166,6 +218,8 @@ def cmd_demo(a):
     out.mkdir(parents=True, exist_ok=True)
     items = [("co", "sync", 0), ("rand", "sync", 0), ("co", "ascending", 10),
              ("co", "ascending", 20), ("co", "zigzag", 20)]
+    if any(c.arrangement in PATTERNS for c in cfg.condition_list()):
+        items = [(c.envelope, c.arrangement, c.dt_ms) for c in cfg.condition_list()]
     for e, arr, dt in items:
         c = Condition(e, arr, float(dt))
         for lvl in (None, a.level):
@@ -286,10 +340,30 @@ def cmd_run(a):
     if a.resume:
         folder = Path(a.resume)
         w = Writer(folder, {}, resume=True)
+        stored = dict(w.meta.get("config") or {})
+        if stored:                         # a session keeps the stimulus it started with
+            stored.setdefault("burst_level", "equalised")
+            if stored != cfg.to_dict():
+                print(f"! continuing with the configuration this session started with "
+                      f"({stored.get('name')}, {stored.get('burst_level')} bursts)")
+            cfg = validate(Config.from_dict(stored))
         rows = [r["row"] for r in read_jsonl(folder / "trials.jsonl")]
         exp = Experiment(cfg, w, w.meta["session_seed"], amp, resume_rows=rows)
     else:
-        w, seed = new_session(cfg, a.data, a.code, extra)
+        if a.seed is not None:             # a seed whose every trial was checked beforehand
+            from . import audit
+            rp = audit.report_path(a.data, cfg, a.seed)
+            rep = json.loads(rp.read_text()) if rp.exists() else None
+            want = "calibrated" if cal else "uncalibrated"
+            if rep is None or not rep.get("ok") or rep.get("amplitude") != want:
+                why = ("no check found" if rep is None else "the check failed" if not rep.get("ok")
+                       else f"the check was made with {rep.get('amplitude')} levels, this run is {want}")
+                print(f"\u2717 seed {a.seed}: {why}. Run first:\n  python -m tcmr check --config "
+                      f"{a.config or PRESET} --seed {a.seed}" + (" --calibrated" if cal else ""))
+                sys.exit(2)
+            extra["seed_check"] = {"report": str(rp), "ok": True, "trials_checked": rep["trials_checked"]}
+            print(f"seed {a.seed}: every planned trial was checked ({rp.name})")
+        w, seed = new_session(cfg, a.data, a.code, extra, seed=a.seed)
         exp = Experiment(cfg, w, seed, amp)
     print(f"session: {w.folder}  (output {dev['name']}, stream latency "
           f"{info['latency_s'] * 1000:.0f} ms)")
@@ -342,6 +416,11 @@ def main(argv=None):
 
     p("design", cmd_design)
     p("verify", cmd_verify)
+    sp = p("check", cmd_check)
+    sp.add_argument("--seed", type=int, required=True)
+    sp.add_argument("--data", default="data")
+    sp.add_argument("--calibrated", action="store_true",
+                    help="use the calibration in DATA/calibration (as a calibrated run would)")
     sp = p("demo", cmd_demo)
     sp.add_argument("--out", default="data_tcmr/demo")
     sp.add_argument("--level", type=float, default=66.0)
@@ -362,6 +441,8 @@ def main(argv=None):
                             help="set the system volume (0-100) at the start and hold it there")
             sp.add_argument("--visual-offset-ms", type=float, default=0.0,
                             help="delay the box lighting (Bluetooth delay), ms")
+            sp.add_argument("--seed", type=int, default=None,
+                            help="session seed; must have passed `python -m tcmr check`")
     sp = p("simulate", cmd_simulate)
     sp.add_argument("--data", default="data_tcmr/sim")
     sp.add_argument("--code", default="SIM01")

@@ -1,0 +1,294 @@
+[
+ {
+  "papers": [
+   {
+    "citation": "Christiansen SK, Oxenham AJ (2014). Assessing the effects of temporal coherence on auditory stream formation through comodulation masking release. J Acoust Soc Am 135(6):3520-3529. PMID 24907815, PMC4048442.",
+    "doi": "10.1121/1.4872300",
+    "verified_by_search": true,
+    "design": "(Checked against the PMC full text.) Target: 1-kHz tone in a 20-Hz-wide on-frequency band (MN). Four 20-Hz flanking bands (FN) at 0.25, 0.5, 2 and 4 kHz, gated together. Every band at 60 dB SPL. Bursts of 187.5 ms including 20-ms raised-cosine ramps, noise onset interval (NOI) 250 ms. 3I-3AFC, 2-down 1-up. Exp 1 (8 recruited, 7 analysed): 4 precursor bursts, target in burst 5. Only the MN precursors were delayed relative to the FN, by dT = 20, 40 or 60 ms. The flankers were never staggered against each other. Before the target burst, NOI_M was shortened by dT/2 and NOI_F lengthened by dT/2, so the target burst was synchronous. Other conditions: NOI_F = 200 or 300 ms against NOI_M = 250 ms, and NOIs jittered by +/-30 ms with onsets still synchronous across bands. Every condition ran with comodulated and random envelopes. Exp 2 (n=10): precursors always had random envelopes; dT = 0 or 60 ms. Exp 3 (n=8): 10 bursts, target at random in burst 5, 6 or 7, dT = 0 or 60 ms applied to both pre- and post-cursors. No perceptual reports were collected.",
+    "result": "Exp 1: CMR main effect F(6,36) = 9.97, p < 0.001. Post hoc tests showed CMR significantly reduced at dT = 40 and 60 ms and at unequal rates. dT = 20 ms and synchronous jitter had no significant effect. CMR stayed above zero in all 7 conditions (t(6) > 4.46, p < 0.003, Bonferroni). Exp 2: effect of dT on CMR F(1,15) = 26.21, p < 0.001; CMR was still significant at both dT = 0 (t(9) = 5.30) and dT = 60 (t(9) = 2.39, p = 0.02). Exp 3: dT effect F(1,13) = 70.6. CMR > 0 at dT = 0 (t(7) = 14.1, p < 0.001) but not at dT = 60 (t(7) = 1.42, p = 0.10); the authors read this as segregation. CMR in dB appears only in the figures (Figs. 2, 3 and 5).",
+    "bearing": "This is the direct template. Corrections to the previous draft: the target burst was resynchronized by splitting dT/2 across both the MN and FN intervals, not by moving the MN alone. Exp 2 is listed above with its actual result: CMR survived dT = 60 when the precursors had random envelopes. Only one band was ever offset and the flankers always kept a common onset, so a progressive across-band shear is untested. Aliasing caveat for the proposal: with a 250-ms period and 62.5-ms gaps, a row lagging by 4*dT = 240 ms (dT = 60) leads the next burst by only 10 ms. Keep the maximum lag well below about 125 ms, or treat the wrap-around as its own condition."
+   },
+   {
+    "citation": "Grose JH, Hall JW (1993). Comodulation masking release: is comodulation sufficient? J Acoust Soc Am 93(5):2896-2902. PMID 8315153.",
+    "doi": "10.1121/1.405809",
+    "verified_by_search": true,
+    "design": "Three experiments, each with one manipulation meant to hinder fusion of the comodulated bands. (1) Onset/offset asynchrony between the on-signal band and the flanking bands. (2) A streaming paradigm with flanking-band precursors. (3) Bands drawn into separate harmonic series. Only the abstract was verified; band frequencies and the exact gating are not checked.",
+    "result": "CMR could be completely abolished when the asynchrony between the on-signal band and the flanking bands was 50 ms or more. Streaming precursors disrupted CMR significantly, but a substantial CMR remained. Harmonicity had a small effect that did not seem to reflect parsing of the fused image. Authors' summary: onset/offset synchrony is of paramount importance.",
+    "bearing": "This is the classic asynchrony limit of about 50 ms, but the asynchrony was inside the signal interval (a gating fringe), not in precursors with a synchronous final burst as in the proposal. It therefore sets an upper bound, not a direct prediction. The previous draft said the flankers were shifted as one group; that is consistent with the abstract, which describes on-signal vs flanking-band asynchrony, but was not checked in the full text."
+   },
+   {
+    "citation": "Grose JH, Buss E, Hall JW (2009). Within- and across-channel factors in the multiband comodulation masking release paradigm. J Acoust Soc Am 125(1):282-293. PMID 19173415, PMC2677279.",
+    "doi": "10.1121/1.3023067",
+    "verified_by_search": true,
+    "design": "(Checked against the PMC full text.) Five 20-Hz Gaussian noise bands at 60 dB SPL each; 1-kHz signal, 280 ms with 40-ms ramps. Log spacings of 1/24, 1/6, 1/3 and 1 octave, the 1-octave set being 250, 500, 1000, 2000 and 4000 Hz. Linear spacings of 30, 120 and 240 Hz. 3AFC, 3-down 1-up. n = 5 highly practised listeners. Asynchrony conditions: OSB continuous with flankers gated for 280 ms (COM/OSB); flankers continuous with the OSB gated (COM/CFB); and continuous fringes around the gated comodulated core that were random, codeviant or comodulated (COM/RAN, COM/COD, COM/COM).",
+    "result": "Masking release given in the text: about 6.5 dB at 1/6 octave and 6.7 dB at 1/3 octave; 6.7, about 10.5 and 7.0 dB at 30, 120 and 240 Hz linear spacing. The 1-octave release is not given numerically in the text; it is in the figures only. COM/CFB raised thresholds above the gated baseline only at 1/3- and 1-octave spacing, which is the across-channel loss. COM/OSB raised thresholds above baseline at all spacings. Random or codeviant fringes largely eliminated release at all spacings.",
+    "bearing": "Confirms that the 0.25-4 kHz, 1-octave layout is dominated by across-channel cues, so a shear effect there would be a grouping effect. Every condition had at most two onset groups (OSB vs flankers); no band had its own onset. Caveat: the listeners were highly practised, and naive listeners differ (see Goldman et al. 2012)."
+   },
+   {
+    "citation": "Dau T, Ewert SD, Oxenham AJ (2009). Auditory stream formation affects comodulation masking release retroactively. J Acoust Soc Am 125(4):2182-2188. PMID 19354394, PMC2736735.",
+    "doi": "10.1121/1.3082121",
+    "verified_by_search": true,
+    "design": "(Checked against the PMC full text.) 1-kHz tone in a 20-Hz on-frequency band plus four comodulated or independent flanking bands, spaced 1 octave (wide) or 1/6 octave (narrow). Each band at 60 dB SPL. Four postcursor flanking-band bursts (187.5 ms with 20-ms ramps, 62.5-ms gaps, 250-ms period) followed the signal; no precursors were used. Controls: the first postcursor replaced by a silent gap, and postcursors shifted half an octave. n = 6.",
+    "result": "Wide spacing: CMR 6.1 dB without postcursors and 0.25 dB with them. Narrow spacing: 9.4 dB vs 8.0 dB. Gap control: R-GPC 5.5 dB, GPR-GPC 4.9 dB. Half-octave-shifted postcursors: 4.6 dB.",
+    "bearing": "Sequential streaming of the flankers alone can abolish wide-spacing CMR, even retroactively, with exactly the proposal's burst timing. In every proposed condition, each row keeps a fixed 250-ms periodicity, so every row has a within-row sequential stream. An ordered staircase adds a glide-like across-row pattern (successive onsets step through frequency) that might act as its own sequential object. That is a hypothesis, not something this paper tested."
+   },
+   {
+    "citation": "Verhey JL, Ernst SMA, Yasin I (2012). Effects of sequential streaming on auditory masking using psychoacoustics and auditory evoked potentials. Hear Res 285(1-2):77-85. PMID 22326589.",
+    "doi": "10.1016/j.heares.2012.01.006",
+    "verified_by_search": true,
+    "design": "CMR with precursors made only of the off-signal-frequency (flanking) maskers, measured with AFC psychophysics and with EEG (MMN) in the same listeners; dipole source analysis.",
+    "result": "Precursors of off-frequency maskers alone abolished CMR. An MMN was present whatever the envelope correlation when only the off-frequency components were present. MMN size did not correlate with signal audibility. Frequency-specific adaptation may contribute but was judged unlikely to be the main cause.",
+    "bearing": "Independent replication that precursor streaming of the flankers abolishes CMR, plus an EEG segregation index (with the caveat that MMN did not track thresholds). Adaptation is a confound to control: rows with different lags differ in precursor-to-target gap only if the shear changes the final inter-burst interval."
+   },
+   {
+    "citation": "Hall JW, Grose JH, Dev MB (1997). Auditory development in complex tasks of comodulation masking release. J Speech Lang Hear Res 40(4):946-954. PMID 9263957.",
+    "doi": "10.1044/jslhr.4004.946",
+    "verified_by_search": true,
+    "design": "Listeners aged 5 years to adult. CMR with an on-signal band (OSB) and six comodulated flanking bands (FBs). Conditions with a second modulation pattern, and with temporal asynchrony (a fringe) between the OSB and the FBs in either direction.",
+    "result": "OSB leading the FBs: adult CMR near zero for fringes of 50 ms or more; children usually showed negative CMR. FBs leading the OSB: substantial CMR in all age groups, larger in adults than in children.",
+    "bearing": "Asynchrony effects on CMR are direction-asymmetric (OSB-leading is harmful, FB-leading much less so). The asynchrony here was a fringe within the masker containing the signal, not a precursor offset, so it transfers to the proposal only by analogy. Still, the 1-kHz row's lead/lag pattern relative to the flankers should be matched between ordered and random conditions, not only its absolute lags."
+   },
+   {
+    "citation": "Moore BCJ, Schooneveldt GP (1990). Comodulation masking release as a function of bandwidth and time delay between on-frequency and flanking-band maskers. J Acoust Soc Am 88(2):725-731. PMID 2212296.",
+    "doi": "10.1121/1.399775",
+    "verified_by_search": true,
+    "design": "1-kHz, 400-ms signal; on-frequency band plus one flanking band at 0.25-2.0 kHz, monaural or dichotic. Bandwidths of 6.25, 25 or 100 Hz. The flanking-band envelope was delayed by 0, 5, 10 or 20 ms.",
+    "result": "100-Hz bands: CMR typically under 1 dB at all delays. 25-Hz bands: about 3.5 dB at 0 ms, falling to about 1.5 dB at 20 ms. 6.25-Hz bands: about 5 dB, nearly independent of delay. The authors conclude that envelope correlation, not absolute delay, is the critical variable.",
+    "bearing": "With 20-Hz bands, even 10-20 ms of envelope delay inside the target burst decorrelates the envelopes and lowers CMR without any change in grouping. The proposal's synchronous, comodulated final burst avoids this. The shear must not leak into the target burst (for example through partial overlap of the last precursor with the target)."
+   },
+   {
+    "citation": "McFadden D (1986). Comodulation masking release: effects of varying the level, duration, and time delay of the cue band. J Acoust Soc Am 80(6):1658-1667. PMID 3794071.",
+    "doi": "10.1121/1.394277",
+    "verified_by_search": true,
+    "design": "CMR with one correlated cue band, 75 or 100 Hz wide, varying its level, the signal duration and burst duration, and the cue-band time delay. Supplementary forward-masking conditions.",
+    "result": "CMR was abolished when the cue band was more than about 10 dB below the masker band. CMR began to decline at cue delays above about 1.6 ms and was gone between 3 and 15 ms, depending on the subject. There was no cyclic, autocorrelation-like recovery at the envelope period. A small CMR was found in forward masking.",
+    "bearing": "Envelope delay within the signal interval destroys CMR at millisecond scales for wide bands (narrow 20-Hz bands tolerate more; see Moore & Schooneveldt 1990). This supports keeping the target burst strictly synchronous, so that CMR loss can be attributed to grouping by the precursors."
+   },
+   {
+    "citation": "Goldman SA, Baer T, Moore BCJ (2012). Comodulation masking release: effects of training and experimental design on use of within- and across-channel cues. J Acoust Soc Am 132(1):303-316. PMID 22779479.",
+    "doi": "10.1121/1.4726074",
+    "verified_by_search": true,
+    "design": "Exp 1: replication of Dau et al. (2009) with naive listeners and a design that minimized familiarization with the cues. Exp 2: training over sessions across four designs, naive listeners with 2 or 4 flanking bands, and postcursors to separate within- from across-channel cues. Exp 3: naive listeners, 2 flanking bands, continuous noise, after Grose et al. (2009).",
+    "result": "Exp 1: listeners used within-channel cues but not across-channel cues. Exp 2: within-channel cues were usable from the outset; across-channel cues needed training when they were less salient, and more repeated exposure strengthened the training effect. Exp 3: CMR was large from the outset.",
+    "bearing": "With 1-octave spacing and gated bursts, naive listeners may show little across-channel CMR, which leaves no room to see a shear or order effect. Train listeners, require a baseline synchronous-precursor CMR of several dB per listener, and counterbalance conditions."
+   },
+   {
+    "citation": "Sollini J, Poole KC, Blauth-Muszkowski D, Bizley JK (2022). The role of temporal coherence and temporal predictability in the build-up of auditory grouping. Sci Rep 12:14493. PMID 36008519.",
+    "doi": "10.1038/s41598-022-18583-0",
+    "verified_by_search": true,
+    "design": "Precursors that varied in temporal coherence (narrowband vs broadband) and in temporal predictability (regular vs jittered over time), followed by a fixed masker containing a tone to detect.",
+    "result": "Coherence and predictability of the precursor each contributed independently to masking and unmasking (Exp 1). Interfering precursors produced the largest threshold changes (Exp 2).",
+    "bearing": "Revised: the predictability manipulated here is regularity over time. In the proposed design, each row stays strictly periodic in both the ordered and the random-order conditions, and a fixed permutation repeats every burst. Temporal predictability is therefore matched and does not by itself predict an ordered vs random difference. It would apply only if the random order were re-drawn on every burst; that would be a separate condition, confounding order with predictability."
+   },
+   {
+    "citation": "Elhilali M, Ma L, Micheyl C, Oxenham AJ, Shamma SA (2009). Temporal coherence in the perceptual organization and cortical representation of auditory scenes. Neuron 61(2):317-329. PMID 19186172.",
+    "doi": "10.1016/j.neuron.2008.12.005",
+    "verified_by_search": true,
+    "design": "Psychophysics with synchronous vs alternating tone sequences widely separated in frequency, ferret A1 recordings, and a temporal-coherence model of streaming.",
+    "result": "Spectrally distant components were heard as one stream when synchronous and as separate streams when consecutive. A1 tonotopic responses were comparably segregated in both cases. A coherence-based model accounted for the percepts.",
+    "bearing": "This is the theory C&O 2014 tested and the proposal extends. Correction to the previous draft: any permutation of the delays {0, dT, ..., 4dT} gives the same overall set of pairwise lags. In an ordered staircase, however, rows adjacent in frequency differ by only dT; in a random order they can differ by up to 4dT. A pairwise coherence model whose cross-channel interactions fall off with tonotopic distance therefore already predicts an ordered vs random difference. Only an unweighted (distance-independent) pairwise model predicts none. To be diagnostic of structure beyond pairwise coherence, the contrast needs that weighting modelled or controlled (fix the 1-kHz row's delay and its lag set to each flanker frequency)."
+   },
+   {
+    "citation": "Laback B, Tabuchi H, Kohlrausch A (2024). Evidence for proactive and retroactive temporal pattern analysis in simultaneous masking. J Acoust Soc Am 155(6):3742-3759. PMID 38856312.",
+    "doi": "10.1121/10.0026240",
+    "verified_by_search": true,
+    "design": "Tone thresholds in Schroeder-phase harmonic-complex maskers, with precursors or postcursors matched or mismatched in amplitude-modulation peakedness. Variants added gaps, an F0 difference, and lower levels.",
+    "result": "A flat cursor before or after a peaked masker raised thresholds (interference, both pro- and retroactive). A precursor matched in peakedness lowered thresholds (facilitation, proactive only). Both effects survived a gap, disappeared with an F0 difference between masker and precursor, and shrank at lower level. The authors call it a time-domain variant of CMR.",
+    "bearing": "Recent evidence that precursor context shapes dip listening only when precursor and masker form one stream. This supports a stream-based reading of precursor-shear effects. Indirect: it used a single complex, not across-band CMR."
+   },
+   {
+    "citation": "Doleschal F, Verhey JL (2020). Comodulation masking release with random variations of flanking-band center frequencies. J Acoust Soc Am 148(2):692. PMID 32873023.",
+    "doi": "10.1121/10.0001735",
+    "verified_by_search": true,
+    "design": "Flanking-band paradigm: an on-frequency narrowband masker plus two flanking bands (one below, one above), whose center frequencies jumped randomly at each local envelope minimum of the masker.",
+    "result": "CMR was present even for large center-frequency variations. In two experimental settings it fell only for very large variations. The authors interpret this as a broadly tuned stage that detects comodulation, with spectral weighting.",
+    "bearing": "This concerns spectral irregularity within the target interval, not temporal order of precursors, so it is only an indirect counter-prediction: a broadly tuned comodulation stage may care little about which flanker carries which lag. The spectral weighting it reports also implies that flanker distance from 1 kHz matters, which again argues for fixing the 1-kHz row's lag-to-flanker mapping across order conditions."
+   },
+   {
+    "citation": "Turgeon M, Bregman AS, Ahad PA (2002). Rhythmic masking release: contribution of cues for perceptual organization to the cross-spectral fusion of concurrent narrow-band noises. J Acoust Soc Am 111(4):1819-1831. PMID 12002866. [ADDED]",
+    "doi": "10.1121/1.1453450",
+    "verified_by_search": true,
+    "design": "Rhythmic masking release (RMR) paradigm with brief narrowband noise bursts. Listeners identify one of two rhythms masked by interleaved irregular distractors; the rhythm is released when the distractors fuse with concurrent flanking bursts in other frequency regions. Onset asynchrony, spatial separation and frequency separation were varied. 2AFC accuracy plus clarity ratings.",
+    "result": "Synchrony fully fused brief noise bursts across frequency and space. An asynchrony of 20-40 ms produced no fusion; 10-20 ms produced partial fusion, with other cues then critical. Frequency and spatial separation reduced fusion but did not abolish it. Onset asynchrony was the dominant cue, with additive effects of the others.",
+    "bearing": "A grouping-based (not CMR-based) measure of cross-frequency fusion of narrowband noise bursts as a function of onset asynchrony. It predicts that adjacent-row lags of 10-40 ms already break simultaneous fusion of bursts. That fits the proposed perceptual 'rows break apart' measure and suggests a dT grid of roughly 5-40 ms."
+   },
+   {
+    "citation": "Teki S, Chait M, Kumar S, Shamma S, Griffiths TD (2013). Segregation of complex acoustic scenes based on temporal coherence. eLife 2:e00699. PMID 23898398, PMC3721234. [ADDED]",
+    "doi": "10.7554/eLife.00699",
+    "verified_by_search": true,
+    "design": "Stochastic figure-ground (SFG): 50-ms (or 25-ms) chords of random tones, with a 'figure' of components repeating across chords. Coherence and duration were varied (n = 9-10 per experiment; 27 in Exp 6b). Exp 4 used 'ramped' figures whose components stepped up in frequency each chord by 2 or 5 units of 1/24 octave. Figure components always started and stopped together; onset asynchrony among figure components was never manipulated.",
+    "result": "Detection grew with coherence and duration. Ramped figures were still detected: maximum hit rate 0.97 at step 2 and 0.83 at step 5, worse for the steeper ramp (F(1,18) = 21, p < 0.001). Performance survived up to 300 ms of noise inserted between chords (d' = 1.00 at 500 ms). A temporal-coherence model fitted the data.",
+    "bearing": "This is the SFG background the proposal borrows from. The only 'sheared' SFG figures tested were sheared in frequency, not in time. A temporal shear of figure rows (row-specific onset lags) is untested in SFG as well as in CMR, which strengthens the novelty claim. The graded cost of steeper frequency ramps is a natural analogue for a graded cost of larger temporal shear."
+   },
+   {
+    "citation": "Kim H, Ratkute V, Epp B (2021). The effect of the preceding masking noise on monaural and binaural release from masking. bioRxiv preprint 2021.11.05.467091 (not peer reviewed; no published version listed). [ADDED, preprint]",
+    "doi": "10.1101/2021.11.05.467091",
+    "verified_by_search": true,
+    "design": "CMR and IPD-induced BMLD measured after a preceding masker whose duration and envelope temporal coherence were varied.",
+    "result": "Abstract: the preceding stream formation affected CMR on time scales beyond 200 ms, depending on the masker's spectrotemporal characteristics. It did not significantly affect BMLD. No numeric CMR values were verified.",
+    "bearing": "A recent, unreviewed indication that preceding-masker context of more than 200 ms modulates CMR. With 4 precursor bursts at 250 ms (about 1 s of context), build-up and adaptation are in play. The number of precursors should be held constant across shear conditions, and possibly varied as a factor. Only the abstract was verified."
+   }
+  ],
+  "closest_prior_work": "Christiansen & Oxenham (2014, JASA 135:3520, doi 10.1121/1.4872300; checked against the PMC full text) is the direct template. It used the same five 20-Hz bands (0.25-4 kHz) at 60 dB SPL, a 1-kHz tone, 187.5-ms bursts at a 250-ms onset interval, and 4 precursors before a resynchronized target burst. Only the on-frequency band's precursors were offset (dT = 20/40/60 ms, with dT/2 split across the masker and flanker intervals to resynchronize). There were also unequal-rate and synchronous-jitter controls. CMR dropped significantly at dT = 40 and 60 ms but stayed above zero in Exp 1. It was no longer significant at dT = 60 in Exp 3 (pre- plus post-cursors). The flankers always shared one onset. Other neighbours:\n- Grose & Hall (1993; 10.1121/1.405809): asynchrony of 50 ms or more between the on-signal band and the flankers in the target interval abolished CMR.\n- Grose, Buss & Hall (2009; 10.1121/1.3023067): same 1-octave five-band layout, but only two onset groups.\n- Dau, Ewert & Oxenham (2009; 10.1121/1.3082121): flanker postcursors cut wide-spacing CMR from 6.1 to 0.25 dB.\n- Turgeon, Bregman & Ahad (2002; 10.1121/1.1453450): a grouping measure in which 20-40 ms of onset asynchrony prevents cross-frequency fusion of noise bursts.\n- Teki et al. (2013; 10.7554/eLife.00699): SFG figures sheared in frequency (ramps), never in time.\nA title screen of the 18 papers that Semantic Scholar lists as citing C&O 2014 turned up no follow-up that staggers all bands.",
+  "novelty_verdict": "Likely novel as a specific design, and an incremental extension of Christiansen & Oxenham (2014). All cited papers were confirmed in PubMed (PMIDs above). C&O 2014, Dau et al. 2009, Grose et al. 2009 and Teki et al. 2013 were also checked against their full texts. Searches of PubMed, Consensus and the web, and a title screen of the 18 papers citing C&O 2014 in Semantic Scholar, found no CMR or SFG study that does any of the following:\n(a) progressively offsets the precursor onsets of every band across frequency (a temporal shear);\n(b) compares an ordered staircase with a permuted row order at matched lags;\n(c) pairs CMR thresholds with reports of when rows perceptually break apart.\nPrior manipulations shift one band (C&O 2014), the flankers as one group (Grose & Hall 1993; Hall et al. 1997; Grose et al. 2009), or add flanker pre- or post-cursor streams (Dau et al. 2009; Verhey et al. 2012). SFG 'sheared' figures were sheared in frequency, not time (Teki et al. 2013).\n\nCorrections to the previous draft:\n(1) A pairwise temporal-coherence model does NOT generally predict 'no difference' between ordered and random orders. A permutation keeps the overall set of pairwise lags, but in the ordered staircase, rows adjacent in frequency differ by dT, while in a random order they can differ by up to 4dT. Any model whose cross-channel coherence weighting falls with tonotopic distance therefore predicts a difference. Only a distance-independent model predicts none. The ordered vs random contrast is diagnostic of non-pairwise ('glide' or ramp object) structure only once that distance weighting is modelled or controlled.\n(2) Sollini et al. (2022) do not support an order effect when each row stays periodic and one fixed permutation repeats every burst, because temporal predictability is then matched.\n(3) Hall et al. (1997) and Grose & Hall (1993) varied asynchrony inside the signal interval, not in precursors, so their 50-ms limits transfer only by analogy.\n(4) C&O Exp 2 (random-envelope precursors) left CMR significant at dT = 60 ms.\nAdded papers: Turgeon et al. 2002, Teki et al. 2013, and the Kim, Ratkute & Epp 2021 preprint.\n\nDesign cautions:\n- Fix the delay of the 1-kHz row and its lag (including lead or lag direction) to each flanker frequency across the ordered and random conditions.\n- Keep k*dT well below half the 250-ms period: at dT = 60 ms, a 240-ms lag sits only 10 ms ahead of the next burst.\n- Keep the target burst synchronous and comodulated. Envelope delays of 10-20 ms with 20-25-Hz bands reduce CMR through decorrelation alone (3.5 to 1.5 dB; Moore & Schooneveldt 1990).\n- Use a dT grid of about 5-40 ms, guided by Turgeon et al. 2002 and C&O 2014.\n- Train listeners and require a baseline across-channel CMR, since naive listeners often show none at 1-octave spacing (Goldman et al. 2012).\n- Hold the number of precursors constant (precursor context beyond 200 ms matters; Kim et al. 2021 preprint).\n\nNot verified:\n- The content of Dau, Ewert & Oxenham (2005), Springer chapter (doi 10.1007/0-387-27045-0_42): it exists, but no abstract was found.\n- The full text of Grose & Hall (1993), so how the flankers were gated there is checked only at abstract level.\n- Very recent work not yet indexed."
+ },
+ {
+  "papers": [
+   {
+    "citation": "Christiansen SK, Oxenham AJ (2014). Assessing the effects of temporal coherence on auditory stream formation through comodulation masking release. J Acoust Soc Am 135(6):3520-3529. PMID 24907815.",
+    "doi": "10.1121/1.4872300",
+    "verified_by_search": true,
+    "design": "Checked against the PMC full text. Bands were 20-Hz-wide noises: the masker at 1 kHz and four flankers at 0.25, 0.5, 2 and 4 kHz, each at 60 dB SPL. The target was a 1-kHz tone. Bursts lasted 187.5 ms including 20-ms raised-cosine ramps, with a 250-ms noise-onset interval (NOI). Four precursor bursts preceded the target burst. In the offset conditions the masker-band precursors were DELAYED relative to the flankers, so the flankers led, by dT = 0, 20, 40 or 60 ms; only this direction was tested. The final burst was always synchronous: the masker's last NOI was shortened by dT/2 and the flankers' lengthened by dT/2. Other Experiment 1 conditions gave the flankers a different rate (masker NOI 250 ms, flanker NOI 200 or 300 ms) or jittered the NOI by \u00b130 ms (uniform), with the jitter kept synchronous across frequency. Experiment 2 used random-envelope precursors at dT = 0 and 60 ms. Experiment 3 used 10 bursts with the target at burst 5, 6 or 7 (pre- and postcursors) at dT = 0 or 60 ms. The task was 3I-3AFC, 1-up/2-down. N = 7 analysed in Experiment 1 (8 recruited), 10 in Experiment 2 and 8 in Experiment 3.",
+    "result": "Experiment 1 CMR ANOVA: F(6,36) = 9.97, p < 0.001. Tukey post hoc tests showed significantly reduced CMR at dT = 40 and 60 ms and for unequal rates; dT = 20 ms was not reported as significant, and common \u00b130-ms jitter had no significant effect. CMR stayed positive in all seven conditions (paired t(6) > 4.46). Experiment 2 showed a dT effect on CMR, F(1,15) = 26.21, with CMR still significant at 60 ms (t(9) = 2.39). In Experiment 3, CMR at 0 ms was well above zero (t(7) = 14.1, p < 0.001) and CMR at 60 ms was not (t(7) = 1.42, p = 0.10); the authors call this somewhat ambiguous. CMR in dB appears only in the figures. The authors conclude that asynchronies up to 60 ms do not fully remove fusion. They cite Turgeon et al. for segregation at asynchronies greater than 20-40 ms.",
+    "bearing": "This is the direct parent paradigm and the closest prior work. It used one band (the on-frequency band, OFB) against a block of four flankers that stayed synchronous with each other, in one lag direction only (flankers lead). It never staggered all rows, never varied lag sign and never compared ordered with permuted lags. The range is bracketed: 20 ms of OFB lag was not significant, 40-60 ms was. Important for the new design: in C&O the OFB always lagged. In a staircase, the middle (1-kHz) row leads some flankers and lags others, and the lead-lag literature (Hall et al. 1997; Grose et al. 2009) suggests an OFB-leading asynchrony is more damaging. So C&O's dT values may not transfer directly. Fixed lags plus common jitter were harmless, while burst-to-burst-varying lags (unequal rates) hurt CMR. That bears on whether a random arm should be a fixed permutation or re-drawn every burst."
+   },
+   {
+    "citation": "Grose JH, Hall JW (1993). Comodulation masking release: is comodulation sufficient? J Acoust Soc Am 93(5):2896-2902. PMID 8315153.",
+    "doi": "10.1121/1.405809",
+    "verified_by_search": true,
+    "design": "Three experiments, each designed to hinder fusion of the comodulated bands. Experiment 1 varied onset/offset asynchrony between the on-signal band and the flanking bands. Experiment 2 used an auditory streaming paradigm; the abstract does not specify the stimulus beyond that. Experiment 3 placed the noise bands in separate harmonic series. Details were verified from the abstract only.",
+    "result": "CMR could be completely abolished when the asynchrony between the on-signal band and the flankers was 50 ms or more. Streaming disrupted CMR significantly, but a substantial CMR remained. The harmonicity manipulation had only a small effect, which the authors judged not to come from parsing. They concluded that onset/offset synchrony is of paramount importance.",
+    "bearing": "Sets up onset synchrony as the dominant grouping cue for CMR, with a ceiling of 50 ms or more that matches the C&O range. The asynchrony was again one band against a synchronous block. It was never graded across rows or ordered."
+   },
+   {
+    "citation": "Hall JW, Grose JH, Dev MB (1997). Auditory development in complex tasks of comodulation masking release. J Speech Lang Hear Res 40(4):946-954. PMID 9263957.",
+    "doi": "10.1044/jslhr.4004.946",
+    "verified_by_search": true,
+    "design": "CMR in children (5 years and older) and adults. One set of conditions varied the temporal asynchrony (a temporal fringe) between the on-signal band (OSB) and six comodulated flanking bands, in both directions: OSB leading, or flanking bands leading. Another set added bands carrying a second modulation pattern.",
+    "result": "With the OSB leading the flankers by a fringe of 50 ms or more, adult CMR was near zero; children often showed negative CMR. With the flankers leading the OSB, all age groups showed substantial CMR, larger in adults than in children.",
+    "bearing": "A key paper missing from the draft. It shows a strong lead-lag ASYMMETRY: an OSB-leading asynchrony abolishes CMR, while a flanker-leading asynchrony largely spares it. C&O 2014 tested only the spared direction (flankers lead). In an ordered staircase the 1-kHz row leads the rows on one side and lags those on the other, and a random permutation changes how many flankers it leads. The SIGN pattern of the OFB's lags, not just their magnitude, therefore has to be matched between the ordered and random arms. A caveat: these were gated or continuous fringes, not repeated precursor bursts."
+   },
+   {
+    "citation": "Grose JH, Buss E, Hall JW (2009). Within- and across-channel factors in the multiband comodulation masking release paradigm. J Acoust Soc Am 125(1):282-293. PMID 19173415.",
+    "doi": "10.1121/1.3023067",
+    "verified_by_search": true,
+    "design": "Checked against the PMC full text. Five 20-Hz-wide bands at 60 dB SPL around a 1-kHz tone. The observation interval was 280 ms with 40-ms ramps. Spacing was logarithmic (1/24, 1/6, 1/3 or 1 octave; the 1-octave set was 250-4000 Hz, the same as the proposal) or linear (30, 120 or 240 Hz). Asynchrony conditions: COM/OSB, a continuous OSB with gated flankers, so the OSB leads; and COM/CFB, continuous flankers with a gated OSB, so the flankers lead. A further condition added a random-envelope temporal fringe (COM/RAN). N = 5 highly practised listeners.",
+    "result": "With synchronous gating, release was about 6.5 dB at 1/6 octave, 6.7 dB at 1/3 octave and none at 1/24 octave. With linear spacing it was 6.7, about 10.5 and 7.0 dB at 30, 120 and 240 Hz. Significant release was found at 1 octave, but no value in dB is given in the text. COM/OSB (OSB leading) eliminated release at most spacings, though in Experiment 1 not at 1 octave. COM/CFB (flankers leading) reduced release only at the wider spacings. The random fringe largely eliminated release, with some remaining at 1/6 and 1 octave. Asynchronies were defined by gating mode, not by values in ms.",
+    "bearing": "Same five-band geometry with a 1-kHz tone. It confirms that the effect of asynchrony depends on direction (OSB-leading vs flanker-leading) and on spacing, and that a random temporal fringe is disruptive. Correction to the earlier summary: at the proposal's 1-octave spacing, the OSB-leading gating did not clearly remove release in Experiment 1, so effects at octave spacing may be weaker than at narrower spacings."
+   },
+   {
+    "citation": "Dau T, Ewert SD, Oxenham AJ (2009). Auditory stream formation affects comodulation masking release retroactively. J Acoust Soc Am 125(4):2182-2188. PMID 19354394.",
+    "doi": "10.1121/1.3082121",
+    "verified_by_search": true,
+    "design": "A 1-kHz tone in a 20-Hz-wide on-frequency band, with four comodulated or independent flankers spaced 1/6 octave (narrow) or 1 octave (wide). Gated flanker-only 'postcursor' bursts followed the signal.",
+    "result": "CMR occurred at both spacings. Postcursors eliminated CMR at the 1-octave spacing but not at 1/6 octave. Controls ruled out long-term adaptation and general distraction.",
+    "bearing": "Establishes across-frequency CMR at octave spacing, the proposal's spacing, as an index of stream membership. Rows that segregate during the precursors should lose their contribution."
+   },
+   {
+    "citation": "Verhey JL, Ernst SMA, Yasin I (2012). Effects of sequential streaming on auditory masking using psychoacoustics and auditory evoked potentials. Hear Res 285(1-2):77-85. PMID 22326589.",
+    "doi": "10.1016/j.heares.2012.01.006",
+    "verified_by_search": true,
+    "design": "CMR measured with an AFC procedure and EEG (mismatch negativity) in the same listeners. Precursors consisted of the off-frequency masker components only.",
+    "result": "Adding precursors made only of off-signal-frequency maskers abolished CMR. An MMN was present whatever the envelope correlation when only the off-frequency components were present.",
+    "bearing": "Independent replication that precursor-driven sequential streaming can remove CMR entirely. It supports reading CMR loss in the staircase as segregation set up by the precursors, and it offers an EEG route to a concurrent objective index of row breakup."
+   },
+   {
+    "citation": "Goldman SA, Baer T, Moore BCJ (2012). Comodulation masking release: effects of training and experimental design on use of within- and across-channel cues. J Acoust Soc Am 132(1):303-316. PMID 22779479.",
+    "doi": "10.1121/1.4726074",
+    "verified_by_search": true,
+    "design": "Replicated Dau et al. (2009) with naive listeners and a design that minimised familiarity with the cues. Experiment 2 tracked training over sessions across four designs, using postcursors to separate within-channel from across-channel cues.",
+    "result": "Naive listeners used within-channel cues effectively but not across-channel cues. Use of across-channel cues depended on training and design.",
+    "bearing": "A practical risk missing from the draft. Across-channel CMR at 1-octave spacing may be small or absent in naive listeners, which compresses the range for ordered-versus-random differences. The design should plan training and screen for baseline across-channel CMR at dT = 0."
+   },
+   {
+    "citation": "Moore BCJ, Schooneveldt GP (1990). Comodulation masking release as a function of bandwidth and time delay between on-frequency and flanking-band maskers. J Acoust Soc Am 88(2):725-731. PMID 2212296.",
+    "doi": "10.1121/1.399775",
+    "verified_by_search": true,
+    "design": "A 1-kHz, 400-ms signal with one flanking band (0.25-2 kHz), presented monaurally or dichotically. Bandwidths were 6.25, 25 or 100 Hz. The flanker envelope was delayed relative to the on-frequency band by 0, 5, 10 or 20 ms.",
+    "result": "At 100 Hz bandwidth, CMR was below about 1 dB. At 25 Hz it was about 3.5 dB with no delay, falling to about 1.5 dB at 20 ms. At 6.25 Hz it was about 5 dB and almost independent of delay. CMR tracked envelope correlation, not absolute delay.",
+    "bearing": "With 20-Hz bands, an envelope delay inside the target burst would reduce CMR on its own. Keeping the final burst synchronous isolates the grouping set up by the precursors from envelope decorrelation."
+   },
+   {
+    "citation": "Turgeon M, Bregman AS, Ahad PA (2002). Rhythmic masking release: contribution of cues for perceptual organization to the cross-spectral fusion of concurrent narrow-band noises. J Acoust Soc Am 111(4):1819-1831. PMID 12002866.",
+    "doi": "10.1121/1.1453450",
+    "verified_by_search": true,
+    "design": "Rhythmic masking release with brief narrowband noise bursts and concurrent flanking bursts. Onset asynchrony, spatial separation and frequency separation were varied. Measures were 2AFC rhythm identification accuracy and clarity ratings.",
+    "result": "Synchrony fully fused the bursts across frequency and space. An asynchrony of 20-40 ms gave no fusion, and 10-20 ms gave partial fusion in which other cues decided the outcome. Onset asynchrony was the dominant cue, with additive effects of the other cues.",
+    "bearing": "Independent estimate of where cross-frequency fusion of brief noise bursts breaks. It puts the informative range for adjacent-row and OFB-flanker lags at roughly 10-20 ms."
+   },
+   {
+    "citation": "Zera J, Green DM (1993). Detecting temporal onset and offset asynchrony in multicomponent complexes. J Acoust Soc Am 93(2):1038-1052. PMID 8445115.",
+    "doi": "10.1121/1.405552",
+    "verified_by_search": true,
+    "design": "Discrimination of a synchronous standard from asynchronous complexes. Onset or offset times were Gaussian-distributed, or selected components were displaced. Complexes were 20 harmonics of 200 Hz or log-spaced components from 200 to 4000 Hz.",
+    "result": "In harmonic complexes, the minimum onset-asynchrony threshold was 0.2 ms (1-ms rise time; minimum near 2 kHz). Offset thresholds were about 10 times larger, at 0.45-1.3 ms. For logarithmic complexes, thresholds were up to nearly two orders of magnitude larger in some conditions. Detection relied on comparison between frequency channels.",
+    "bearing": "Asynchrony between widely spaced components is much less detectable than between harmonics. For octave-spaced rows, grouping rather than raw detection of asynchrony is the likely limit."
+   },
+   {
+    "citation": "Zera J, Green DM (1993). Detecting temporal asynchrony with asynchronous standards. J Acoust Soc Am 93(3):1571-1579. PMID 8473611.",
+    "doi": "10.1121/1.406816",
+    "verified_by_search": true,
+    "design": "The standard had successive components linearly delayed, an ordered onset staircase across frequency. The signal was an extra temporal displacement of one component. Complexes were harmonic (Experiment I) or log-spaced (Experiment II).",
+    "result": "For onsets, an asynchronous standard greatly increased the difficulty of detecting asynchrony in a single component, in both complex types. Offset discrimination was not greatly affected.",
+    "bearing": "The only auditory study found that used an ordered, linear onset staircase across frequency. It measured asynchrony discrimination, not grouping or masking release, and had no random-order comparison. It only loosely suggests that a regular staircase can serve as a template."
+   },
+   {
+    "citation": "Wojtczak M, Beim JA, Micheyl C, Oxenham AJ (2013). Effects of temporal stimulus properties on the perception of across-frequency asynchrony. J Acoust Soc Am 133(2):982-997. PMID 23363115.",
+    "doi": "10.1121/1.4773350",
+    "verified_by_search": true,
+    "design": "Pairs of 500-ms tones: 250 Hz with 1, 2, 4 or 6 kHz. Measures were subjective synchrony judgments, 3AFC asynchrony detection and asynchrony discrimination. Onset and offset ramps were manipulated independently. A coincidence-detector model was fitted.",
+    "result": "Sensitivity was asymmetric: asynchrony was detected more easily when the low-frequency tone led than when the high-frequency tone led. The asymmetry held for discrimination at small standards (20 ms or less) but not at larger ones. Onsets dominated.",
+    "bearing": "Missing from the draft. A staircase has a DIRECTION (low-first or high-first), and across-frequency asynchrony is perceived asymmetrically for small lags. Ascending and descending staircases may therefore differ in breakup and CMR. The design should include both, or counterbalance them, and the random arm should be compared against both."
+   },
+   {
+    "citation": "Teki S, Chait M, Kumar S, Shamma S, Griffiths TD (2013). Segregation of complex acoustic scenes based on temporal coherence. eLife 2:e00699. PMID 23898398.",
+    "doi": "10.7554/eLife.00699",
+    "verified_by_search": true,
+    "design": "Stochastic figure-ground (SFG) stimuli: 50-ms chords (25 ms in Experiment 3) drawn from 129 frequencies at 1/24-octave spacing, 179-7246 Hz. Figure coherence was 1-8 and duration 2-7 chords. Experiment 2 was AXB identification (coherence 6; 4, 8 or 12 chords). Experiment 4 used ramped figures with steps of 2 or 5 \u00d7 1/24 octave per chord. Experiment 6 interleaved figure chords with noise of 50-500 ms. A temporal-coherence model was fitted.",
+    "result": "Experiment 1 maximum hit rate was 93 \u00b1 2%. Experiment 2 gave d' = 0.31 \u00b1 0.18 (not different from 0), 1.75 \u00b1 0.34 and 2.93 \u00b1 0.26 for 4, 8 and 12 chords. Ramped figures gave maximum hit rates of 0.97 (step 2) and 0.83 (step 5); condition effect F(2,25) = 19, p < 0.001. Detection survived 500-ms noise interruptions (d' = 1.00 \u00b1 0.30). No condition desynchronised figure components across frequency within a chord; the only jitter was in the figure's onset time.",
+    "bearing": "SFG figures move in frequency over time but stay synchronous across frequency, the transpose of the proposed shear. No SFG study found here applies a cross-frequency onset shear to figure components."
+   },
+   {
+    "citation": "Elhilali M, Ma L, Micheyl C, Oxenham AJ, Shamma SA (2009). Temporal coherence in the perceptual organization and cortical representation of auditory scenes. Neuron 61(2):317-329. PMID 19186172.",
+    "doi": "10.1016/j.neuron.2008.12.005",
+    "verified_by_search": true,
+    "design": "Corrected from the earlier summary. The psychophysics was an OBJECTIVE task, not streaming reports. N = 9 listeners detected a temporal shift of the final B tone (2I-2AFC, 3-down/1-up). A was fixed at 1 kHz and B was 0.5, 0.75 or 1.25 octaves above. Tones were 100 ms with 10-ms ramps, in sequences of five precursor A-B pairs. Synchronous sequences had all gaps at 50 ms. Asynchronous sequences used A gaps of 30 or 70 ms, so the onset asynchrony drifted from tone to tone. A B-only control was included. The study also included ferret A1 recordings (including 40-ms partially overlapping sequences) and a temporal-coherence model.",
+    "result": "Thresholds for synchronous sequences were about 2-4 ms at all separations, including 15 semitones, consistent with fusion. Asynchronous sequences gave about 10-20 ms, not different from the B-only control, consistent with segregation. A1 tonotopic separation was similar for both, so the coherence model, not tonotopy, predicted the percepts.",
+    "bearing": "The theoretical basis. The model's coherence matrix is built from pairwise channel products with no adjacency term (this follows from the equations; it is not stated explicitly). An order-invariant model therefore predicts no ordered-versus-random difference once the pairwise lag distributions are matched, which is a clean null to test. Its 'asynchronous' condition had drifting lags, like C&O's unequal-rate condition, not a fixed shear."
+   },
+   {
+    "citation": "Micheyl C, Hanson C, Demany L, Shamma S, Oxenham AJ (2013). Auditory stream segregation for alternating and synchronous tones. J Exp Psychol Hum Percept Perform 39(6):1568-1580. PMID 23544676.",
+    "doi": "10.1037/a0032241",
+    "verified_by_search": true,
+    "design": "Experiment 1 collected one- versus two-stream reports for alternating and synchronous tones. Experiments 2-3 tested detection of rare intensity changes in target tones with synchronous or asynchronous random-intensity distractor tones at another frequency.",
+    "result": "At large frequency separations, two-stream reports were less likely on average for synchronous than for alternating tones. Sensitivity to target intensity changes was greater with asynchronous than with synchronous distractors.",
+    "bearing": "Objective evidence that synchrony limits segregation even at large frequency separations, and a performance-based way to measure breakup without relying only on subjective reports. It also shows that synchrony does not fully prevent segregation, so tone thresholds in the ordered and random arms may not hit a floor."
+   },
+   {
+    "citation": "Rajendran VG, Harper NS, Willmore BD, Hartmann WM, Schnupp JWH (2013). Temporal predictability as a grouping cue in the perception of auditory streams. J Acoust Soc Am 134(1):EL98-EL104. PMID 23862914.",
+    "doi": "10.1121/1.4811161",
+    "verified_by_search": true,
+    "design": "A-B-A-B tone sequences, either regular or with graded temporal jitter added independently to each B tone. Listeners reported one or two streams.",
+    "result": "Two-stream reports increased substantially and significantly with jitter. Exact percentages were not verified (abstract only).",
+    "bearing": "Unpredictable timing promotes segregation. This speaks most directly to a random arm whose lags are re-drawn each burst. A fixed random permutation is fully predictable after one burst, so this result does not by itself predict an ordered advantage over a fixed permutation."
+   },
+   {
+    "citation": "Andreou LV, Kashino M, Chait M (2011). The role of temporal regularity in auditory segregation. Hear Res 280(1-2):228-235. PMID 21683778.",
+    "doi": "10.1016/j.heares.2011.06.001",
+    "verified_by_search": true,
+    "design": "Rand-AB: two concurrent, temporally uncorrelated tone sequences. The attended sequence was irregular (inter-tone interval, ITI, 100-400 ms). The distractor was random, or isochronous with an ITI of 400, 250 or 100 ms. The objective task was detecting an amplitude-modulation pattern in the attended stream.",
+    "result": "At a 2-semitone separation (not at 4 semitones), performance was better with isochronous distractors at 250 and 100 ms than with random ones. The regularity benefit was limited to fast rates and to cases where frequency separation alone was insufficient.",
+    "bearing": "Regularity matters only when other cues are weak. Octave-spaced rows are strongly separated in frequency, so any ordered-versus-random effect is likely to be small and confined to dT values near the fusion boundary."
+   },
+   {
+    "citation": "Aman L, Picken S, Andreou LV, Chait M (2021). Sensitivity to temporal structure facilitates perceptual analysis of complex auditory scenes. Hear Res 400:108111. PMID 33333425.",
+    "doi": "10.1016/j.heares.2020.108111",
+    "verified_by_search": true,
+    "design": "Soundscapes of up to 14 concurrent tone-pip streams, each with its own frequency and amplitude-modulation pattern, either temporally regular or random. The task was detecting the appearance or disappearance of a stream.",
+    "result": "Change detection was better with regular streams. Regularity of the changing stream and of the background contributed independently. The benefit occurred without awareness. Exact d' values were not verified.",
+    "bearing": "The regularity here is within-stream timing, not cross-frequency lag structure. It motivates, but does not test, an advantage for a structured cross-row lag pattern."
+   },
+   {
+    "citation": "Hancock PJB, Walton L, Mitchell G, Plenderleith Y, Phillips WA (2008). Segregation by onset asynchrony. J Vis 8(7):21. PMID 19146254.",
+    "doi": "10.1167/8.7.21",
+    "verified_by_search": true,
+    "design": "Visual figure-ground: Gabor arrays in which a figure (for example a curving path) is defined only by onset asynchrony relative to background elements.",
+    "result": "Most observers needed 20-40 ms of onset asynchrony to segregate. Asynchronous onsets aligned with the path could be discriminated from onsets lying on the path but not aligned with it.",
+    "bearing": "A cross-modal precedent showing that the spatial organisation of onset asynchronies (structured versus unstructured) is perceptually available. It is visual and uses no masking-release measure."
+   }
+  ],
+  "closest_prior_work": "Christiansen & Oxenham (2014, JASA 135:3520, doi 10.1121/1.4872300) remains the closest prior work and the direct parent. It is confirmed against the PMC full text: the same five 20-Hz bands (0.25-4 kHz), a 1-kHz tone, four precursor bursts of 187.5 ms at a 250-ms NOI, and a synchronous final burst (last NOIs adjusted by \u00b1dT/2). Only the on-frequency band's precursors were offset, and only in one direction (OFB delayed, flankers leading), by 0/20/40/60 ms against four mutually synchronous flankers. In Experiment 1, 40-60 ms significantly reduced CMR (F(6,36) = 9.97) and 20 ms did not. Unequal rates reduced CMR, while common \u00b130-ms jitter did not. CMR was never abolished, except possibly at 60 ms with randomised target position (Experiment 3, t(7) = 1.42, ns versus 0).\n\nSupporting lines of work:\n- **CMR and onset asynchrony as segregation.** Grose & Hall 1993 (50 ms or more abolishes CMR), Hall, Grose & Dev 1997 and Grose, Buss & Hall 2009. The last two show a strong lead-lag asymmetry: an OSB-leading asynchrony abolishes or strongly reduces CMR, while a flanker-leading one largely spares it. Dau, Ewert & Oxenham 2009 and Verhey et al. 2012 show that sequential capture of the flankers removes CMR at wide spacing.\n- **Ordered onset staircase across frequency.** Only Zera & Green 1993 (JASA 93:1571), which measured asynchrony discrimination and had no random-order comparison.\n- **Direction asymmetry in across-frequency asynchrony perception.** Wojtczak et al. 2013 (low-frequency-leading is more detectable at lags of 20 ms or less).\n- **Structured versus unstructured onset asynchrony.** Only in vision (Hancock et al. 2008).\n\nSFG work (Teki et al. 2013 and others) always keeps figure components synchronous across frequency.",
+  "novelty_verdict": "Largely novel, verdict unchanged. All 14 original papers exist and are correctly identified. PubMed metadata confirmed every DOI, and C&O 2014, Grose et al. 2009, Teki et al. 2013 and Elhilali et al. 2009 were also checked against PMC full text.\n\nCorrections made:\n1. **C&O 2014 lag direction.** Only the OFB-delayed (flankers-lead) direction was tested. Sample sizes were N = 7, 10 and 8.\n2. **Grose et al. 2009 at octave spacing.** At 1-octave spacing, OSB-leading gating did not clearly remove release in Experiment 1. The random fringe left some release at 1/6 and 1 octave.\n3. **Elhilali et al. 2009 task.** The psychophysics used an objective timing-shift task: about 2-4 ms thresholds for synchronous sequences versus about 10-20 ms for asynchronous ones, where the asynchronous lags drifted. It did not use streaming reports.\n4. **Teki et al. 2013 statistics.** The ramped-figure effect is F(2,25) = 19.\n\nAdded papers, all verified: Hall, Grose & Dev 1997; Verhey, Ernst & Yasin 2012; Goldman, Baer & Moore 2012; Wojtczak et al. 2013; Micheyl et al. 2013 (JEP:HPP).\n\nNo study was found, on PubMed, Consensus or the web, that shears all rows progressively (row k delayed by k*dT) in a CMR or SFG paradigm. None compares an ordered with a permuted cross-frequency lag structure at matched asynchrony using CMR or any objective grouping measure. The general claim that precursor asynchrony reduces CMR through segregation is well established (Grose & Hall 1993; Dau et al. 2009; Verhey et al. 2012; C&O 2014) and should be framed as a replication anchor. The new contribution is whether lag structure (order and direction) matters beyond pairwise lag magnitudes. An order-invariant pairwise coherence model (Elhilali et al. 2009) predicts no difference.\n\nDesign caveats, revised:\n1. **Lag sign, not just magnitude.** Hall et al. 1997 and Grose et al. 2009 show that OSB-leading asynchrony is far more damaging than flanker-leading asynchrony, and C&O tested only flanker-leading. In an ordered staircase the 1-kHz row (k=2) leads two flankers and lags two. Random permutations change both the magnitude (up to a mean of 2.5dT if the 1-kHz row lands at an end) and the number of flankers it leads. Either fix the 1-kHz row's rank, or match its full signed lag set, across arms.\n2. **Staircase direction.** Wojtczak et al. 2013 found that low-frequency-leading asynchrony is more detectable at lags of 20 ms or less. Run both ascending and descending staircases, or counterbalance them, and compare the random arm against both.\n3. **Adjacent versus global lags.** The ordered arm has all adjacent lags equal to dT, while the random arm has adjacent lags up to 4dT. Analyse both measures: a local or neighbour coherence account predicts an ordered advantage, while a global pairwise account predicts none once the OFB's signed lags are matched.\n4. **Fixed versus re-drawn random order.** Predictability effects (Rajendran et al. 2013; Andreou et al. 2011) and C&O's finding that varying lags hurt more than fixed lags concern lags that change from burst to burst. A fixed permutation is just as predictable as the staircase, so state which random arm is tested. Re-drawing the permutation each burst would confound order with predictability.\n5. **dT range.** Fusion and CMR break between about 10-20 ms (partial) and 20-40 ms or more (none) (Turgeon et al. 2002; C&O 2014). Use dT of about 5-15 ms, so the outer-row spread of 4dT is 20-60 ms. Expect effects near threshold (Andreou et al. 2011). Octave spacing may yield weaker asynchrony effects (Grose et al. 2009).\n6. **Training and baseline CMR.** Naive listeners may not use across-channel cues at all (Goldman et al. 2012). Train listeners, and require a reliable CMR at dT = 0 before comparing arms.\n7. **Final-interval rhythm cue and envelope decorrelation.** Keep the final burst synchronous and split the last-NOI adjustment as \u00b1offset/2, as C&O did, reporting the resulting rhythm cue. With 20-Hz bands, envelope lags inside the target burst would reduce CMR on their own (Moore & Schooneveldt 1990: about 3.5 to about 1.5 dB at 20 ms for 25-Hz bands). Predict CMR in dB only after piloting, because C&O report CMR only in figures.\n8. **Measuring breakup.** Pair the subjective breakup reports with an objective measure, such as Micheyl et al. 2013-style performance or the MMN of Verhey et al. 2012."
+ }
+]

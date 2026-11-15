@@ -21,11 +21,12 @@ def _style(cfg):
     step), orange for zigzag, greys for random envelopes."""
     col, lab, order = {}, {}, []
     conds = cfg.condition_list()
-    asc = sorted({c.dt_ms for c in conds if c.envelope == "co" and c.arrangement == "ascending"})
+    asc = sorted({c.dt_ms for c in conds if c.envelope == "co" and c.arrangement in ("ascending", "frozen")})
     cmap = matplotlib.colormaps["viridis"]
     for c in sorted(conds, key=lambda c: (c.envelope == "ref", c.envelope != "co", c.arrangement != "sync",
                                           c.arrangement, c.dt_ms)):
-        short = {"sync": "sync", "ascending": "asc", "zigzag": "zig"}[c.arrangement]
+        short = {"sync": "sync", "ascending": "asc", "zigzag": "zig", "frozen": "frozen",
+                 "reordered": "reord"}[c.arrangement]
         lab[c.name] = f"{c.envelope} {short}" + (f" {c.dt_ms:g}" if c.dt_ms else "")
         if c.envelope == "ref":
             col[c.name] = "#7a5bbf"
@@ -34,7 +35,7 @@ def _style(cfg):
             col[c.name] = "#9aa4b2" if c.arrangement == "sync" else "#c9b28a"
         elif c.arrangement == "sync":
             col[c.name] = "#1b4f9c"
-        elif c.arrangement == "zigzag":
+        elif c.arrangement in ("zigzag", "reordered"):
             col[c.name] = "#d0682e"
         else:
             i = asc.index(c.dt_ms)
@@ -52,13 +53,13 @@ def session_figure(folder: Path, summ: dict, out: Path = None) -> Path:
     COL, LAB, ORDER = _style(cfg)
     conds = [c for c in ORDER if c in th]
     tracks = sorted({int(r["track"]) for r in main})
-    nrow = (min(len(tracks), 8) + 3) // 4
+    nrow = (min(len(tracks), 12) + 3) // 4
     fig = plt.figure(figsize=(15, 3.4 * (nrow + 1)))
     gs = fig.add_gridspec(nrow + 1, 4, hspace=0.55, wspace=0.35)
 
     # A: every track, level by trial
     for i, tid in enumerate(tracks):
-        ax = fig.add_subplot(gs[i // 4, i % 4]) if i < 8 else None
+        ax = fig.add_subplot(gs[i // 4, i % 4]) if i < 12 else None
         if ax is None:
             break
         rs = [r for r in main if int(r["track"]) == tid]
@@ -119,13 +120,15 @@ def session_figure(folder: Path, summ: dict, out: Path = None) -> Path:
     ax = fig.add_subplot(gs[nrow, 2])
     cmr = summ["cmr_db"]
     pts = sorted((float(k.split("_")[1]), v) for k, v in cmr.items()
-                 if v is not None and k.split("_")[0] in ("ascending", "sync"))
+                 if v is not None and k.split("_")[0] in ("ascending", "sync", "frozen"))
     if pts:
         ax.plot([x for x, _ in pts], [y for _, y in pts], "o-", color="#2f6f9f", lw=2,
-                label="sync / ascending")
-    zz = [(float(k.split("_")[1]), v) for k, v in cmr.items() if k.startswith("zigzag") and v is not None]
+                label="sync / ascending / frozen")
+    zz = [(float(k.split("_")[1]), v) for k, v in cmr.items()
+          if (k.startswith("zigzag") or k.startswith("reordered")) and v is not None]
     if zz:
-        ax.plot([x for x, _ in zz], [y for _, y in zz], "s", color="#d0682e", ms=8, label="zigzag")
+        ax.plot([x for x, _ in zz], [y for _, y in zz], "s", color="#d0682e", ms=8,
+                label="re-ordered" if any(k.startswith("reordered") for k in cmr) else "zigzag")
     ax.axhline(0, color="k", lw=0.8)
     ax.axhspan(4, 7, color="0.85", alpha=0.6, zorder=0)
     ax.set_xlabel("step per row dT (ms); largest shift = 2 dT", fontsize=8)

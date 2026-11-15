@@ -5,6 +5,11 @@ ascending 20 ms; zigzag 20 shares the ascending-20 baseline (same set of onset o
 ascending 10 uses the mean of the two. The key contrasts do not need a baseline at all:
 co_ascending_20 - co_sync (does shear cost release?) and co_zigzag_20 - co_ascending_20 (does
 order matter?), both in dB of tone level (positive = harder).
+
+Patterns (frozen, reordered; see config.py): each has its own random baseline at the same step.
+Reported as well: the drop in CMR from sync to each step (positive = release lost) and, where both
+exist at a step, frozen minus re-ordered CMR (positive = the repeating pattern kept more release),
+with the same contrast on the comodulated thresholds alone.
 """
 from __future__ import annotations
 
@@ -82,6 +87,17 @@ def summarize(folder: Path) -> dict:
             a = g(f"co_ascending_{c.dt_ms:g}")
             if a is not None:
                 contrasts[f"order_cost_zigzag_vs_ascending_{c.dt_ms:g}_db"] = th[c.name] - a
+    for key, v in list(cmr.items()):
+        if key != "sync_0" and v is not None and cmr.get("sync_0") is not None:
+            contrasts[f"cmr_drop_{key}_db"] = cmr["sync_0"] - v
+    for c in cfg.condition_list():
+        if c.envelope == "co" and c.arrangement == "reordered":
+            k_f, k_r = f"frozen_{c.dt_ms:g}", f"reordered_{c.dt_ms:g}"
+            if cmr.get(k_f) is not None and cmr.get(k_r) is not None:
+                contrasts[f"learning_cmr_frozen_minus_reordered_{c.dt_ms:g}_db"] = cmr[k_f] - cmr[k_r]
+            if g(f"co_frozen_{c.dt_ms:g}") is not None and g(c.name) is not None:
+                contrasts[f"learning_co_reordered_minus_frozen_{c.dt_ms:g}_db"] = \
+                    th[c.name] - th[f"co_frozen_{c.dt_ms:g}"]
     for c in cfg.condition_list():
         if c.envelope == "rand" and c.dt_ms > 0 and c.name in th and "rand_sync_0" in th:
             contrasts[f"random_baseline_shift_{c.arrangement}_{c.dt_ms:g}_db"] = \
@@ -107,6 +123,9 @@ def summarize(folder: Path) -> dict:
     under = sum(int(r["underflows"] or 0) for r in rows if r["status"] == "ok")
     if under:
         flags.append(f"{under} audio underflows in valid trials")
+    if meta["config"].get("burst_level", "equalised") != "natural":
+        flags.append("bursts were equalised in level (the default before 2026-11-14): thresholds "
+                     "and CMR are not comparable with natural-level sessions")
     rep = {}
     for r in rows:
         if r["status"] != "ok":

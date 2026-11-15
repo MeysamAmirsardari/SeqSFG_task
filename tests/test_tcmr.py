@@ -183,3 +183,35 @@ def test_tone_band_is_randomised_and_band_alone_has_one_band():
     # the default preset still regenerates exactly as before (no extra random draw)
     t1, b1 = build(CFG, Condition("co", "sync", 0.0), 66.0, (9,))
     assert t1.tone_hz == 1000.0
+
+
+def test_bursts_keep_the_natural_level_of_the_noise():
+    from tcmr.stimulus import band_bursts
+    rng = np.random.default_rng(3)
+    lev = lambda xs: 10 * np.log10([np.mean(x ** 2) for x in xs])
+    co = np.array([lev(band_bursts(CFG, rng, True)) for _ in range(400)])
+    rd = np.array([lev(band_bursts(CFG, rng, False)) for _ in range(400)])
+    assert 1.5 < co[:, 2].std() < 3.2                       # about 2 dB for 20 Hz x 187.5 ms
+    assert np.abs(co - co[:, [2]]).max() < 0.3              # comodulated bands share the level
+    assert abs(np.corrcoef(rd[:, 1], rd[:, 2])[0, 1]) < 0.2  # random bands do not
+    assert np.mean(10 ** (co[:, 2] / 10)) == pytest.approx(1.0, abs=0.1)   # long-term level kept
+    short = CFG.replace(burst_ms=40.0, ramp_ms=10.0, noi_ms=200.0)
+    s = np.array([lev(band_bursts(short, rng, True)) for _ in range(400)])
+    assert s[:, 2].std() > co[:, 2].std() + 1.0             # shorter bursts vary more
+    eq = np.array([lev(band_bursts(CFG.replace(burst_level="equalised"), rng, False))
+                   for _ in range(20)])
+    assert np.abs(eq).max() < 1e-9                          # the old behaviour is still available
+    with pytest.raises(ConfigError):
+        validate(CFG.replace(burst_level="loud"))
+
+
+def test_a_tall_noise_peak_draws_the_trial_again():
+    c = Condition("co", "sync", 0.0)
+    tight = lambda f, db: 0.09                              # little headroom: some draws exceed 0.95
+    out = [build(CFG, c, None, (7, k), n_intervals=1, amplitude=tight) for k in range(30)]
+    again = [(t, b) for t, b in out if len(t.seed) > 2]
+    assert again and all(np.abs(b).max() <= 0.95 for _, b in out)
+    t, b = again[0]                                         # the logged seed regenerates the trial
+    assert np.array_equal(build(CFG, c, None, t.seed, n_intervals=1, amplitude=tight)[1], b)
+    with pytest.raises(RuntimeError):                       # a level that never fits still fails
+        build(CFG, c, None, (7, 0), n_intervals=1, amplitude=lambda f, db: 1.0)

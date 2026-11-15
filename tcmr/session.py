@@ -20,12 +20,13 @@ import numpy as np
 from tsync.logbook import now_iso, read_jsonl, write_json_atomic
 from tsync.text import QUESTIONNAIRE
 
-from .config import ARRANGEMENTS, Condition, Config
+from .config import ARRANGEMENTS, PATTERNS, Condition, Config
 from .procedure import Track, make_order, make_tracks
-from .stimulus import build, sha256
+from .stimulus import build, order_code, sha256
 
 FIELDS = ["row", "phase", "index", "attempt", "status", "reason", "condition", "envelope",
-          "arrangement", "dt_ms", "tone_hz", "track", "track_trial", "level_db", "signal_interval",
+          "arrangement", "dt_ms", "orders", "tone_hz", "track", "track_trial", "level_db",
+          "signal_interval",
           "response", "correct", "rating", "rt_ms", "step_db", "reversal", "next_level_db",
           "seed", "sha256", "onset_error_ms", "underflows", "volume", "muted", "wall", "t_s"]
 
@@ -81,8 +82,12 @@ class Writer:
             self.meta = dict(meta, status="running", created=now_iso())
         self.save()
         new = not (self.folder / "trials.csv").exists()
+        names = FIELDS
+        if not new:                                   # a log started under an older column list
+            with open(self.folder / "trials.csv", newline="") as fh:   # keeps its own header
+                names = next(csv.reader(fh), FIELDS) or FIELDS
         self._csv_f = open(self.folder / "trials.csv", "a", newline="")
-        self._csv = csv.DictWriter(self._csv_f, fieldnames=FIELDS, extrasaction="ignore")
+        self._csv = csv.DictWriter(self._csv_f, fieldnames=names, extrasaction="ignore")
         if new:
             self._csv.writeheader()
         self._js = open(self.folder / "trials.jsonl", "a")
@@ -128,10 +133,10 @@ class Writer:
 
 T = {
     "intro1": ("Listening for a tone in noise",
-               "Each trial has three short bursts of rushing noise, one after the other. Each "
-               "burst is a few seconds long and ends with a slightly louder part.\n\nIn ONE of the "
-               "three, a steady beep (a pure tone) is hidden in that last part. Your task: say which "
-               "of the three had the beep."),
+               "Each trial has three sounds, one after the other. Each is about a second of "
+               "pulsing, rushing noise and ends with one last pulse.\n\nIn ONE of the three, a "
+               "steady beep (a pure tone) is hidden in that last pulse. Your task: say which of the "
+               "three had the beep."),
     "intro2": ("How to answer",
                "The three boxes on the screen light up in turn, one for each sound.\n\n"
                "Press 1, 2 or 3 (or ← ↓ →) for the sound with the beep. After each "
@@ -141,7 +146,7 @@ T = {
     "examples": ("Two examples", "Listen: the beep is easy to hear in these. The box with the "
                  "beep is marked after each example."),
     "practice": ("Practice", "Eight practice trials. Answer with 1, 2 or 3."),
-    "main": ("The main part", "About 30 minutes, with three short breaks."),
+    "main": ("The main part", "About {minutes} minutes, with {breaks} short breaks."),
     "rest": ("Short break", "Take a moment. Press Space when you are ready."),
     "rate": ("Last part: how did the noise sound?",
              "You will hear single noise sequences, without a beep. After each one, tell us how it "
@@ -152,12 +157,44 @@ T = {
 }
 
 
+def order_plan(cfg: Config, seed: int, n_intervals: int = 3) -> Dict[int, List[list]]:
+    """The orders of every frozen track's trials, fixed by the session seed: per track, each of the
+    24 orders once in every 8 trials (24 = 8 trials x 3 intervals), so the three intervals of a
+    trial always get three different orders. A trial played again after a pause keeps its orders."""
+    pool = cfg.orders()
+    plan: Dict[int, List[list]] = {}
+    for t in make_tracks(cfg):
+        if t.cond.arrangement != "frozen":
+            continue
+        rng = np.random.default_rng([int(seed), 43, t.id])
+        seq: List = []
+        while len(seq) < cfg.trials_per_track * n_intervals:
+            seq += [pool[i] for i in rng.permutation(len(pool))]
+        plan[t.id] = [[list(o) for o in seq[k * n_intervals:(k + 1) * n_intervals]]
+                      for k in range(cfg.trials_per_track)]
+    return plan
+
+
+def trial_seconds(cfg: Config, overhead_s: float = 2.3) -> float:
+    """One main trial: the sound (three intervals and the gaps) plus the box, answer, feedback and
+    blank (2.3 s at a naive pace; P00 measured 1.9 s)."""
+    lead = cfg.lead_ms if cfg.lead_ms is not None else max(
+        [-min(cfg.offsets_ms(c.arrangement, c.dt_ms)) for c in cfg.condition_list()] + [0.0])
+    span = lead + cfg.n_precursors * cfg.noi_ms + cfg.burst_ms
+    return (3 * span + 2 * cfg.isi_ms) / 1000 + overhead_s
+
+
+def main_minutes(cfg: Config) -> float:
+    return cfg.n_tracks * cfg.trials_per_track * trial_seconds(cfg) / 60
+
+
 class Experiment:
     def __init__(self, cfg: Config, writer: Writer, seed: int, amplitude=None,
                  resume_rows: Optional[List[dict]] = None):
         self.cfg, self.w, self.seed, self.amp = cfg, writer, int(seed), amplitude
         self.tracks = make_tracks(cfg)
         self.order = make_order(cfg, self.seed)
+        self.order_plan = order_plan(cfg, self.seed)
         self.done = 0
         self.rated = 0
         self.resumed = resume_rows is not None
@@ -176,9 +213,9 @@ class Experiment:
 
     # ------------------------------------------------------------------------------------------
     def _play(self, phase, cond, level, sd, *, mode="respond", label="", progress=None,
-              n_intervals=3, signal_interval=None, caption=""):
+              n_intervals=3, signal_interval=None, caption="", orders=None):
         tr, buf = build(self.cfg, cond, level, sd, phase=phase, n_intervals=n_intervals,
-                        signal_interval=signal_interval, amplitude=self.amp)
+                        signal_interval=signal_interval, amplitude=self.amp, orders=orders)
         return Play(tr, buf, sha256(buf), mode, mode == "respond", label, progress, caption)
 
     def _log(self, play: Play, res: Result, index, attempt, track=None, step=None, rating=None):
@@ -189,6 +226,7 @@ class Experiment:
         row = {"phase": tr.phase, "index": index, "attempt": attempt, "status": res.status,
                "reason": res.reason, "condition": tr.condition, "envelope": tr.envelope,
                "arrangement": tr.arrangement, "dt_ms": tr.dt_ms,
+               "orders": order_code(tr.slots) if getattr(tr, "slots", None) else None,
                "tone_hz": getattr(tr, "tone_hz", None),
                "track": track.id if track else None,
                "track_trial": step.index if step else None, "level_db": tr.level_db,
@@ -243,7 +281,9 @@ class Experiment:
                     f"{len(cfg.practice_levels_db)}", progress=(i + 1) / len(cfg.practice_levels_db))
                 play, res, att = yield from self._until_ok(make, lambda p, r, a: self._log(p, r, i, a))
                 self._log(play, res, i, att)
-            yield Screen("main", *T["main"])
+            n_breaks = (cfg.trials_per_track - 1) // max(cfg.break_every_rounds, 1)
+            yield Screen("main", T["main"][0], T["main"][1].format(
+                minutes=int(round(main_minutes(cfg) / 5.0) * 5) or 5, breaks=n_breaks))
         else:
             yield Screen("resume", *T["resume"])
         per_round = cfg.n_tracks
@@ -257,7 +297,8 @@ class Experiment:
             k = len(track.steps)
             make = lambda a, track=track, k=k: self._play(
                 "main", track.cond, track.level, (self.seed, 6, track.id, k, a),
-                label="Main part", progress=i / total)
+                label="Main part", progress=i / total,
+                orders=self.order_plan.get(track.id, [None] * (k + 1))[k])
             play, res, att = yield from self._until_ok(
                 make, lambda p, r, a: self._log(p, r, i, a, track))
             step = track.update(res.response == play.trial.signal_interval)
