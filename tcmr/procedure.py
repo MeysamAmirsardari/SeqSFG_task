@@ -8,6 +8,14 @@ random order), so conditions share fatigue and learning equally and the session 
 Thresholds: each condition's level at 70.7% correct from a maximum-likelihood fit of every trial
 (cumulative Gaussian in dB, guess 1/3, lapse 0.02, one slope per listener shared by all
 conditions); the mean of the last reversals at 2 dB is reported alongside.
+
+The level range is limited (min_db to max_db). When the rule asks for a level outside it, the track
+gets the limit instead and the step is marked (`Step.limit`). A track on which that happened
+CEILING_CALLS times or more at the top is "at ceiling": its threshold is at or above the highest
+level that can be played. In simulated exp1 tracks (32 trials, start 75, maximum 85 dB) that is
+under 5% of tracks when the true threshold is 80 dB or lower, about half at 84 dB and about 90%
+at 86 dB or higher. The fit itself stays within about 2 dB up to a true threshold of 86 dB and
+loses precision above it, so a fitted threshold above max_db is not used as a number (analysis.py).
 """
 from __future__ import annotations
 
@@ -21,6 +29,7 @@ from scipy import optimize, stats
 from .config import Condition, Config
 
 GUESS = 1.0 / 3.0
+CEILING_CALLS = 3        # this many calls above max_db in one track: the track is at ceiling
 
 
 @dataclass
@@ -31,6 +40,7 @@ class Step:
     step_db: float
     reversal: bool
     next_level_db: float
+    limit: int = 0       # +1: the rule asked for more than max_db, -1: for less than min_db
 
 
 class Track:
@@ -59,17 +69,28 @@ class Track:
                 move, self.run = -1, 0
         else:
             move, self.run = +1, 0
-        rev = False
+        rev, limit = False, 0
         if move:
             if self.direction and move != self.direction:
                 rev = True
                 self.n_rev += 1
                 self.reversal_levels.append((lvl, st))
             self.direction = move
-            self.level = float(np.clip(lvl + move * self.step_db, cfg.min_db, cfg.max_db))
-        s = Step(len(self.steps), lvl, bool(correct), st, rev, self.level)
+            want = lvl + move * self.step_db
+            self.level = float(np.clip(want, cfg.min_db, cfg.max_db))
+            limit = int(want > cfg.max_db) - int(want < cfg.min_db)
+        s = Step(len(self.steps), lvl, bool(correct), st, rev, self.level, limit)
         self.steps.append(s)
         return s
+
+    @property
+    def calls_above_max(self) -> int:
+        """Trials after which the rule asked for a level above max_db (and got max_db)."""
+        return sum(1 for s in self.steps if s.limit > 0)
+
+    @property
+    def at_ceiling(self) -> bool:
+        return self.calls_above_max >= CEILING_CALLS
 
     @classmethod
     def replay(cls, cfg, cond, track_id, responses: Sequence[bool]) -> "Track":

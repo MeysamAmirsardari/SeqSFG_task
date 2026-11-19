@@ -4,6 +4,10 @@ The script yields Screen or Play and receives what happened. It owns every decis
 which level, repeats after a pause or an audio fault, the rating block) and writes every trial to
 disk (fsync) before asking for the next one, so a crash loses at most the trial in flight and a
 session can resume where it stopped.
+
+The practice gate (cfg.practice_min_correct): a listener with fewer correct practice trials than
+that is stopped right after the practice. The session is closed as "practice_failed", the screen
+only thanks the listener, and the main part never starts; such a session cannot be resumed.
 """
 from __future__ import annotations
 
@@ -67,7 +71,7 @@ class Result:
 
 
 class Writer:
-    def __init__(self, folder: Path, meta: dict, resume: bool = False):
+    def __init__(self, folder: Path, meta: dict, resume: bool = False, fields=None):
         self.folder = Path(folder)
         self.folder.mkdir(parents=True, exist_ok=True)
         self.t0 = time.perf_counter()
@@ -82,10 +86,10 @@ class Writer:
             self.meta = dict(meta, status="running", created=now_iso())
         self.save()
         new = not (self.folder / "trials.csv").exists()
-        names = FIELDS
+        names = list(fields) if fields else FIELDS
         if not new:                                   # a log started under an older column list
             with open(self.folder / "trials.csv", newline="") as fh:   # keeps its own header
-                names = next(csv.reader(fh), FIELDS) or FIELDS
+                names = next(csv.reader(fh), names) or names
         self._csv_f = open(self.folder / "trials.csv", "a", newline="")
         self._csv = csv.DictWriter(self._csv_f, fieldnames=names, extrasaction="ignore")
         if new:
@@ -153,6 +157,7 @@ T = {
              "sounded:\n\n1 = one single sound that pulses together\n5 = separate layers that "
              "pulse on their own\n\nUse 2, 3 and 4 for in between. There are no right answers."),
     "end": ("Thank you!", "That is the end. Please let the experimenter know."),
+    "stopped": ("Thank you!", "The practice is over. Please let the experimenter know."),
     "resume": ("Welcome back", "We will continue where you left off."),
 }
 
@@ -173,6 +178,31 @@ def order_plan(cfg: Config, seed: int, n_intervals: int = 3) -> Dict[int, List[l
         plan[t.id] = [[list(o) for o in seq[k * n_intervals:(k + 1) * n_intervals]]
                       for k in range(cfg.trials_per_track)]
     return plan
+
+
+def practice_state(cfg: Config, rows) -> dict:
+    """The practice block as it stands in a log: valid trials done, how many were right, and
+    whether the gate is passed (always, when the configuration has none)."""
+    ok = [r for r in rows if r["phase"] == "practice" and r["status"] == "ok"]
+    n, need = len(cfg.practice_levels_db), int(cfg.practice_min_correct)
+    right = sum(bool(r["correct"]) for r in ok)
+    return {"correct": right, "trials": len(ok), "planned": n, "needed": need,
+            "passed": need == 0 or (len(ok) >= n and right >= need)}
+
+
+def resume_blocked(cfg: Config, meta: dict, rows) -> str:
+    """Why a session must not be continued ('' if it may): the practice gate has to be passed in
+    the session itself, so a session that stopped at or before the gate starts again as a new one."""
+    if meta.get("status") == "complete":
+        return "this session is complete"
+    st = practice_state(cfg, rows)
+    if st["passed"]:
+        return ""
+    if st["trials"] < st["planned"]:
+        return (f"this session ended before the practice was finished ({st['trials']} of "
+                f"{st['planned']} trials): start a new session instead")
+    return (f"this session stopped at the practice gate ({st['correct']} of {st['trials']} correct, "
+            f"{st['needed']} needed): it cannot be continued")
 
 
 def trial_seconds(cfg: Config, overhead_s: float = 2.3) -> float:
@@ -197,7 +227,10 @@ class Experiment:
         self.order_plan = order_plan(cfg, self.seed)
         self.done = 0
         self.rated = 0
+        self.first_attempt = 0             # attempt number of the first main trial after a resume
         self.resumed = resume_rows is not None
+        if self.resumed and not practice_state(cfg, resume_rows)["passed"]:
+            raise ValueError("the practice gate was not passed in this session: it cannot be resumed")
         if resume_rows:
             per: Dict[int, List[bool]] = {}
             for r in resume_rows:
@@ -210,6 +243,10 @@ class Experiment:
                 for c in per.get(t.id, []):
                     t.update(c)
             self.done = sum(len(v) for v in per.values())
+            # the trial that was interrupted is drawn anew, as after a pause: its earlier attempts
+            # (logged as aborted) were heard at least in part
+            self.first_attempt = sum(1 for r in resume_rows if r["phase"] == "main"
+                                     and r["status"] != "ok" and r["index"] == self.done)
 
     # ------------------------------------------------------------------------------------------
     def _play(self, phase, cond, level, sd, *, mode="respond", label="", progress=None,
@@ -241,8 +278,7 @@ class Experiment:
         self.w.trial(row, {"trial": tr.summary(), "result": asdict(res), "mode": play.mode})
         return correct
 
-    def _until_ok(self, make, log):
-        attempt = 0
+    def _until_ok(self, make, log, attempt: int = 0):
         while True:
             play = make(attempt)
             res = yield play
@@ -274,13 +310,23 @@ class Experiment:
                 play, res, att = yield from self._until_ok(make, lambda p, r, a: self._log(p, r, i, a))
                 self._log(play, res, i, att)
             yield Screen("practice", *T["practice"])
+            right = 0
             for i, lvl in enumerate(cfg.practice_levels_db):
                 c = co0 if i % 2 == 0 else r0
                 make = lambda a, i=i, c=c, lvl=lvl: self._play(
                     "practice", c, lvl, (self.seed, 2, i, a), label=f"Practice {i + 1} of "
                     f"{len(cfg.practice_levels_db)}", progress=(i + 1) / len(cfg.practice_levels_db))
                 play, res, att = yield from self._until_ok(make, lambda p, r, a: self._log(p, r, i, a))
-                self._log(play, res, i, att)
+                right += bool(self._log(play, res, i, att))
+            need = int(cfg.practice_min_correct)
+            self.w.meta["practice"] = {"correct": right, "trials": len(cfg.practice_levels_db),
+                                       "needed": need, "passed": right >= need}
+            self.w.save()
+            if right < need:                       # the gate: no main part for this listener
+                self.w.event("practice_gate", correct=right, needed=need)
+                self.w.close("practice_failed")
+                yield Screen("stopped", *T["stopped"], ("escape",), "end")
+                return
             n_breaks = (cfg.trials_per_track - 1) // max(cfg.break_every_rounds, 1)
             yield Screen("main", T["main"][0], T["main"][1].format(
                 minutes=int(round(main_minutes(cfg) / 5.0) * 5) or 5, breaks=n_breaks))
@@ -300,12 +346,14 @@ class Experiment:
                 label="Main part", progress=i / total,
                 orders=self.order_plan.get(track.id, [None] * (k + 1))[k])
             play, res, att = yield from self._until_ok(
-                make, lambda p, r, a: self._log(p, r, i, a, track))
+                make, lambda p, r, a: self._log(p, r, i, a, track), self.first_attempt)
+            self.first_attempt = 0
             step = track.update(res.response == play.trial.signal_interval)
             self._log(play, res, i, att, track, step)
             self.done += 1
         self.w.meta["tracks"] = {t.id: {"condition": t.cond.name, "final_level_db": t.level,
-                                       "reversal_threshold_db": t.reversal_threshold()}
+                                       "reversal_threshold_db": t.reversal_threshold(),
+                                       "calls_above_max": t.calls_above_max}
                                  for t in self.tracks}
         self.w.save()
         # ratings: one sequence (precursors + final burst, no tone) per item

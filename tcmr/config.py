@@ -38,6 +38,9 @@ fixed offset list but drawn for every interval:
                Consecutive bursts of one band keep at least `min_gap_ms` of silence (at dT = 40 ms a
                band may not jump from +2 to -2).
 
+Practice gate (2026-11-15): with `practice_min_correct` set, a listener who gets fewer practice
+trials right than that is stopped after the practice; the main part never starts (session.py).
+
 The noise is never frozen: every burst is new noise at its natural level. With `lead_ms` set, every
 interval opens `lead_ms` before the tone band's first burst whatever the condition, so the tone band
 sits at the same times in every trial and every trial has the same length.
@@ -57,8 +60,8 @@ ARRANGEMENTS: Dict[str, Tuple[int, ...]] = {
 }
 PATTERNS = ("frozen", "reordered")        # drawn per interval (frozen) or per repetition
 FLANK_SLOTS = (-2, -1, 1, 2)
-NEW_DEFAULTS = {"lead_ms": None}          # fields added after sessions were recorded: left out of
-                                          # the hash at these values, so old hashes stay the same
+NEW_DEFAULTS = {"lead_ms": None,           # fields added after sessions were recorded: left out of
+                "practice_min_correct": 0}  # the hash at these values, so old hashes stay the same
 
 
 class ConfigError(ValueError):
@@ -128,6 +131,9 @@ class Config:
 
     # ---- practice and ratings ------------------------------------------------------------------
     practice_levels_db: Tuple[float, ...] = (80.0, 80.0, 78.0, 78.0, 75.0, 75.0, 72.0, 72.0)
+    practice_min_correct: int = 0         # the practice gate: with fewer correct practice trials
+                                          # than this the session stops before the main part
+                                          # (0: no gate, as in every session before 2026-11-15)
     ratings: Tuple[Tuple, ...] = (("sync", 0.0), ("ascending", 10.0), ("ascending", 20.0),
                                   ("zigzag", 10.0), ("zigzag", 20.0))
     rating_reps: int = 2
@@ -245,6 +251,8 @@ def validate(cfg: Config) -> Config:
                               f"{need:g} ms lead")
     if cfg.burst_level not in ("natural", "equalised"):
         raise ConfigError("burst_level must be natural or equalised")
+    if not 0 <= cfg.practice_min_correct <= len(cfg.practice_levels_db):
+        raise ConfigError("practice_min_correct must lie between 0 and the number of practice trials")
     if not cfg.min_db <= cfg.start_db <= cfg.max_db:
         raise ConfigError("start level outside the level range")
     if len(cfg.steps_db) != len(cfg.step_change_after) + 1:

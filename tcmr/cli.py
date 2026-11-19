@@ -1,11 +1,20 @@
 """python -m tcmr <command>: design | verify | check | demo | calibrate | run | simulate | analyze.
 
     check --seed N     every trial a session with seed N will play, drawn and checked (tcmr.audit);
-                       `run --seed N` then refuses to start unless that check passed
+                       `run --seed N` then refuses to start unless that check passed. Several
+                       seeds (--seed N1 N2 ...) are checked in parallel.
+    run --seed next    the lowest checked seed that no session of this configuration has used;
+                       a seed another listener already used is refused (--reuse-seed overrides)
+    calibrate          one tone per band on the meter. A calibrated seed check is tied to the
+                       calibration it was made with: after calibrating again, check again.
+
+A session whose listener does not pass the practice gate (practice_min_correct) stops after the
+practice; `run` says so when it ends, and such a session cannot be resumed.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import secrets
@@ -20,6 +29,10 @@ from .config import PATTERNS, Condition, Config, validate
 from .stimulus import band_envelopes, build
 
 PRESET = Path(__file__).resolve().parent / "configs" / "tcmr_main.json"
+TEST_AMP = 0.05                  # peak of the calibration tones
+NOISE_PEAK_PER_AMP = 2.8         # tallest noise peak / sum of the bands' 60-dB amplitudes, from the
+                                 # uncalibrated checks of 27 exp1 seeds (0.28 above the tone's 0.36)
+_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 
 def _cfg(p):
@@ -77,6 +90,22 @@ def sim_thresholds(cfg) -> dict:
     return out
 
 
+def source_state():
+    """The tcmr code that is about to run: a hash over its .py and preset files, what git says
+    about the tcmr folder, and its uncommitted diff. tsync's git_info looks at tsync alone, so a
+    session used to be recorded as clean while tcmr had uncommitted changes."""
+    from tsync.system import REPO, _run
+    pkg = Path(__file__).resolve().parent
+    h = hashlib.sha256()
+    for f in sorted(list(pkg.rglob("*.py")) + list(pkg.rglob("*.json"))):
+        h.update(f.relative_to(pkg).as_posix().encode())
+        h.update(f.read_bytes())
+    status = _run(["git", "-C", str(REPO), "status", "--porcelain", "--", str(pkg)]) or ""
+    diff = _run(["git", "-C", str(REPO), "diff", "HEAD", "--", str(pkg)]) or ""
+    return {"source_tcmr": h.hexdigest(), "tcmr_dirty": bool(status),
+            "tcmr_status": status}, diff
+
+
 def new_session(cfg, data, code, meta_extra=None, seed=None):
     from tsync.design import clean_code
     from tsync.system import git_info, machine, source_hash, versions
@@ -86,14 +115,15 @@ def new_session(cfg, data, code, meta_extra=None, seed=None):
     n = 1 + max([int(p.name.rsplit("_", 1)[1]) for p in root.glob("tcmr_session_*")], default=0)
     seed = secrets.randbits(62) if seed is None else seed
     g = git_info()
+    own, own_diff = source_state()
     meta = {"task": "tcmr", "code": code, "session_index": n, "config": cfg.to_dict(),
             "config_hash": cfg.hash(), "session_seed": seed, "git": {k: v for k, v in g.items()
                                                                      if k != "diff"},
-            "source_tsync": source_hash(), "versions": versions(), "machine": machine(),
+            "source_tsync": source_hash(), **own, "versions": versions(), "machine": machine(),
             **(meta_extra or {})}
     w = Writer(root / f"tcmr_session_{n:02d}", meta)
-    if g.get("diff"):
-        (w.folder / "code.patch").write_text(g["diff"])
+    if g.get("diff") or own_diff:
+        (w.folder / "code.patch").write_text((g.get("diff") or "") + own_diff)
     return w, seed
 
 
@@ -115,6 +145,11 @@ def cmd_design(a):
         else:
             print(f"  {c.name:<20} x{c.tracks}  offsets {off} ms, smallest gap before the final "
                   f"burst {gap:g} ms")
+    lv = ", ".join(f"{v:g}" for v in cfg.practice_levels_db)
+    gate = (f"; gate: at least {cfg.practice_min_correct} correct, otherwise the session stops there"
+            if cfg.practice_min_correct else "; no gate")
+    print(f"practice: {len(cfg.practice_levels_db)} trials at {lv} dB{gate}")
+    print(f"tone level: starts at {cfg.start_db:g} dB, between {cfg.min_db:g} and {cfg.max_db:g} dB")
     with tempfile.TemporaryDirectory() as td:
         from .session import Writer
         ts = []
@@ -194,6 +229,34 @@ def cmd_verify(a):
     sys.exit(0 if ok else 1)
 
 
+def cal_id(cal):
+    """A short name for a calibration's levels (device, system volume, every band's amplitude);
+    None without a calibration. A seed check made with calibrated levels carries it, and a
+    calibrated run asks for a check with the same one: peaks depend on the amplitudes."""
+    if cal is None:
+        return None
+    key = [cal.device, cal.system_volume, cal.ref_db,
+           sorted((str(k), round(float(v), 9)) for k, v in cal.amp_at_ref.items())]
+    return hashlib.sha256(json.dumps(key).encode()).hexdigest()[:12]
+
+
+def _check_seed(cfg, seed, data, cal, progress=None):
+    from . import audit
+    amp = (lambda f, db: cal.amplitude(f, db)) if cal else None
+    t0 = time.time()
+    rep = audit.audit(cfg, seed, amp, progress=progress)
+    rep["seconds"] = round(time.time() - t0, 1)
+    rep["calibration"] = cal_id(cal)
+    return rep, audit.save(rep, audit.report_path(data, cfg, seed))
+
+
+def _check_worker(job):
+    """One seed in a worker process (check with several seeds)."""
+    cfg_dict, seed, data, calibrated = job
+    cal = _load_cal(data) if calibrated else None
+    return _check_seed(validate(Config.from_dict(cfg_dict)), seed, data, cal)
+
+
 def cmd_check(a):
     from . import audit
     cfg = _cfg(a.config)
@@ -201,14 +264,62 @@ def cmd_check(a):
     if a.calibrated and cal is None:
         print("\u2717 no calibration in", Path(a.data) / "calibration")
         sys.exit(2)
-    amp = (lambda f, db: cal.amplitude(f, db)) if cal else None
-    t0 = time.time()
-    rep = audit.audit(cfg, a.seed, amp, progress=lambda i, n: print(f"  {i}/{n} trials", end="\r"))
-    rep["seconds"] = round(time.time() - t0, 1)
-    path = audit.save(rep, audit.report_path(a.data, cfg, a.seed))
-    print(audit.describe(rep))
-    print(f"  report: {path}  ({rep['seconds']:.0f} s)")
-    sys.exit(0 if rep["ok"] else 1)
+    seeds = list(dict.fromkeys(a.seed))
+    if len(seeds) == 1:
+        rep, path = _check_seed(cfg, seeds[0], a.data, cal,
+                                progress=lambda i, n: print(f"  {i}/{n} trials", end="\r"))
+        print(audit.describe(rep))
+        print(f"  report: {path}  ({rep['seconds']:.0f} s)")
+        sys.exit(0 if rep["ok"] else 1)
+    # several seeds: one worker process each, as many at a time as there are cores
+    import os
+    from concurrent.futures import ProcessPoolExecutor
+    print(f"checking {len(seeds)} seeds of {cfg.name} ({cfg.hash()}), "
+          f"{'calibrated' if cal else 'uncalibrated'} levels ...")
+    jobs = [(cfg.to_dict(), s, a.data, bool(cal)) for s in seeds]
+    passed = 0
+    with ProcessPoolExecutor(max_workers=max(1, min(len(seeds), (os.cpu_count() or 2) - 1))) as ex:
+        for rep, path in ex.map(_check_worker, jobs):
+            passed += bool(rep["ok"])
+            if rep["ok"]:
+                print(f"  seed {rep['seed']}: passed ({sum(rep['trials_checked'].values())} trials, "
+                      f"tallest peak {rep['peak_max']:.2f}, {rep['seconds']:.0f} s)")
+            else:
+                print(audit.describe(rep))
+    print(f"{passed} of {len(seeds)} seeds passed; reports in {Path(a.data) / 'checks'}")
+    sys.exit(0 if passed == len(seeds) else 1)
+
+
+def seed_users(data, cfg, seed) -> list:
+    """Sessions of this configuration that used this seed: [(code, folder)]."""
+    out = []
+    for p in sorted(Path(data).glob("*/tcmr_session_*/session.json")):
+        try:
+            m = json.loads(p.read_text())
+        except (OSError, ValueError):
+            continue
+        if m.get("session_seed") == int(seed) and m.get("config_hash") == cfg.hash() \
+                and not m.get("simulated"):
+            out.append((m.get("code"), p.parent))
+    return out
+
+
+def next_seed(data, cfg, levels: str, calibration=None):
+    """The lowest seed whose check passed with these levels ('calibrated' or 'uncalibrated') and
+    that no session of this configuration has used yet; None if there is none. For calibrated
+    levels the check must have been made with this calibration (`cal_id`)."""
+    from . import audit
+    for p in sorted(audit.report_path(data, cfg, 0).parent.glob(f"tcmr_{cfg.hash()}_*.json"),
+                    key=lambda p: int(p.stem.rsplit("_", 1)[1])):
+        try:
+            rep = json.loads(p.read_text())
+        except (OSError, ValueError):
+            continue
+        if levels == "calibrated" and rep.get("calibration") != calibration:
+            continue
+        if rep.get("ok") and rep.get("amplitude") == levels and not seed_users(data, cfg, rep["seed"]):
+            return int(rep["seed"])
+    return None
 
 
 def cmd_demo(a):
@@ -230,6 +341,44 @@ def cmd_demo(a):
             print(p)
 
 
+def parse_level(text: str):
+    """A meter reading typed at the keyboard, in dB SPL. Persian and Arabic digits and a decimal
+    comma are read too. None if it is not a level between 30 and 120 dB SPL."""
+    t = text.strip().translate(_DIGITS).replace("\u066b", ".").replace(",", ".")
+    try:
+        db = float(t)
+    except ValueError:
+        return None
+    return db if 30.0 <= db <= 120.0 else None
+
+
+def calibration_notes(cfg, readings: dict, test: float = TEST_AMP) -> list:
+    """What a set of readings (band centre in Hz -> dB SPL at amplitude `test`) means for the
+    levels: [(mark, text)], mark "!" for something to act on before running a listener."""
+    a60 = {f: test * 10 ** ((60.0 - db) / 20) for f, db in readings.items()}
+    out = []
+    tones = [cfg.bands_hz[b] for b in (cfg.tone_bands or (cfg.target_band,))]
+    if all(f in a60 for f in tones) and len(a60) == len(cfg.bands_hz):
+        tone = max(a60[f] for f in tones) * 10 ** ((cfg.max_db - 60.0) / 20)
+        peak = tone + NOISE_PEAK_PER_AMP * sum(a60.values()) * 10 ** ((cfg.band_db - 60.0) / 20)
+        out.append(("!" if peak > 0.95 else " ",
+                    f"the {cfg.max_db:g}-dB tone peaks at {tone:.2f}; with the noise the tallest "
+                    f"peak will be about {peak:.2f} (limit 0.95)" +
+                    (": too little headroom, raise the system volume and calibrate again"
+                     if peak > 0.95 else "")))
+    for f in tones:
+        if f in a60 and a60[f] > cfg.uncal_peak_60db * 1.0005:
+            need = 60.0 + 20 * math.log10(test / cfg.uncal_peak_60db)
+            out.append((" ", f"{f:g} Hz read {readings[f]:g} dB SPL, below the {need:.0f} dB at "
+                             f"which the seeds were checked without a calibration: less headroom "
+                             f"than those checks had; the calibrated check decides"))
+    if len(readings) > 1 and max(readings.values()) - min(readings.values()) > 15.0:
+        out.append(("!", f"the bands differ by {max(readings.values()) - min(readings.values()):.0f} "
+                         f"dB: look at the seal on the coupler and at the weighting (A weighting "
+                         f"reads 8.6 dB low at 250 Hz)"))
+    return out
+
+
 def cmd_calibrate(a):
     from datetime import datetime
     from tsync.audio import AudioEngine, find_output
@@ -241,31 +390,86 @@ def cmd_calibrate(a):
     eng = AudioEngine(dev["index"], cfg.sample_rate, cfg.channels, cfg.blocksize, cfg.latency)
     eng.start()
     vol = volume_settings()
-    print(f"{dev['name']}, system volume {vol['output_volume']}. Sound level meter on an ear "
-          f"coupler, Z or C weighting, slow.")
+    print(f"{dev['name']}, system volume {vol['output_volume']}.\n"
+          f"Sound level meter on an ear coupler, C or Z weighting (not A), slow. Each band's tone "
+          f"plays for a minute; Enter plays it again.")
     info = {k: input(f"{k}: ").strip() for k in ("headphones", "meter", "coupler", "operator")}
-    amps, meas, test = {}, [], 0.05
-    try:
-        for f in cfg.bands_hz:
-            n = 30 * cfg.sample_rate
-            t = np.arange(n) / cfg.sample_rate
-            x = (test * envelope(t, 30.0, 0.05) * np.sin(2 * np.pi * f * t)).astype(np.float32)
-            pb = eng.play_at(np.repeat(x[:, None], cfg.channels, 1), time.perf_counter() + 0.1)
-            db = float(input(f"{f:g} Hz playing at amplitude {test}: level on the meter (dB SPL): "))
+    tone_s, readings, now = 60.0, {}, {"pb": None}
+    t = np.arange(int(tone_s * cfg.sample_rate)) / cfg.sample_rate
+    gate = TEST_AMP * envelope(t, tone_s, 0.05)
+
+    def stop():
+        pb = now["pb"]
+        if pb is not None and not pb.finished:
             eng.abort(pb)
-            time.sleep(0.1)
-            amps[f"{f:.6f}"] = test * 10 ** ((60.0 - db) / 20)
-            meas.append({"freq_hz": f, "amplitude": test, "db_spl": db})
+            t_end = time.perf_counter() + 1.0
+            while not pb.finished and time.perf_counter() < t_end:
+                time.sleep(0.01)
+        now["pb"] = None
+
+    def play(f):
+        stop()
+        x = (gate * np.sin(2 * np.pi * f * t)).astype(np.float32)
+        now["pb"] = eng.play_at(np.repeat(x[:, None], cfg.channels, 1), time.perf_counter() + 0.1)
+
+    # the tone's own band first: it shows at once whether this volume is high enough
+    first = [cfg.bands_hz[b] for b in (cfg.tone_bands or (cfg.target_band,))]
+    order = first + [f for f in cfg.bands_hz if f not in first]
+    saved = False
+    try:
+        for f in order:
+            play(f)
+            while True:
+                txt = input(f"{f:g} Hz at amplitude {TEST_AMP}: reading on the meter (dB SPL): ")
+                if not txt.strip():
+                    play(f)
+                    continue
+                db = parse_level(txt)
+                if db is not None:
+                    break
+                print("  that is not a level between 30 and 120 dB SPL: type the reading again")
+            readings[f] = db
+            a60 = TEST_AMP * 10 ** ((60.0 - db) / 20)
+            print(f"  60 dB SPL at {f:g} Hz = amplitude {a60:.4f}")
+            if f in first and a60 * 10 ** ((cfg.max_db - 60.0) / 20) > 0.6:
+                stop()                         # the tone alone would use most of the range
+                print(f"\u2717 at this volume the {cfg.max_db:g}-dB tone would peak at "
+                      f"{a60 * 10 ** ((cfg.max_db - 60.0) / 20):.2f} before any noise. Raise the "
+                      f"system volume (now {vol['output_volume']}) and run calibrate again. "
+                      f"Nothing was saved.")
+                sys.exit(2)
+        stop()
+        after = volume_settings()
+        if after.get("output_volume") != vol.get("output_volume") or after.get("muted"):
+            print(f"\u2717 the system volume changed during the calibration "
+                  f"({vol.get('output_volume')} to {after.get('output_volume')}, muted "
+                  f"{after.get('muted')}). Nothing was saved: run calibrate again.")
+            sys.exit(2)
+        amps = {f"{f:.6f}": TEST_AMP * 10 ** ((60.0 - readings[f]) / 20) for f in cfg.bands_hz}
+        meas = [{"freq_hz": f, "amplitude": TEST_AMP, "db_spl": readings[f]} for f in order]
+        stamp = datetime.now().astimezone()
+        cal = Calibration(True, 60.0, amps, dev["name"], vol["output_volume"], info["headphones"],
+                          info["meter"], info["coupler"], "Z/C", stamp.isoformat(timespec="seconds"),
+                          info["operator"], "tcmr: sines at the band centres", meas)
+        d = Path(a.data) / "calibration"
+        d.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(cal.to_dict(), indent=1)
+        (d / f"tcmr_calibration_{stamp.strftime('%Y%m%d-%H%M%S')}.json").write_text(text)
+        (d / "tcmr_latest.json").write_text(text)
+        saved = True
     finally:
+        stop()
         eng.stop()
-    cal = Calibration(True, 60.0, amps, dev["name"], vol["output_volume"], info["headphones"],
-                      info["meter"], info["coupler"], "Z/C",
-                      datetime.now().astimezone().isoformat(timespec="seconds"), info["operator"],
-                      "tcmr: sines at the band centres", meas)
-    d = Path(a.data) / "calibration"
-    d.mkdir(parents=True, exist_ok=True)
-    (d / "tcmr_latest.json").write_text(json.dumps(cal.to_dict(), indent=1))
-    print(f"saved {d / 'tcmr_latest.json'}")
+        if not saved:
+            print("no calibration was saved")
+    print(f"saved {d / 'tcmr_latest.json'} (calibration {cal_id(cal)}, system volume "
+          f"{vol['output_volume']})")
+    for mark, note in calibration_notes(cfg, readings):
+        print(f"{mark} {note}")
+    cfg_arg = f" --config {a.config}" if a.config else ""
+    print(f"next: check the seeds with these levels, then run every session at this volume:\n"
+          f"  python -m tcmr check{cfg_arg} --seed N1 N2 ... --calibrated\n"
+          f"  python -m tcmr run{cfg_arg} --code CODE --seed next --volume {vol['output_volume']}")
 
 
 def _load_cal(data):
@@ -282,6 +486,22 @@ def cmd_run(a):
     from .session import Experiment, Writer
     from tsync.logbook import read_jsonl
     cfg = _cfg(a.config)
+    old = None                             # the session to continue: its own record, read first
+    if a.resume:
+        from .session import resume_blocked
+        folder = Path(a.resume)
+        try:
+            old = json.loads((folder / "session.json").read_text())
+            old_rows = [r["row"] for r in read_jsonl(folder / "trials.jsonl")]
+        except (OSError, ValueError) as e:
+            print(f"\u2717 {folder} is not a session that can be continued ({e})")
+            sys.exit(2)
+        stored = dict(old.get("config") or cfg.to_dict())
+        stored.setdefault("burst_level", "equalised")
+        why = resume_blocked(validate(Config.from_dict(stored)), old, old_rows)
+        if why:
+            print(f"\u2717 {why}")
+            sys.exit(2)
     match = "AirPods" if a.airpods else (a.device_match or cfg.device_match)
     try:
         dev = find_output(match)
@@ -304,11 +524,31 @@ def cmd_run(a):
         print("! " + n_)
     uncal = a.uncalibrated or bluetooth or a.allow_volume_change
     cal = None if uncal else _load_cal(a.data)
+    run_volume = a.volume if a.volume is not None else vol["output_volume"]   # --volume sets it below
     if not uncal and (cal is None or cal.device != dev["name"]
-                      or cal.system_volume != vol["output_volume"]):
+                      or cal.system_volume != run_volume):
         print("\u2717 no matching calibration (device and system volume must match): run "
               "`python -m tcmr calibrate`, or pass --uncalibrated for a pilot")
         sys.exit(2)
+    if old is not None:                    # a session is continued with the levels it started with
+        v0 = (old.get("volume_at_start") or {}).get("output_volume")
+        again = (f"--volume {v0}" if v0 is not None else "") + \
+            ("" if old.get("levels_calibrated") else " --uncalibrated")
+        if bool(old.get("levels_calibrated")) != (cal is not None):
+            print(f"\u2717 this session started with "
+                  f"{'calibrated' if old.get('levels_calibrated') else 'uncalibrated'} levels: "
+                  f"continue it the same way ({again.strip()})")
+            sys.exit(2)
+        if cal is not None and old.get("calibration") and \
+                cal_id(cal) != cal_id(type(cal).from_dict(old["calibration"])):
+            print("\u2717 the calibration changed since this session started: its levels would "
+                  "change in the middle. Start a new session instead.")
+            sys.exit(2)
+        if old.get("volume_locked") and v0 is not None and run_volume != v0 \
+                and not a.allow_volume_change:
+            print(f"\u2717 this session started at system volume {v0}, now it would be "
+                  f"{run_volume}: continue it with {again.strip()}")
+            sys.exit(2)
     if vol.get("muted") and a.volume is None:
         print("\u2717 the output is muted")
         sys.exit(2)
@@ -338,26 +578,52 @@ def cmd_run(a):
              "volume_locked": not a.allow_volume_change, "visual_offset_ms": a.visual_offset_ms,
              "output_notes": notes}
     if a.resume:
-        folder = Path(a.resume)
         w = Writer(folder, {}, resume=True)
         stored = dict(w.meta.get("config") or {})
         if stored:                         # a session keeps the stimulus it started with
             stored.setdefault("burst_level", "equalised")
-            if stored != cfg.to_dict():
+            was = validate(Config.from_dict(stored))
+            if was != cfg:
                 print(f"! continuing with the configuration this session started with "
                       f"({stored.get('name')}, {stored.get('burst_level')} bursts)")
-            cfg = validate(Config.from_dict(stored))
+            cfg = was
         rows = [r["row"] for r in read_jsonl(folder / "trials.jsonl")]
         exp = Experiment(cfg, w, w.meta["session_seed"], amp, resume_rows=rows)
     else:
         if a.seed is not None:             # a seed whose every trial was checked beforehand
+            from tsync.design import clean_code
             from . import audit
+            want = "calibrated" if cal else "uncalibrated"
+            if str(a.seed).lower() == "next":
+                a.seed = next_seed(a.data, cfg, want, cal_id(cal))
+                if a.seed is None:
+                    print(f"✗ no seed of {cfg.name} is both checked ({want} levels) and unused. "
+                          f"Check more first:\n  python -m tcmr check --config {a.config or PRESET} "
+                          f"--seed N1 N2 ..." + (" --calibrated" if cal else ""))
+                    sys.exit(2)
+                print(f"seed {a.seed}: the lowest checked seed no one has used yet")
+            else:
+                try:
+                    a.seed = int(a.seed)
+                except ValueError:
+                    print("✗ --seed takes a number or 'next'")
+                    sys.exit(2)
+            others = [(c, f) for c, f in seed_users(a.data, cfg, a.seed) if c != clean_code(a.code)]
+            if others and not a.reuse_seed:      # every listener hears their own trials
+                nxt = next_seed(a.data, cfg, want, cal_id(cal))
+                print(f"✗ seed {a.seed} was already used by {others[0][0]} ({others[0][1]}). "
+                      f"Every listener gets their own seed" +
+                      (f": the next unused checked seed is {nxt} (or pass --seed next)." if nxt
+                       else "; check more seeds first."))
+                sys.exit(2)
             rp = audit.report_path(a.data, cfg, a.seed)
             rep = json.loads(rp.read_text()) if rp.exists() else None
-            want = "calibrated" if cal else "uncalibrated"
-            if rep is None or not rep.get("ok") or rep.get("amplitude") != want:
+            stale = bool(rep) and cal is not None and rep.get("calibration") != cal_id(cal)
+            if rep is None or not rep.get("ok") or rep.get("amplitude") != want or stale:
                 why = ("no check found" if rep is None else "the check failed" if not rep.get("ok")
-                       else f"the check was made with {rep.get('amplitude')} levels, this run is {want}")
+                       else f"the check was made with {rep.get('amplitude')} levels, this run is {want}"
+                       if rep.get("amplitude") != want
+                       else "the check was made with another calibration than the one in use now")
                 print(f"\u2717 seed {a.seed}: {why}. Run first:\n  python -m tcmr check --config "
                       f"{a.config or PRESET} --seed {a.seed}" + (" --calibrated" if cal else ""))
                 sys.exit(2)
@@ -365,6 +631,9 @@ def cmd_run(a):
             print(f"seed {a.seed}: every planned trial was checked ({rp.name})")
         w, seed = new_session(cfg, a.data, a.code, extra, seed=a.seed)
         exp = Experiment(cfg, w, seed, amp)
+        if w.meta.get("tcmr_dirty"):
+            print("! the tcmr folder has uncommitted changes. This session records their hash "
+                  "(and the diff of tracked files), but commit before a listener whose data will count.")
     print(f"session: {w.folder}  (output {dev['name']}, stream latency "
           f"{info['latency_s'] * 1000:.0f} ms)")
     locked = None if a.allow_volume_change or not vol.get("readable") else vol["output_volume"]
@@ -381,6 +650,11 @@ def cmd_run(a):
         if w.meta.get("status") == "running":
             w.close("interrupted")
     print(f"ended: {why}")
+    gate = w.meta.get("practice") or {}
+    if gate and not gate.get("passed", True):
+        print(f"\u2717 practice gate: {gate.get('correct')} of {gate.get('trials')} correct, "
+              f"{gate.get('needed')} needed. The session stopped before the main part and "
+              f"cannot be continued.")
     print(describe(summarize(w.folder)))
 
 
@@ -401,6 +675,9 @@ def cmd_analyze(a):
     for f in a.sessions:
         s = summarize(Path(f))
         print(describe(s))
+        if not s.get("thresholds_db"):              # e.g. quit before the main part
+            print("  no main trials: no figure")
+            continue
         print(session_figure(Path(f), s))
 
 
@@ -417,7 +694,8 @@ def main(argv=None):
     p("design", cmd_design)
     p("verify", cmd_verify)
     sp = p("check", cmd_check)
-    sp.add_argument("--seed", type=int, required=True)
+    sp.add_argument("--seed", type=int, nargs="+", required=True,
+                    help="one or more seeds (several are checked in parallel)")
     sp.add_argument("--data", default="data")
     sp.add_argument("--calibrated", action="store_true",
                     help="use the calibration in DATA/calibration (as a calibrated run would)")
@@ -441,8 +719,11 @@ def main(argv=None):
                             help="set the system volume (0-100) at the start and hold it there")
             sp.add_argument("--visual-offset-ms", type=float, default=0.0,
                             help="delay the box lighting (Bluetooth delay), ms")
-            sp.add_argument("--seed", type=int, default=None,
-                            help="session seed; must have passed `python -m tcmr check`")
+            sp.add_argument("--seed", default=None,
+                            help="session seed; must have passed `python -m tcmr check`. 'next': "
+                                 "the lowest checked seed that no session has used yet")
+            sp.add_argument("--reuse-seed", action="store_true",
+                            help="allow a seed another listener already used")
     sp = p("simulate", cmd_simulate)
     sp.add_argument("--data", default="data_tcmr/sim")
     sp.add_argument("--code", default="SIM01")

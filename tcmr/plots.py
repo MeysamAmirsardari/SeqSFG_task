@@ -74,7 +74,11 @@ def session_figure(folder: Path, summ: dict, out: Path = None) -> Path:
         ax.scatter(rev, L[rev], s=45, facecolor="none", edgecolor="0.3", lw=0.8)
         if c in th:
             ax.axhline(th[c], color="0.35", ls="--", lw=0.9)
-        ax.set_title(f"track {tid}: {LAB.get(c, c)}", fontsize=9)
+        capped = c in (summ.get("at_ceiling") or []) or c in (summ.get("censored_at_max") or {})
+        if L.max() >= cfg.max_db - 2 or capped:      # the top of the level range, when a track gets there
+            ax.axhline(cfg.max_db, color="#b03a2e", ls=":", lw=1.0)
+        ax.set_title(f"track {tid}: {LAB.get(c, c)}" + ("  (AT CEILING)" if capped else ""),
+                     fontsize=9, color="#b03a2e" if capped else "black")
         ax.set_ylim(min(45, L.min() - 3), max(80, L.max() + 3))
         ax.tick_params(labelsize=7)
         if i % 4 == 0:
@@ -97,7 +101,7 @@ def session_figure(folder: Path, summ: dict, out: Path = None) -> Path:
     ax = fig.add_subplot(gs[nrow, 1])
     s = summ["slope_sigma_db"] or 3.0
     z = stats.norm.ppf((0.707 - GUESS) / (1 - GUESS - cfg.lapse))
-    xs = np.linspace(45, 80, 200)
+    xs = np.linspace(45, max(80.0, max(th.values()) + 5.0) if th else 80.0, 200)
     for c in conds:
         rs = [r for r in main if r["condition"] == c]
         L = np.array([r["level_db"] for r in rs])

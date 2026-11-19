@@ -180,8 +180,8 @@ class Runner(QtCore.QObject):
         try:
             act = self.gen.send(result) if self.started else next(self.gen)
             self.started = True
-        except StopIteration:
-            self._exit("complete")
+        except StopIteration:              # how the script closed its session: "complete", or
+            self._exit(self.exp.w.meta.get("status") or "complete")     # "practice_failed" (the gate)
             return
         except Exception as e:
             self._fatal(e)
@@ -199,6 +199,7 @@ class Runner(QtCore.QObject):
         self.exp.w.event("screen", name=s.name)
         if s.kind == "form":
             self.state = "form"
+            self._pointer(True)                     # the questionnaire needs the mouse
             self.win.form.build(s.title, s.body, s.fields, self.win.height())
             self.win.stack.setCurrentIndex(1)
             return
@@ -212,8 +213,15 @@ class Runner(QtCore.QObject):
         if s.min_s:
             self._at(self.t_shown + s.min_s, lambda: self.state == "screen" and self._paint(footer=footer))
 
+    def _pointer(self, visible: bool):
+        """Full screen hides the pointer (run_app); show it while a form is up."""
+        if QtWidgets.QApplication.overrideCursor() is not None:
+            QtWidgets.QApplication.changeOverrideCursor(
+                Qt.CursorShape.ArrowCursor if visible else Qt.CursorShape.BlankCursor)
+
     def _form_done(self, values):
         if self.state == "form":
+            self._pointer(False)
             self.win.stack.setCurrentIndex(0)
             self._advance({"key": "return", "values": values})
 
