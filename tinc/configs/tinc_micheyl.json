@@ -1,0 +1,69 @@
+{
+ "name": "tinc_micheyl",
+ "sample_rate": 48000,
+ "channels": 2,
+ "device_match": "Headphones",
+ "blocksize": 256,
+ "latency": "low",
+ "f_b_hz": 1000.0,
+ "df_semitones": 15.0,
+ "tone_ms": 100.0,
+ "ramp_ms": 20.0,
+ "soa_ms": 200.0,
+ "n_tones": 12,
+ "delays_ms": [
+  0.0,
+  35.0,
+  50.0,
+  71.0,
+  100.0
+ ],
+ "levels": "independent",
+ "level_db": 60.0,
+ "rove_db": 4.0,
+ "decoy_db": 4.0,
+ "decoy_counts": [
+  1,
+  2
+ ],
+ "target_db": 4.0,
+ "target_from": 4,
+ "blocks_per_delay": 2,
+ "trials_per_block": 52,
+ "examples": [
+  [
+   0.0,
+   1
+  ],
+  [
+   0.0,
+   0
+  ],
+  [
+   100.0,
+   1
+  ],
+  [
+   100.0,
+   0
+  ]
+ ],
+ "practice": [
+  [
+   0.0,
+   10
+  ],
+  [
+   100.0,
+   10
+  ]
+ ],
+ "feedback": true,
+ "pre_ms": 40.0,
+ "post_ms": 80.0,
+ "ready_ms": 400,
+ "feedback_ms": 500,
+ "blank_ms": 600,
+ "max_peak": 0.95,
+ "uncal_peak_60db": 0.02
+}
